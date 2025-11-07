@@ -124,4 +124,4 @@ The Analytics tab  integrates visual dashboards through **django-plotly-dash**. 
 6. Monitors progress and sends notifications.  
 7. Optionally analyzes data through Analytics tab.
 
-**End of JDash System Overview**  
+
