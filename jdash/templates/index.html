@@ -1,0 +1,228 @@
+{% extends 'base.html' %}
+{% load custom_tags %}
+{% load static %}
+{% block content %}
+
+<script src="{% static 'js/jquery.min.js' %}"></script>
+<link href="{% static 'css/bootstrap-table.min.css' %}" rel="stylesheet">
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css">
+<script src="{% static 'js/bootstrap-table.min.js' %}"></script>
+<script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
+<script src="{% static 'js/main.js' %}"></script>
+<script src="{% static 'js/popper.js' %}"></script>
+
+<div class="row mb-4">
+	<ul class="nav nav-tabs">
+	<li class="nav-item">
+	  <a class="nav-link active" aria-current="page" href="{%url 'home' %}">Studies</a>
+	</li>
+	<li class="nav-item">
+	  <a class="nav-link" href="{%url 'survey' %}">Survey</a>
+	</li>
+	<li class="nav-item">
+	  <a class="nav-link" href="{%url 'analytics' study_name='all' %}">Analytics</a>
+	</li>
+  </ul>
+</div> 
+	<div class="row mb-4" >
+		<div  class="col-md-6 col-lg-4">
+			{% if not request.user|has_group:"Viewer"  %}
+			<a id="add" class="btn btn-outline-primary btn-block" role="button" href="{%url 'add_study' %}">
+				Add Study
+			</a>
+			{% endif %}
+			
+		</div>
+		<div class="col-md-6 col-lg-6">
+			{% if messages %}
+            <ul class="messages">
+                {% for message in messages %}
+                <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+		</div>
+		<div class="col-md-6 col-lg-2 justify-content-end d-flex">
+			<div class="btn-group float-right">
+				<div class="btn-group btn-group-toggle" data-toggle="buttons">
+				  
+				  <label id="grid" class="btn btn-outline-dark"  >
+					<input type="radio" name="layout" id="layout1" checked> Grid 
+				  </label>
+				  <label id="list" class="btn btn-outline-dark " >
+					<input type="radio" name="layout" id="layout2" > List
+				  </label>
+				</div>
+			</div>
+		</div>
+	</div>
+	
+
+	<div id="index-list" class="row" style="display: none;">
+			<div id = "toolbar"  role="toolbar" aria-label="Toolbar with button groups">
+				
+				<div class="btn-group mr-4" role="group" aria-label="First group">
+				  <button type="button" class="btn btn-warning btn-sm ">subjects in study </button>
+				  
+				</div>
+				<div class="btn-group mr-4" role="group" aria-label="Second group">
+				  <button type="button" class="btn btn-success btn-sm">subjects completed study</button>
+				 
+				</div>
+				<div class="btn-group mr-4" role="group" aria-label="Third group">
+				  <button type="button" class="btn btn-primary btn-sm">subjects left study </button>
+				</div>
+				<div class="btn-group" role="group" aria-label="Third group">
+					<button type="button" class="btn btn-danger btn-sm">subjects removed</button>
+				  </div>
+			  </div>
+
+		<table
+			id="index_table" class="table table-responsive"
+			data-search="true"
+			data-toolbar="#toolbar"
+			data-pagination="true"
+			data-sort-name="created_date"
+			data-sort-order="desc"
+			data-id-field="study_name"
+			data-page-list="[10, 25, 50, 100, all]"
+			data-response-handler="responseHandler">
+
+			<thead>
+				<tr>
+					<th data-field="study_name" data-sortable="true"> Name</th> 
+					<th data-field="no_of_subjects" > Enrolled subjects</th>
+					<th data-field="study_desc"> Description</th> 
+					<th data-field="created_date" data-sortable="true" data-visible="false">Created Date</th> 
+					<th data-field="sensors" >Sensors</th>
+					<th data-events="operateEvents">Actions</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for study in study_meta%} 
+				<tr id="tr-{{study.title}}">
+					<td>{{study.title}}</td>
+					{% if study.stats %} 
+					<td>
+						<div class="progress">
+							<div class="progress-bar" role="progressbar" style="width: {{study.stats.leftstudy_percentage}}% " aria-valuenow="{{study.stats.leftstudy}}" 
+							data-toggle="tooltip" data-placement="top" title="{{study.stats.leftstudy}} Left study" aria-valuemin="0" aria-valuemax="100"></div>
+							<div class="progress-bar bg-danger" role="progressbar" style="width: {{study.stats.removed_percentage}}%" aria-valuenow="{{study.stats.removed}}" 
+							data-toggle="tooltip" data-placement="top" title="{{study.stats.removed}} Removed" aria-valuemin="0" aria-valuemax="100"></div>
+							<div class="progress-bar bg-success" role="progressbar" style="width: {{study.stats.completed_percentage}}%" aria-valuenow="{{study.stats.completed}}" 
+							data-toggle="tooltip" data-placement="top" title="{{study.stats.completed}} Completed" aria-valuemin="0" aria-valuemax="100"></div>
+							<div class="progress-bar bg-warning" role="progressbar" style="width: {{study.stats.instudy_percentage}}%" aria-valuenow="{{study.stats.instudy}}" 
+							data-toggle="tooltip" data-placement="top" title="{{study.stats.instudy}} InStudy" aria-valuemin="0" aria-valuemax="100">
+								</div>
+					  	</div>
+					</td>
+					{% else %} 
+					<td>No enrolled subjects</td>
+					{% endif %}
+					<td>{{study.description}}</td>
+					<td>{{study.createdDate}}</td>
+					<td> {{study.sensor_list | get_sensor_codes:study.current_sensor_list |safe }}</td>
+					<td><a class="view"  href="{% url 'details' study_name=study.title %}"  >
+						<i class="fa fa-eye fa-lg"></i></a>
+						{% if request.user|has_group:"Investigator" or request.user|has_group:"administrator" %}
+						<a class="edit" href="{% url 'edit_study' study_name=study.title %}"  >
+							<i class="fa fa-edit fa-lg"></i></a>
+                        <a class="test" href="{% url 'qc_study' study_name=study.title %}"  >
+								<i class="fa fa-check-square fa-lg" aria-hidden="true"></i>
+							</a>
+							{% endif %}
+					</td>
+					
+				</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+	</div>
+    <div id="index-grid" class="row mt-4">
+		<div class="mb-2 d-flex justify-content-end">
+			<input id="study-search"
+         type="search"
+         class="form-control form-control w-auto"
+         placeholder="Search"
+         style="min-width: 200px;">
+		  </div>
+		  <div class="row g-3 mx-0">
+			{% for study in study_meta %}
+			  <div class="col-12 col-md-6 col-lg-4 col-2048-3 study-card"
+				   data-title="{{ study.title|escape }}">
+				<div class="wrimagecard wrimagecard-topimage">
+				  <div class="wrimagecard-topimage_header">
+					<h2 class="h4 text-center">{{ study.title }}</h2>
+				  </div>
+				  <div class="wrimagecard-topimage_title h-140">
+					<p>{{ study.description }}</p>
+				  </div>
+				  <div class="card-action-bar">
+					<a class="float-lg-none link" href="{% url 'details' study_name=study.title %}">View</a>
+					{% if request.user|has_group:"Investigator" or request.user|has_group:"administrator" %}
+					<a class="float-lg-none link" href="{% url 'edit_study' study_name=study.title %}">Edit</a>
+					<a class="float-lg-none link" href="{% url 'qc_study' study_name=study.title %}">QC</a>
+					{% endif %}
+				  </div>
+				</div>
+			  </div>
+			{% endfor %}
+		  </div>
+	<div id="no-results" class="text-muted text-center py-4" style="display:none;">
+		No studies match your search.
+	  </div>
+	</div>
+
+	<script>
+		(() => {
+		  const input = document.getElementById('study-search');
+		  const count = document.getElementById('study-search-count');
+		  const noResults = document.getElementById('no-results');
+		  const cards = Array.from(document.querySelectorAll('#index-grid .study-card'));
+
+		  // normalize: lower-case + strip accents
+		  const norm = s => (s || '')
+			.toString()
+			.normalize('NFD')
+			.replace(/\p{Diacritic}/gu, '')
+			.toLowerCase()
+			.trim();
+
+		  const items = cards.map(card => ({
+			card,
+			key: norm(card.getAttribute('data-title'))
+		  }));
+
+		  let timer = null;
+		  function applyFilter(q) {
+			const nq = norm(q);
+			let shown = 0;
+
+			items.forEach(({ card, key }) => {
+			  const hit = !nq || key.includes(nq);
+			  card.style.display = hit ? '' : 'none';
+			  if (hit) shown++;
+			});
+
+			noResults.style.display = shown ? 'none' : '';
+			count.textContent = (!nq || shown === cards.length) ? '' : `${shown} of ${cards.length}`;
+		  }
+
+		  input.addEventListener('input', () => {
+			clearTimeout(timer);
+			timer = setTimeout(() => applyFilter(input.value), 120);
+		  });
+
+		  // optional: ESC to clear
+		  input.addEventListener('keydown', (e) => {
+			if (e.key === 'Escape' && input.value) {
+			  input.value = '';
+			  applyFilter('');
+			}
+		  });
+
+		  // init (handles bfcache)
+		  applyFilter(input.value);
+		})();
+	</script>
+{% endblock %}

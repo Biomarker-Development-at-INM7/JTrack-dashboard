@@ -1,0 +1,228 @@
+{% extends 'base.html' %}
+{% load custom_tags %}
+{% load static %}
+{% block content %}
+<link href="{% static 'css/bootstrap-table.min.css' %}" rel="stylesheet">
+<link href="{% static 'css/form.css' %}" rel="stylesheet">    
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css">
+<script src="{% static 'js/bootstrap-table.min.js' %}"></script>
+<script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
+<script src="{% static 'js/main.js' %}"></script>
+<script src="{% static 'js/popper.js' %}"></script>
+<script type="text/javascript">
+document.addEventListener('DOMContentLoaded', function() {
+	document.getElementById('id_0_remove_btn').disabled = true
+    const submitButton = document.getElementById('submitButton');
+    const sensorListLimited = document.getElementById('sensor_list_limited');
+    const taskFormset = document.getElementById('form-0');
+    if (submitButton) {
+        submitButton.addEventListener('click', function(event) {
+            var sensorsSelected = sensorListLimited.selectedOptions.length > 0;
+
+            var taskFormsFilled = false;
+            var taskInputs = taskFormset.querySelectorAll('input, select, textarea');
+            
+            for (var i = 0; i < taskInputs.length; i++) {
+                if (taskInputs[i].value.trim() !== '') {
+                    taskFormsFilled = true;
+                    break;
+                }
+            }
+
+            if (sensorsSelected && !taskFormsFilled) {
+                event.preventDefault();  // Prevent form submission
+                alert('Please fill out at least one task form if sensors are selected.');
+            }
+        });
+    } else {
+        console.error('Element with ID submitButton not found.');
+    }
+});
+	</script>
+<div class="row mb-4">
+	<ul class="nav nav-tabs">
+	<li class="nav-item">
+	  <a class="nav-link active" aria-current="page" href="{%url 'home' %}">Studies</a>
+	</li>
+	<li class="nav-item">
+	  <a class="nav-link" href="{%url 'survey' %}">Survey</a>
+	</li>
+	<li class="nav-item">
+	  <a class="nav-link" href="{%url 'analytics' study_name='all' %}">Analytics</a>
+	</li>
+  </ul>
+</div> 
+	<div class="row">
+		<div class="col-xs-12 col-sm-6">
+			<div class="row">
+			<div class="col-lg-4">
+				<h2>New Study</h2>
+				</div>
+			<div class="col-lg-6">
+				
+				
+			</div>
+			
+			</div>
+			
+		</div>
+		<div class="col-xs-12 col-sm-9">
+				{% if error_message %}
+						<p class="text-danger">{{ error_message}}</p>
+				{% endif %}
+
+			</div>
+	</div>
+	
+		<form action="{%url 'add_study' %}" method="POST" enctype="multipart/form-data">
+			{% csrf_token %}
+			<div class="row">
+			<div class="col-xs-12 col-sm-6" >
+
+				<div class="form-group required mb-4">
+					{{study_form.study_label}}
+					<label>Study name</label>
+					<span><small><i>Please dont use spaces between strings and any special characters</i></small></span>
+				</div>
+				<div class="row mb-4">
+					<div class="col form-group">
+
+						{{study_form.study_duration}}
+						
+						<label>Duration</label>	
+						<span><small><i>days</i></small></span>
+					</div>
+					<div class="col form-group">
+						
+						{{study_form.number_of_subjects}}<label>Number of subjects</label>
+						<span><small><i></i></small></span>
+					</div>
+					<div class="col form-group">
+						
+						{{study_form.recording_freq}}
+						<label>Recording frequency</label>
+						<span><small><i></i></small></span>
+					</div>
+				</div>
+				
+				<div class="row mb-4">
+					<div class="col form-group" >
+						
+						{{study_form.sensor_list}}
+						<label>Passive sensors</label>
+						<span><small><i>Please  use ctrl/cmd key for multiple select</i></small></span>
+					</div>
+				
+					<div class="col form-group">
+						
+						{{study_form.sensor_list_limited}}
+						<label>Active sensors</label>
+						<span><small><i>Please  use ctrl/cmd key for multiple select</i></small></span>
+					</div>
+				
+				</div>
+				
+				
+				<div class="form-outline" id="task_details_form"  >
+					
+					{{ task_formset.management_form }}
+					
+
+					<div  >
+						<button  id="add-task" type="button" class="btn btn-secondary mb-4" onclick="add_task_form(this.id)"> Add Task</button>	
+						{% for task_form in task_formset %}
+							<div id="form-0" class="task-formset mb-4" >
+								
+								<div class="row  mb-4 ">
+									<div class="col-sm-4 form-group">
+										{{task_form.task_name}}
+										<label>Task name</label>
+									</div>
+									<div class="col-sm-4">
+										<div class="form-group ">
+											{{task_form.task_preparation}}
+											
+											<label>Task preparation</label>
+											<span><small><i>in seconds</i></small></span>
+										</div>
+									</div>
+									<div class="col-sm-3">
+										<div class="form-group ">
+											{{task_form.task_duration}}
+											<label>Task duration</label>
+											<span><small><i>in seconds</i></small></span>
+										</div>
+									</div>
+									<div class="col-sm-1">
+									<a id="id_0_remove_btn" type="button" class="btn btn-outline-danger btn-sm " onclick="remove_task_form(this.id)" ><i class="fa fa-trash fa-lg" ></i></a>	
+									</div>
+								</div>
+								<div class="row mb-4">
+									<div class="form-group">
+										{{task_form.task_description}}
+										<label>Task description</label>
+										<span><small><i>Text area to describe to task</i></small></span>
+									</div>
+								</div>
+								
+								
+								
+							</div>
+							{% endfor %}
+					
+					
+					</div>	
+				
+				
+				
+				</div>
+				
+			</div>
+			<div class="col-xs-12 col-sm-4 " style="margin-left: 20px;">
+				<div class="form-check mb-4">{{study_form.is_test}} Test Study 
+					<span class="d-inline-block" tabindex="0" data-toggle="tooltip" title="Please select if the study is used for test">
+						<i class="fa fa-question-circle  text-secondary" aria-hidden="true"></i>
+					</span>
+				</div>
+				
+				<div class="form-group required mb-4">
+					{{study_form.study_description}}
+					<label>Study description</label>
+				</div>
+				<div class="form-check mb-4">{{study_form.ema_checkbox}} Ecological momentary assessment 
+					<span  data-toggle="tooltip" data-placement="right" title=' {{info_text.ema}}'>
+						<i class="fa fa-question-circle  text-secondary" aria-hidden="true"></i>
+					</span>
+				</div>
+				<div id="ecological_momentary_form" style="display: none; " >
+					<div class="row mb-4">
+						<div class="form-group required mb-4">
+							{{study_form.survey}}
+							<label>Survey title</label>
+						</div>
+						<div class="col-sm-9 file-drop-area"> 
+							<span class="choose-file-button">OR Upload EMA Json file</span>
+							<span class="file-message">Drag and drop or Select File</span>
+							{{study_form.json_file}} 
+						</div>
+							
+						
+					</div>
+					<div class="row mb-4">
+							<div class="file-drop-area"> 
+								<span class="choose-file-button">Upload EMA images zip file</span>
+								<span class="file-message">Drag and drop or Select File</span>
+								{{study_form.images_zip_file}}
+								</div>
+						
+						</div>
+					
+				</div>
+
+			
+			</div>	
+	</div>
+	<input id='submitButton' name="create_new_study" type="submit" value="Create Study" class="btn btn-primary btn-block mb-8" />	
+</form>
+	
+{% endblock %}		 

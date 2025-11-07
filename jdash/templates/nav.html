@@ -1,0 +1,27 @@
+{% load static %}
+
+<nav class="navbar sticky-top navbar-light bg-light">
+  <div class="container-fluid">
+      <div class="col-sm-6 d-flex align-items-right">
+         <a href="{%url 'home' %}"><img src="{% static 'icons/logo.png' %}"
+                                        height="75"></a>
+    <div id="title-div">
+      <a href="{%url 'home' %}"><h1 id="title">JDash</h1></a>
+      <h6 id="subtitle">                                                         
+      <span>by </span>                                                         
+        <a href="https://www.fz-juelich.de/inm/inm-7/EN/Forschung/Biomarker%20Development/artikel.html?nn=654270" rel="noreferrer" target="_blank">Biomarker Development Group, INM-7</a>
+      </h6>
+    </div>
+      </div>
+      <div class="col-sm-2 d-flex align-items-left justify-content-end">
+    {% if user.is_authenticated %}
+    <div class="media-body ml-2">
+      <span class="mb-0 text-sm  font-weight-bold" style="color: black;">{{user.username}}</span>
+      <a href="{%url 'logout' %}"><img src="{% static 'icons/logout-58.png' %}" height="35"></a>
+    </div>
+
+    {% endif %}
+      </div>
+  </div>
+  
+  </nav>

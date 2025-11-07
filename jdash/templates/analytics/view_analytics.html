@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% load custom_tags %}
+{% load static %}
+{% block content %}
+{% load plotly_dash %}
+
+<div class="row mb-4">
+  <ul class="nav nav-tabs">
+    <li class="nav-item">
+      <a class="nav-link " aria-current="page" href="{%url 'home' %}">Studies</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="{%url 'survey' %}">Survey</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link active" href="{%url 'analytics' study_name='all' %}">Analytics</a>
+    </li>
+    </ul>
+</div>
+
+
+    <div class="row">
+      
+        
+        <div class="col-xs-12 col-sm-9" style="display: flex; justify-content: flex-end">
+            
+          {% if messages %}
+          <ul class="messages">
+              {% for message in messages %}
+              <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+              {% endfor %}
+          </ul>
+          {% endif %}
+            
+            
+        </div>
+        <div id="session-id" style="display: none;" data-username="{{ initial_args }}" data-session-key="{{ session_id }}">
+          
+        </div>
+        
+        <div class="{% plotly_class name='janalytica' %} " style="height: 100%; width: 100%;">
+          {% plotly_app name='janalytica' ratio=1 initial_arguments=initial_args %}
+        </div>
+
+      <br>
+      {{ plot | safe }}
+      <br>
+        
+    </div> 
+ 
+{% endblock %}

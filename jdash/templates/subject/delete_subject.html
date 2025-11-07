@@ -1,0 +1,69 @@
+{% extends 'login_base.html' %}
+{% load static %}
+{% block content %}
+<div class="row justify-content-center mt-5">
+  <div class="col-xl-8 col-lg-4 col-md-6">
+    <h5>
+      Wichtige Informationen zu Ihrer Anfrage zur Löschung Ihrer Daten</h5>
+    <p>Bitte lesen Sie die folgenden Informationen sorgfältig durch, bevor Sie Ihre Anfrage zur dauerhaften Löschung Ihrer Daten einreichen.</p>
+    
+    <ul>
+      <li>
+        <strong>Anonymisierung der Daten: </strong>Wir möchten Ihnen versichern, dass Ihre Privatsphäre für uns von höchster Bedeutung ist. Bevor Daten in Forschung oder Veröffentlichungen verwendet werden, werden alle Daten gründlich anonymisiert, um sicherzustellen, dass die Informationen nicht auf eine einzelne Person zurückgeführt werden können.
+      </li>
+      <li>
+        <strong>Verwendung in wissenschaftlichen Veröffentlichungen: </strong>Es ist wichtig zu verstehen, dass wir anonymisierte Daten für wissenschaftliche Forschung und Veröffentlichungen nutzen. Sobald Ihre Daten in solchen Veröffentlichungen verwendet wurden, ist es möglicherweise nicht mehr möglich, sie zurückzuziehen oder zu löschen. Dies liegt an der dauerhaften Natur veröffentlichter wissenschaftlicher Arbeiten und dem Beitrag, den Ihre Daten zur wissenschaftlichen Gemeinschaft geleistet haben.</li>
+      <li>
+        <strong>Bearbeitungszeit:</strong> Der Löschvorgang beginnt sofort nach Erhalt Ihrer Anfrage. Es kann jedoch 1-2 Arbeitstage dauern, bis die Daten vollständig aus unseren Systemen entfernt sind. Dieser Zeitrahmen ermöglicht es uns, sicherzustellen, dass alle zugehörigen Daten gründlich und sicher gelöscht werden.</li>
+      <li>
+        <strong>Unumkehrbare Aktion: </strong> Sobald Ihre Anfrage zur Datenlöschung bearbeitet wurde, kann die Aktion nicht rückgängig gemacht werden. </ul>
+    <br>
+    <p>
+      Indem Sie auf „Submit“ klicken, bestätigen Sie, dass Sie diese Informationen gelesen und verstanden haben und dass Sie mit der Anforderung zur Datenlöschung fortfahren möchten.</p>
+  </div>
+    <div class="col-xl-4 col-lg-4 col-md-6">
+        
+        <div class="card-body " style="background-color: #212529;">
+            {% if error_message %}
+            <p class="bg-danger p-d ml-b">{{ error_message }}</p>
+            {% endif %}
+            <h5 style="text-align: center;color: white;">Datenanforderung löschen</h5>
+            <p style="text-align: center;color: white;">Füllen Sie dieses Formular aus, um Daten zu löschen</p>
+            <form action="{%url 'delete_subject_data' %}" method="POST" >
+                {% csrf_token %}
+                <div >
+                    
+                    <!-- Name input -->
+                    <div class="form-outline mb-4">{{delete_subject_form.subjectId}}
+                      <span style="color: white;"><small><i>Bitte geben Sie die in Ihrer JTrack-App angezeigte Kennung ein, wenn Sie auf den Menüreiter klicken.</i></small></span>
+                   
+                       </div>
+                       
+                    <!-- Email input -->
+                    <div class="form-outline mb-4 mt-2">{{delete_subject_form.email}}
+                      
+                    </div>
+      
+                    <!-- Message input -->
+                    <div class="form-outline mb-4 mt-2">{{delete_subject_form.reason}}
+                    </div>
+      
+                    <!-- Checkbox 
+                    <div class="form-check d-flex justify-content-center mb-4">
+                      <input class="form-check-input me-2" type="checkbox" value="" id="form4Example4" checked />
+                      <label class="form-check-label" for="form4Example4">
+                        Send me a copy of this message
+                      </label>
+                    </div>-->
+                </div>
+                <div class="form-outline mb-4">
+                    <input name="delete_subject_data" type="submit"  value="Submit" role="button" class="btn btn-outline-light"  >
+                </div>
+            </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+{% endblock %}
+

@@ -1,0 +1,267 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load custom_tags %}
+{% load django_browser_reload %}
+{% block content %}
+
+<script src="{% static 'js/jquery.min.js' %}"></script>
+<link href="{% static 'css/form.css' %}" rel="stylesheet">
+<link href="{% static 'css/bootstrap-table.min.css' %}" rel="stylesheet">
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css">
+<script src="{% static 'js/bootstrap-table.min.js' %}"></script>
+<script src="{% static 'js/bootstrap-table-export.min.js' %}"></script>
+<script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
+<script src="{% static 'js/survey.js' %}"></script>
+<script src="{% static 'js/popper.js' %}"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+<style>
+  input[type="checkbox"] {
+      transform: scale(1.5); /* Increase the scale value to make it larger */
+      margin-right: 10px; /* Adjust spacing as needed */
+  }
+</style>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const modal = document.getElementById('categoryModal');
+    const form = modal.querySelector('form');
+    const originalFormHTML = form.innerHTML; // Store original HTML when DOM is loaded
+  
+    modal.addEventListener('hidden.bs.modal', function () {
+      form.innerHTML = originalFormHTML; // Reset form content
+    });
+  });
+</script>
+<div class="modal fade" id="categoryModal" tabindex="-1" aria-labelledby="categoryModalLabel">
+	<div class="modal-dialog">
+	  <div class="modal-content">
+		<div class="modal-header">
+		  <h5 class="modal-title" id="categoryeModalLabel"> Categories</h5>
+		  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+		</div>
+		<form action="{%url 'create_categories' survey_id=survey_id %}" method="POST" >
+			{% csrf_token %}
+			<div class="modal-body" id="category_details_form">
+				{{ category_formset.management_form }}
+                <div class="row  mb-4 ">
+          <div class="col">
+          <button  id="add-category" type="button" class="btn btn-secondary mb-4"
+            onclick="add_category_form(this.id)"> Add Category</button>	</div>
+          <div class="col form-check form-switch form-switch-md mb-4">
+            <input type="checkbox" name="collect_subject_id_flag" class="form-check-input"
+            placeholder="Collect User ID" id="collect_subject_id_flag"  />
+            <label>Collect User ID</label><br>
+            <span><small><i>Select the checkbox if user id needs to be collected.</i></small></span>
+          </div>
+        </div>
+
+          <!-- Initial row -->
+          {% for category_form in category_formset %}
+          <div id="category-form-{{forloop.counter|add:-1 }}" class="category-formset mb-4" >
+            
+            <div class="row  mb-4 ">
+                <div class="col-sm-4 form-group">
+                  {{category_form.categoryTitle}}
+
+                  <label>Title</label>
+                  <span><small><i>The category name</i></small></span>
+                </div>
+                <div class="col-sm-1">
+                  <a id="id_{{forloop.counter|add:-1}}_remove_btn" type="button" class="btn btn-outline-danger btn-sm " onclick="remove_category_form(this.id)" ><i class="fa fa-trash fa-lg" ></i></a>
+                </div>
+            </div>
+            
+          </div>
+            
+          {% endfor %}
+
+			</div>
+			<div class="modal-footer">
+				<input name="manage_categories" type="submit"  value="Update" role="button" class="btn btn-primary"  >
+			</div>
+		</form>
+	  </div>
+	
+	</div>
+</div>
+
+<div class="modal fade" id="updateSurveyModal" tabindex="-1" aria-labelledby="updateSurveyLabel" >
+	<div class="modal-dialog">
+	  <div class="modal-content">
+		<div class="modal-header">
+		  <h5 class="modal-title" id="updateSurveyLabel">Update Survey</h5>
+		  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+		</div>
+		<form action="{%url 'create_survey' survey_id=survey_id %}" method="POST" >
+			{% csrf_token %}
+			<div class="modal-body">
+				
+
+				<div class="form-group required mb-4">
+					
+						{{survey_form.title}}	 <label >Title </label>  
+				</div>	
+				<div class="form-group required mb-4">	
+						{{survey_form.description}}
+						<label >Description </label>  
+				</div>
+        <div class="form-check form-check-inline mb-4"   >
+          <label class="form-check-label">Scroll Type</label>  
+          <span><small><i>({{survey_help_text.scrolling}})</i></small></span>  	
+          {{ survey_form.scrolling}} 
+        </div>
+			</div>
+			<div class="modal-footer">
+				<input name="update_survey_info" type="submit"  value="Update" role="button" class="btn btn-primary"  >
+			</div>
+		</form>
+	  </div>
+	
+	</div>
+</div>
+
+
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="deleteModalLabel">Delete Question</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id = "deleteQuestionForm" action="{%url 'delete_question' %}" method="POST" >
+        {% csrf_token %}
+        <div class="modal-body">
+        Confirm to delete question 
+      </div>
+      
+      
+      <div class="modal-footer">
+        <input id = "survey_id" name="survey_id" type="hidden"  value="{{survey_id}}"   />
+        <input type="submit" name="delete_question" value="Confirm"  class="btn btn-primary" onclick="delete_quest()" />
+      </div>
+    </form>
+    </div>
+  </div>
+</div>
+
+
+
+<div class="row mb-4">
+  <ul class="nav nav-tabs">
+    <li class="nav-item">
+      <a class="nav-link "  href="{%url 'home' %}">Studies</a>
+    </li>
+    {% if request.user|has_group:"Investigator" or request.user|has_group:"administrator" %}
+	<li class="nav-item">
+	  <a class="nav-link active" aria-current="page" href="{%url 'survey' %}">Survey</a>
+	</li>
+	{% endif %}
+    <li class="nav-item">
+      <a class="nav-link" href="{%url 'analytics' study_name='all' %}">Analytics</a>
+    </li>
+    </ul>
+</div>
+<div class="row">
+
+
+        <div class="col-lg-4">
+          <h3>  <a class="edit"  href="" data-id="" data-bs-toggle="modal" data-bs-target="#updateSurveyModal" ><i class="fas fa-pencil-alt "></i></a>{{survey_title}} </h3> 
+        </div>
+        <div class="col-lg-6">
+          {% if messages %}
+            <ul class="messages">
+                {% for message in messages %}
+                <li>{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+        <div class="col-lg-2">
+        <a name="survey_json" href="{%url 'download_json' survey_id=survey_id  %}" data-bs-toggle="tooltip" title="Export JSON" download >
+          <img src="{% static 'icons/json_download.png' %}" height="45" style="float: right;"> </a>
+      </div>
+ 
+      
+
+
+</div>
+<div class="row">
+  <div id="toolbar" >
+      <button  id="addCategory"  class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#categoryModal">
+      Categories
+      </button>
+      <a id="new_question" role="button" class="btn btn-outline-primary" href="{%url 'manage_question' survey_id=survey_id question_id=0 %}" >
+      New Question
+      </a>
+    
+  </div>
+  <!-- use a button to save all question to database or while exporting to json-->
+    <table id ="quest_table" class="table-responsive"
+    data-toolbar="#toolbar"
+    data-search="true"
+    data-pagination="true"
+    data-id-field="quest_id"
+    data-page-list="[10, 30, 50, 100, all]"
+    >
+      <thead >
+        <tr >
+          <th  data-visible="false">dbid</th>
+          <th  >id</th>
+          <th  >title</th>
+          <th  >subText</th>
+          <th  >questionType</th>
+          <th  >category</th>
+          <th  >frequency</th>
+          <th  >clockTimeStart </th>
+          <th  >clockTimeEnd</th>
+          <th  >nextDayToAnswer</th>
+          <th  data-visible="false" >imageURL</th>
+          <th  data-visible="false" >url</th>
+          <th  data-visible="false" >deactivateOnDate</th>
+          <th  data-visible="false"  >deactivateOnAnswer</th>
+          <th  data-visible="false"  >activate_question</th>
+          <th  data-visible="false"  >deactivate_question</th>
+          <th  data-visible="false"  >activation_condition</th>
+          <th  data-visible="false"  >deactivation_condition</th>
+          <th  data-events="createOperateEvents" >actions</th>
+        </tr>
+        
+      </thead>
+      <tbody>
+        {% for question in questions %}
+        <tr>
+          <td id="db_id">{{question.db_id}}</td>  
+          <td id="quest_id">{{question.id}}</td>
+          <td id='questionTitle'>{{question.title}}</td>
+          <td id='subText'>{{question.subText}}</td>
+          <td id='questionType'>{{question.questionType | get_question_category}}</td>
+          <td id='category'>{{question.category}} </td>
+          <td id='frequency'>{{ question.frequency}}</td>
+          <td id='clockTimeStart'>{{ question.clockTime_start}}</td>
+          <td id='clockTimeEnd'>{{ question.clockTime_end}}</td>
+          <td id='nextDayToAnswer'>{{ question.nextDayToAnswer}}</td>
+          <td data-visible="false">{{ question.imageURL}}</td>
+          <td data-visible="false">{{ question.url}}</td>
+          <td data-visible="false">{{ question.deactivateOnDate}}</td>
+          <td data-visible="false">{{ question.deactivateOnAnswer}}</td>
+          <td data-visible="false">{{ question.activate_question}}</td>
+          <td data-visible="false">{{ question.deactivate_question}}</td>
+          <td data-visible="false">{{ question.activation_condition}}</td>
+          <td data-visible="false">{{ question.deactivation_condition}}</td>
+          <td>  
+              {% if not request.user|has_group:"Viewer"  %}
+            <a class="edit" name="edit_question" title="Edit" href="{%url 'manage_question' survey_id=survey_id question_id=question.db_id %}"  ><i class="fa fa-edit fa-lg"></i></a>
+            <a class="copy" name="copy_question" href="{%url 'duplicate_question' survey_id=survey_id question_id=question.db_id %}" title="Duplicate"  data-id="{{question}}"  ><i class="fa fa-copy fa-lg"></i></i></a>
+            <a class="delete" href="#" title="Delete" data-id="{{question}}" data-bs-toggle="modal" data-bs-target="#deleteModal"  ><i class="fa fa-trash fa-lg"></i></a>
+            {% else %}
+            <a class="view"  href="" title="View"  href="{%url 'manage_question' survey_id=survey_id question_id=question.db_id %}"  ><i class="fa fa-eye fa-lg"></i></a>
+            {% endif %}
+        </td>
+
+        </tr>
+        {% endfor  %}
+      </tbody>
+    </table>
+      
+</div>
+{% endblock %}	

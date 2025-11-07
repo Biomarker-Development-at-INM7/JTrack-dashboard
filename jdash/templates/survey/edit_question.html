@@ -1,0 +1,357 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load custom_tags %}
+{% load django_browser_reload %}
+{% block content %}
+
+<script src="{% static 'js/jquery.min.js' %}"></script>
+<link href="{% static 'css/form.css' %}" rel="stylesheet">
+<link href="{% static 'css/bootstrap-table.min.css' %}" rel="stylesheet">
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css">
+<script src="{% static 'js/bootstrap-table.min.js' %}"></script>
+<script src="{% static 'js/bootstrap-table-export.min.js' %}"></script>
+<script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
+<script src="{% static 'js/survey.js' %}"></script>
+<script src="{% static 'js/popper.js' %}"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script>
+  // Run on initial load
+  window.addEventListener('DOMContentLoaded', toggleDeactivateConditionsField);
+
+  // Optional: also re‑run whenever the textarea changes
+  document.addEventListener('DOMContentLoaded', function() {
+    const deactivate_questions_list = document.getElementById('deactivate_question');
+    if (deactivate_questions_list) {
+      deactivate_questions_list.addEventListener('input', toggleDeactivateConditionsField);
+    }
+  });
+  // Run on initial load
+  window.addEventListener('DOMContentLoaded', toggleActivateConditionsField);
+
+  // Optional: also re‑run whenever the textarea changes
+  document.addEventListener('DOMContentLoaded', function() {
+    const activate_questions_list = document.getElementById('activate_question');
+    if (activate_questions_list) {
+      activate_questions_list.addEventListener('input', toggleActivateConditionsField);
+    }
+  });
+
+  document.addEventListener("DOMContentLoaded", function() {
+  var form = document.getElementById("editQuestionForm");
+  if (form) {
+      show_answer_form();
+  }
+});
+
+</script>
+<div class="modal fade" id="updateModal" tabindex="-1" aria-labelledby="updateModalLabel" >
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="updateModalLabel">Information</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+          <p>If this survey is associated with a study, please follow these steps to update the study with the latest survey details:</p>
+          <ol>
+              <li>Navigate to the <strong>Studies</strong> section.</li>
+              <li>Select the relevant study linked to this survey and choose <strong>Edit</strong>.</li>
+              <li>Click on <strong>Update Study</strong> to ensure the study reflects the most recent survey information.</li>
+          </ol>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" name="update_question" onclick="editQuestion()" class="btn btn-secondary" data-dismiss="modal">Ok</button></div>
+    </div>
+  </div>
+</div>
+<div class="row mb-4">
+    <ul class="nav nav-tabs">
+      <li class="nav-item">
+        <a class="nav-link "  href="{%url 'home' %}">Studies</a>
+      </li>
+      {% if request.user|has_group:"Investigator" or request.user|has_group:"administrator" %}
+      <li class="nav-item">
+        <a class="nav-link active" aria-current="page" href="{%url 'survey' %}">Survey</a>
+      </li>
+      {% endif %}
+      <li class="nav-item">
+        <a class="nav-link" href="{%url 'analytics' study_name='all' %}">Analytics</a>
+      </li>
+      </ul>
+  </div>
+  <div class="row">
+
+
+    <div class="col-lg-4">
+      <h3>  <a class="view"  href="{%url 'create_survey' survey_id=survey_id %}"><i class="fas fa-eye  "></i></a>{{survey_title}} </h3> 
+    </div>
+    <div class="col-lg-6">
+      {% if messages %}
+          <ul class="messages">
+              {% for message in messages %}
+              <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+              {% endfor %}
+          </ul>
+      {% endif %}
+    </div>
+
+</div>
+
+<form  id ="editQuestionForm" action="{%url 'manage_question' survey_id=survey_id question_id=question_id  %}" method="POST" >
+    {% csrf_token %}
+      <div>
+            <!-- question form-->
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="row">
+                      <div class=" form-group required col-sm-4 mb-4" >
+                          {{ question_form.sortId}}
+                      <label >Sequence Id</label>
+                      <span><small><i>{{question_help_text.sortId}}</i></small></span>
+                      </div>
+                      <!--<div  class="col  required mb-4"  >
+                          {{question_form.active }}
+                          <label class="form-check-label">Is active question</label>
+                      </div>-->  
+                        <div  class=" col form-group  required mb-4" >
+                      {{question_form.questionType }}  
+                      <label >Type</label>	         
+                      <span><small><i>{{question_help_text.type}}</i></small></span>
+                  </div>
+                  </div>
+                <div class="form-group  required mb-4 " >
+                  {{ question_form.title}} 
+                  <label>Title</label>
+                  <span><small><i>{{question_help_text.title}}</i></small></span>
+                </div>	
+                <div class="form-group  required mb-4" >	
+                  {{ question_form.subText}}
+                  <label>Description</label>   	                   
+                  <span><small><i>{{question_help_text.description}}</i></small></span>
+                </div>
+                <div class="row">
+                  <div class="form-group col  mb-4" >
+                    {{ question_form.activate_question}} 
+                    <label >Activate question</label> 
+                    <span><small><i>{{question_help_text.activate_question}}</i></small></span>  
+                  </div>
+                  <div class=" form-group col mb-4" >
+                    {{ question_form.deactivate_question}}  
+                    <label >Deactivate question</label>  
+                    <span><small><i>{{question_help_text.deactivate_question}}</i></small></span>   	
+                  </div>
+                </div>
+                <div class="row">
+                  <div id = "activate_condition_div" class="form-group  col mb-4" style="display:none">
+                    {{ question_form.activation_condition}} 
+                    <label >Activation_condition</label> 
+                    <span><small><i>{{question_help_text.activation_condition}}</i></small></span>  
+                  </div>
+                    
+                  <div id = "deactivate_condition_div" class=" form-group col mb-4" style="display:none">
+                      {{ question_form.deactivation_condition}}  
+                      <label >Deactivation_condition</label>  
+                      <span><small><i>{{question_help_text.deactivation_condition}}</i></small></span>   	
+                  </div>
+                </div>
+                <div class="row">
+                    <div class=" form-group col mb-4" >
+                      {{ question_form.imageURL}}
+                      <label >Image Url</label>
+                      <span><small><i>{{question_help_text.imageURL}}</i></small></span>
+                    </div>
+                    <div class="form-group col mb-4" >
+                      {{ question_form.url}}
+                      <label >Url</label>
+                      <span><small><i>{{question_help_text.url}}</i></small></span>
+                    </div>
+                </div>
+              </div>
+              <div class="col-lg-6">
+                <div class="form-check form-switch form-switch-md mb-4">
+                  {{ question_form.default_value}}  Use default values for below form
+                  </button>
+                </div>
+                <div class="row">
+                  <div class="form-group col  required mb-4" >	
+                    {{ question_form.category}} 
+                    <label >Category</label>    
+                    <span><small><i>{{question_help_text.category}}</i></small></span>                  
+                  </div>
+                  <div class="form-group col required mb-4" >
+                    {{ question_form.frequency}} 
+                    <label >Frequency</label>
+                    <span><small><i>{{question_help_text.frequency}}</i></small></span>
+                  </div>
+                  <div class="form-group col required mb-4" >
+                    {{ question_form.nextDayToAnswer}} 
+
+                    <label >NextDayToAnswer</label>
+                    <span><small><i>{{question_help_text.firstDayToAnswer}}</i></small></span> 
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="form-group col  mb-4" >
+                    {{ question_form.deactivateOnAnswer}}
+                    <label >DeactivateOnAnswer</label>
+                    <span><small><i>{{question_help_text.deactivateOnAnswer}}</i></small></span>
+                  </div>
+                  <div class=" form-group col  required mb-4" >
+                    {{ question_form.deactivateOnDate}}
+                    <label >DeactivateOnDate</label>
+                    <span><small><i>{{question_help_text.deactivateOnDate}}</i></small></span>
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="form-group  required mb-4" style="display: none;">
+                    {{ question_form.clockTime}} 
+                    <label >ClockTime</label> 
+                  </div>
+                  <div class="form-group  required mb-4" >
+                    {{ question_form.clockTime_start}} 
+                    <label >ClockTime Start</label>
+                    <span><small><i>{{question_help_text.clockTime_start}}</i></small></span>  
+                  </div>
+                  
+                </div>
+                <div class="row">
+                  <div class="form-group  required mb-4" >
+                    {{ question_form.clockTime_end}} 
+                    <label >ClockTime End</label>
+                    <span><small><i>{{question_help_text.clockTime_end}}</i></small></span>  
+                  </div>
+                </div>
+                
+              </div>
+            </div>
+            <!-- answer form-->
+            <div class= "row" id="choice_details_form" >
+                <h5 id="answerForm_header" style="display: none;">Answer Form</h5>
+                {{ question_details.answer_formset.management_form }}	
+                <div class="mb-4">
+                  <button  id="add-choice" type="button" class="col-sm-2 btn btn-secondary"
+                      onclick="add_choices_form(this.id)" style="display: none;"> Add Choice</button>
+                </div>
+              <!--  {% if question_details.questionType > 3 %}
+                        <div id="choice-form-0" class="row choice-formset mb-4 " style="display: none;">
+                          <div class="col-sm-1 form-group mb-4" >
+                              <input type="number" name="form-0-answerSortId" value="" id="id_form-0-answerSortId">
+                            <label >Sequence id </label>
+                          </div>
+                          <div class="col-sm-10 form-group mb-4" >
+                            <input type="text" name="form-0-text" value="" maxlength="10000" id="id_form-0-text">
+                              <label >Choice </label>
+
+                          </div>
+                          <div class="col-sm-1">
+                            <a id="id_0_remove_btn" type="button" class="btn btn-outline-danger btn-sm " onclick="remove_choice_form(this.id)" ><i class="fa fa-trash fa-lg" ></i></a>
+                          </div>
+                        </div>
+                        <div  id="slidingAnswer-0" class="row mb-4" style="display: none;">
+                            <div class="col-sm-4 form-group  mb-4" >
+                                <input type="number" name="form-0-value"
+                                value="0.1" step="0.1" id="id_form-0-value">
+                            <label > Value </label>
+                            </div>
+                            <div class="form-group col-sm-4 mb-4" >
+                                <input type="number" name="form-0-defaultValue"
+                                value="0.1" step="0.1" id="id_form-0-defaultValue">
+                            <label >Default Value </label>
+                            </div>
+                            <div class="form-group col-sm-4 mb-4" >
+                                <input type="number" name="form-0-stepSize"
+                                                     value="0.1" step="0.1" id="id_form-0-stepSize">
+                            <label >Step size</label>
+                            </div>
+                        </div>
+                          <div id="slidingAnswer-1" class="row mb-4" style="display: none;">
+                              <div class="form-group col-md-3 mb-3" >
+                                  <input type="number" name="form-0-minValue"
+                                                       value="0.1" step="0.1" id="id_form-0-minValue">
+                                  <label >Minimum value</label>
+                              </div>
+                              <div class=" form-group col-md-3 mb-3" >
+                                  <input type="number" name="form-0-maxValue"
+                                                       value="0.1" step="0.1" id="id_form-0-maxValue">
+                                  <label >Maximum value</label>
+                              </div>
+                                  <div class="form-group col-md-3 mb-3" >
+                                      <input type="text" name="form-0-minText" value="" maxlength="100" id="id_form-0-minText">
+                                  <label >Minimum Text</label>
+                                  </div>
+                                  <div class="form-group col-md-3 mb-3" >
+                                      <input type="text" name="form-0-maxText" value="" maxlength="100" id="id_form-0-maxText">
+                                  <label >Maximum Text</label>
+                                  </div>
+                          </div>
+                          {% endif %} -->
+                    {% for answer_form in question_details.answer_formset %}
+                        {% with idx=forloop.counter0 %}
+                        <input id="answer_id" name="answer_id" type="hidden"  value="{{ question_details.answer|get_item:idx }}"   />
+                        <div id="choice-form-{{forloop.counter|add:-1 }}"
+                             class="row choice-formset mb-4 " style="display:
+                                    none;">
+                          <div class="form-group col-sm-1 mb-4" style="display: inline-block;">
+                            {{ answer_form.answerSortId}}
+                            <label >Sequence id </label>  
+                          </div>
+                          <div class="col-sm-8 form-group mb-4" style="display: inline-block;">	
+                          
+                              {{ answer_form.text}}   
+                              <label >Choice </label>  
+                              
+                          </div>
+                          <div class="col-sm-1" style="display: inline-block;">
+                            <a id="id_{{forloop.counter|add:-1 }}_remove_btn" type="button" class="btn btn-outline-danger btn-sm " onclick="remove_choice_form(this.id)" ><i class="fa fa-trash fa-lg" ></i></a>	
+                          </div>
+                        </div>
+                        <div  id="slidingAnswer-0" class="row" style="display: none;">
+                            <div class="col-sm-4 form-group  mb-4" >	
+                            {{answer_form.value }}  	         
+                            <label > Value </label>                       
+                            </div>
+                            <div class="form-group col-sm-4  mb-4" >
+                            {{answer_form.defaultValue}}
+                            <label >Default Value </label> 
+                            </div>
+                            <div class="form-group col-sm-4  mb-4" >
+                            {{answer_form.stepSize}}
+                            <label >Step size</label> 
+                            </div>
+                        </div>
+                          <div id="slidingAnswer-1" class="row" style="display: none;">
+                              <div class="col-sm-3 form-group  mb-4" >	
+                                  {{ answer_form.minValue}} 
+                                  <label >Minimum value</label>                     
+                              </div>
+                              <div class=" form-group col-sm-3   mb-4" >	
+                                  {{ answer_form.maxValue}}   
+                                  <label >Maximum value</label> 	                   
+                              </div>  
+                                  <div class="form-group col-sm-3  mb-4" >
+                                  {{ answer_form.minText}} 
+                                  <label >Minimum Text</label>
+                                  </div>
+                                  <div class="form-group col-sm-3  mb-4" >	
+                                  {{ answer_form.maxText}} 
+                                  <label >Maximum Text</label> 	                   
+                                  </div>
+                          </div>
+                        <div id= "subTextDiv" class="col-sm-4 form-group  mb-4" 
+                            style="display: none;">	                     
+                          {{ answer_form.answerSubText}}   
+                          <label >subText </label>
+                        </div>
+                      {% endwith %}
+                {% endfor %}
+            </div>
+
+            <input name="update_button" onclick="display_info()"   value="Update" role="button" class="btn btn-primary" />
+      </div>
+	
+</form>
+
+
+{% endblock %}		 

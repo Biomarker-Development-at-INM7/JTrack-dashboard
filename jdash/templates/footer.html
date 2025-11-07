@@ -1,0 +1,132 @@
+{% load static %}
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css">
+<div class="modal fade" id="contactModal" tabindex="-1" aria-labelledby="contactModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="contactModalLabel">Write to us</h5>
+          <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form action="{%url 'contact_email' %}" method="POST" >
+            {% csrf_token %}
+            <div class="modal-body">
+                
+                <!-- Name input -->
+                <div class="form-outline mb-4">{{contact_form.fullname}}
+                  
+                </div>
+  
+                <!-- Email input -->
+                <div class="form-outline mb-4">{{contact_form.email}}
+                  
+                </div>
+  
+                <!-- Message input -->
+                <div class="form-outline mb-4">{{contact_form.message}}
+                </div>
+  
+                <!-- Checkbox 
+                <div class="form-check d-flex justify-content-center mb-4">
+                  <input class="form-check-input me-2" type="checkbox" value="" id="form4Example4" checked />
+                  <label class="form-check-label" for="form4Example4">
+                    Send me a copy of this message
+                  </label>
+                </div>-->
+            </div>
+            <div class="modal-footer">
+                <input name="contact_message" type="submit"  value="Send Message" role="button" class="btn btn-primary"  >
+            </div>
+        </form>
+      </div>
+    
+    </div>
+  </div>
+
+<footer id="footer-div" class="footer-section">
+    <div class="container-fluid">
+        <div class="footer-cta">
+            <div class="row">
+                <div class="col-lg-6 ">
+                        <div class="row"> <a class="footer_link" href="https://www.fz-juelich.de/en/inm/inm-7/research-groups/biomarker-development" rel="noreferrer" target="_blank"><h1>Biomarker Development</h1></a></div>
+                        
+                       <div>We develop novel biomarkers that improve diagnosis, prognosis, and disease progression monitoring, which is an important step toward the development of effective treatment options for neuropsychiatric diseases.</div>
+                    </div>
+                    
+                    
+                
+                <div class="col-lg-3 mb-30">
+                    <div class = "row ">
+                        <div class="col-4 " >
+                    <img class="image--cover"  src="{% static 'icons/jtrack-ema.jpeg' %}" /></div>
+                    <div class = "col-6 mt-4 ">
+                        <div class = "row ">
+                        <a href="https://apps.apple.com/de/app/jtrack-ema/id1605100657?l=en" target="_blank" >
+                            <img src='http://upload.wikimedia.org/wikipedia/commons/0/0f/Available_on_the_App_Store_%28black%29_SVG.svg' /></a>
+                        </div><div class = "row ">
+                        <a href="https://play.google.com/store/apps/details?id=inm7.JTrack.JTrack_EMA_Plus" target="_blank">
+                            <img src='https://gallery.mailchimp.com/b88b3ba75f26335343bfecdc0/images/5e301e76-08a9-459e-ad1a-b9eab2f28c0c.png' /></a>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+                <div class="col-lg-3  mb-30">
+                    <div class = "row ">
+                        <div class = " col-4">
+                            <img class="image--cover" src="{% static 'icons/jtrack-social.jpeg' %}" />
+                        </div>
+                        <div class = " col-6 mt-4">
+                            <div class = "row ">
+                            <a href="https://apps.apple.com/de/app/jtrack-social/id1645319896?l=en" target="_blank" >
+                            <img src='http://upload.wikimedia.org/wikipedia/commons/0/0f/Available_on_the_App_Store_%28black%29_SVG.svg' /></a>
+                        </div><div class = "row ">
+                            <a href="https://play.google.com/store/apps/details?id=inm7.JTrack.JTrack_Social" target="_blank">
+                            <img src='https://gallery.mailchimp.com/b88b3ba75f26335343bfecdc0/images/5e301e76-08a9-459e-ad1a-b9eab2f28c0c.png' /></a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="footer-content pt-4">
+            <div class="row">
+                <div class="col-lg-6 col-sm-6 mb-50">
+                    <div class="footer-widget">
+                        <div class="footer-widget-heading">
+                            <h3>Contact us</h3>
+                        </div>
+                        <div class="footer-text">
+                            <p>If you are already collaborating and want to delete your data <a href="{% url 'delete_subject_data' %}">request here</a>
+                            <p>If you are interested in collaboration with us or
+                            would like to learn more about<br> JTrack or our
+                            studies <a type="button" href="{% url 'contact_email' %}" class="btn btn-outline-light" >GET IN TOUCH</a>
+                            </p>
+                        </div>
+                        
+                    </div>
+                </div>
+                <div class="col-lg-3 col-sm-3 mb-30">
+                    
+                    <div class="footer-widget">
+                        <div class="footer-widget-heading">
+                            <h3>Mail us</h3>
+                        </div>
+                        <div class="person"> <a class="footer_link" href="mailto:j.dukart@fz-juelich.de" itemprop="email"><i class="fa fa-user"> Dr. Juergen Dukart</i></a> </div>
+                        <div class="person"><a class="footer_link" href="mailto:m.sahandi.far@fz-juelich.de" itemprop="email"><i class="fa fa-user"> Dr. Mehran Sahandi Far</i></a> </div>
+                        
+                    </div>
+                </div>
+                <div class="col-lg-3 col-sm-3 mb-50">
+                    <a  href="https://www.fz-juelich.de/en/inm/inm-7/" target="_blank"><img src="{% static 'icons/bb-icon.png' %}" height="65" ></a>
+                    <a href="https://www.fz-juelich.de/" target="_blank"><img src="{% static 'icons/fz-icon.png' %}" height="65" ></a>
+                   
+                </div>
+                   
+                </div>
+                <div class="row copyright-text text-center">
+                            <p>Copyright &copy; 2023, All Right Reserved </p>
+                </div>
+        </div>
+        
+    </div>
+    
+   
+</footer>

@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% load custom_tags %}
+{% load static %}
+{% block content %}
+
+<script src="{% static 'js/jquery.min.js' %}"></script>
+<link href="{% static 'css/bootstrap-table.min.css' %}" rel="stylesheet">
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css">
+<script src="{% static 'js/bootstrap-table.min.js' %}"></script>
+<script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
+<script src="{% static 'js/main.js' %}"></script>
+<script src="{% static 'js/popper.js' %}"></script>
+
+<div class="row mb-4">
+	<ul class="nav nav-tabs">
+	<li class="nav-item">
+	  <a class="nav-link active" aria-current="page" href="{%url 'home' %}">Studies</a>
+	</li>
+	<li class="nav-item">
+	  <a class="nav-link" href="{%url 'survey' %}">Survey</a>
+	</li>
+	<li class="nav-item">
+	  <a class="nav-link" href="{%url 'analytics' study_name='all' %}">Analytics</a>
+	</li>
+  </ul>
+</div> 
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card ">
+            <div class="card-header text-white " style="background-color: #e85e6c;">
+                
+                <h2 class="h4 text-center">
+                    <i class="fas fa-times-circle fa-2x "></i>
+                </h2>
+            </div>
+            <div class="card-body">
+                <h2 class="h4 text-center">
+                    Ooops!
+                </h2>
+                <p class="card-text text-center">
+                    We're sorry for the hiccup! 
+                    <br>
+                    Thanks for your patience while we sprinkle some tech magic on your request. ✨
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
