@@ -1,0 +1,296 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load custom_tags %}
+{% load django_browser_reload %}
+{% block content %}
+<script src="{% static 'js/jquery.min.js' %}"></script>
+<link href="{% static 'css/form.css' %}" rel="stylesheet">
+<link href="{% static 'css/bootstrap-table.min.css' %}" rel="stylesheet">
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css">
+<script src="{% static 'js/bootstrap-table.min.js' %}"></script>
+<script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
+<script src="{% static 'js/survey.js' %}"></script>
+<script src="{% static 'js/popper.js' %}"></script>
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="deleteModalLabel">Delete Question</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id = "removeQuestionForm" action="{%url 'edit_survey' study_name=study_name  %}" method="POST" >
+        {% csrf_token %}
+      <div class="modal-body">
+          Confirm to delete question
+      </div>
+      <div class="modal-footer">
+        <input name="remove_question"  value="Confirm" type="submit" class="btn btn-primary" onclick="remove_question()" >
+      </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade bs-example-modal-xl" id="questionModal" tabindex="-1" aria-labelledby="questioModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="questioModalLabel">Edit Question</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form name="questionForm" action="{%url 'edit_survey' study_name=study_name  %}" method="POST" >
+          {% csrf_token %}
+          <div  class="modal-body" >
+            <!-- question form-->
+                <div class="row">
+                  <div class="col-lg-6">
+                  <div class="form-group  required mb-4 " >
+                    {{ question_form.title}} 
+                    <label>Title</label>
+                  </div>	
+                  <div class="form-group  required mb-4" >	
+                    {{ question_form.subText}}
+                    <label>Description</label>   	                   
+                  </div>
+                  
+                  <div  class="form-group  required mb-4" >
+                      {{question_form.questionType }}  
+                      <label >Type</label>	         
+                  </div>
+                </div>
+                <div class="col-lg-6">
+                  <div class="form-check form-switch form-switch-md mb-4">
+                    {{ question_form.default_value}}  Use default values for below form
+                    </button>
+                  </div>
+                  <div class="row">
+                    <div class="form-group col  required mb-4" >	
+                      {{ question_form.category}} 
+                      <label >Category</label>                     
+                    </div>
+                    <div class="form-group col required mb-4" >
+                      {{ question_form.nextDayToAnswer}} 
+
+                      <label >NextDayToAnswer</label>
+                    </div>
+                  </div>
+                  <div class="row">
+                      <div class=" form-group col mb-4" >	
+                        {{ question_form.imageURL}}  
+                        <label >Image Url</label>  	                   
+                      </div>
+                      <div class="form-group col mb-4" >	
+                        {{ question_form.url}}  	 
+                        <label >Url</label>                  
+                      </div>
+                  </div>
+                  <div class="row">
+                    <div class="form-group col required mb-4" >
+                      {{ question_form.frequency}} 
+                      <label >Frequency</label>
+                    </div>
+                    <div class="form-group col required mb-4" >
+                      {{ question_form.clockTime}} 
+                      <label >ClockTime</label>
+                    </div>
+                    
+                  </div>
+                  <div class="row">
+                    <div class="form-group col  mb-4" >
+                      {{ question_form.deactivateOnAnswer}} 
+                      <label >DeactivateOnAnswer</label>  	
+                    </div>
+                    <div class=" form-group col  required mb-4" >
+                      {{ question_form.deactivateOnDate}}  
+                      <label >DeactivateOnDate</label>   	
+                    </div>
+
+
+                  </div>
+                </div>
+              </div>
+              <!-- answer form-->
+              <div id= "answerChoices" class="row" style="display: none;">
+                  <div class="form-group required mb-4" >	
+                    
+                    {{ answer_form.text}}  <label >Choices </label>  
+                    <span><small><i>Enter semicolon seperated answer choices</i></small></span>
+                      
+                  </div>
+                  
+              </div> 
+              <div id= "slidingAnswer" class="row" style="display: none;">
+                <div  class="row" >
+                  <div class="col form-group required mb-4" >	
+                    {{answer_form.value }}  	         
+                    <label > Value </label>                       
+                  </div>
+                  <div class="form-group col required mb-4" >
+                    {{answer_form.defaultValue}}
+                               
+                    <label >Default Value </label> 
+                  </div>
+                  <div class="form-group col required mb-4" >
+                    {{answer_form.stepSize}}
+                    <label >Step size</label> 
+                  </div>
+                </div>
+                  <div class="row" >
+                    <div class="col form-group required mb-4" >	
+                      {{ answer_form.minValue}} 
+                      <label >Minimum value</label>                     
+                    </div>
+                    <div class=" form-group col form-outline mb-4" >	
+                      {{ answer_form.maxValue}}   
+                      <label >Maximum value</label> 	                   
+                    </div>  
+                      <div class="form-group col required mb-4" >
+                      {{ answer_form.minText}} 
+                      <label >Minimum Text</label>
+                      </div>
+                      <div class="form-group col form-outline  mb-4" >	
+                        {{ answer_form.maxText}} 
+                        <label >Maximum Text</label> 	                   
+                      </div>
+                  </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+              <input name="update_question_in_file" type="submit"  value="Update" role="button" class="btn btn-primary"  >
+              <input id = "id_value" name="id_value" type="hidden"  value=""   />
+              
+            </div>
+        </form>
+      </div>
+    
+    </div>
+</div>
+<div class="row mb-4">
+  <ul class="nav nav-tabs">
+    <li class="nav-item">
+      <a class="nav-link "  href="{%url 'home' %}">Studies</a>
+    </li>
+	<li class="nav-item">
+	  <a class="nav-link active" aria-current="page" href="{%url 'survey' %}">Survey</a>
+	</li>
+    <li class="nav-item">
+      <a class="nav-link" href="{%url 'analytics' study_name='all' %}">Analytics</a>
+    </li>
+    </ul>
+</div>
+<div class="row">
+    <div class="col-xs-12 col-sm-4">
+      <h2>Edit Survey</h2> 
+      </div>
+      
+ 
+    <div class="col-xs-12 col-sm-9">
+            {% if error_message %}
+                    <p class="text-danger">{{ error_message}}</p>
+          {% endif %}
+
+      </div>
+ </div>
+ <div class="row">
+  <div><h2>{{survey_id}}:  {{survey_title}}</h2> </div>
+ </div>
+     
+    <div class="row">
+      <div class="col-md-12">
+        <table id ="survey_quest_table" class="table-responsive"
+        data-pagination="true" 
+        data-page-list="[10, 30, 50, 75, 100, ALL]"
+        data-show-export="true"
+        data-pagination-h-align="right"
+        data-pagination-detail-h-align="left">
+          <thead>
+            <tr>
+              <th rowspan="2">ID</th>
+              <th rowspan="2">Title</th>
+              <th rowspan="2">Description</th>
+              <th rowspan="2">Question Type</th>
+              <th rowspan="2">Category</th>
+              <th rowspan="2" data-visible="false" >frequency</th>
+              <th rowspan="2" data-visible="false" >clockTime</th>
+              <th rowspan="2" data-visible="false" >nextDayToAnswer</th>
+              <th rowspan="2" data-visible="false" >imageURL</th>
+              <th rowspan="2" data-visible="false" >url</th>
+              <th rowspan="2" data-visible="false" >deactivateOnDate</th>
+              <th rowspan="2" data-visible="false"  >deactivateOnAnswer</th>
+              <th rowspan="2">Answer size</th>
+              <th data-visible="false" colspan="11">Answer Details</th>
+              <th data-events="operateEvents" >Actions</th>
+            </tr>
+            <tr>
+          <th data-visible="false" >text</th>
+          <th data-visible="false" >value</th>
+          <th data-visible="false" >defaultValue</th>
+          <th data-visible="false" >stepSize</th>
+          <th data-visible="false" >minVal</th>
+          <th data-visible="false" >maxVal</th>
+          <th data-visible="false" >minText</th>
+          <th data-visible="false" >maxText</th>
+          <th data-visible="false" >answerSubText</th>
+          <th data-visible="false" >answerSortId</th>
+          <th data-visible="false" >answer_id</th>
+            </tr>
+          </thead>
+          <tbody>
+              {% for question in json_meta.survey.questions %}
+            <tr id="tr-{{question.id}}"  >
+              <td>{{question.id}}</td>
+              <td>{{question.title}}</td>
+              <td>{{question.subText}}</td>
+              <td>{{question.questionType | get_question_category}}</td>
+              <td>{{question.category}}</td>
+            <td data-visible="false">{{ question.frequency}}</td>
+              <td data-visible="false">{{ question.clockTime}}</td>
+              <td data-visible="false">{{ question.nextDayToAnswer}}</td>
+              <td data-visible="false">{{ question.imageURL}}</td>
+              <td data-visible="false">{{ question.url}}</td>
+              <td data-visible="false">{{ question.deactivateOnDate}}</td>
+              <td data-visible="false">{{ question.deactivateOnAnswer}}</td>
+              <td data-visible="false">{{ question.answer | get_size|safe}}</td>
+              <td data-visible="false">{{ question.answer | get_text|safe}}</td>
+              <td data-visible="false">{{ question.answer | get_value|safe }}</td>
+              <td data-visible="false">{{ question.answer | get_defaultValue|safe }}</td>
+              <td data-visible="false">{{ question.answer | get_stepSize|safe }}</td>
+              <td data-visible="false">{{ question.answer | get_minVal|safe }}</td>
+              <td data-visible="false">{{ question.answer | get_maxVal|safe}}</td>
+              <td data-visible="false">{{ question.answer | get_minText|safe }}</td>
+              <td data-visible="false">{{ question.answer | get_maxText|safe}}</td>
+              <td data-visible="false">{{ question.answer | get_subText|safe}}</td>
+              <td data-visible="false">{{ question.answer | get_sortId|safe}}</td>
+              <td data-visible="false">{{ question.answer | get_id|safe}}</td>
+               
+              <td>
+                  {% if not request.user|has_group:"Viewer"  %}
+                  <a class="edit"  href="{%url 'edit_survey'
+                      study_name=study_name %}" title="View"
+                      data-id="{{question}}" data-bs-toggle="modal"
+                      data-bs-target="#questionModal" ><i class="fa fa-edit
+                          fa-lg"></i></a>
+                  
+                  <a class="delete" href="#" title="Delete"
+                      data-bs-toggle="modal" data-bs-target="#deleteModal"  ><i
+                          class="fa fa-trash fa-lg"></i></a>
+               
+              </td>
+              {% else %}
+                <a class="view"  href="" data-id="{{question}}" data-bs-toggle="modal" data-bs-target="#questionModal" title="View"   >
+                    <i class="fa fa-eye fa-lg"></i></a>
+              {% endif %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+</div>
+
+
+{% endblock %}	
+
+
+
+

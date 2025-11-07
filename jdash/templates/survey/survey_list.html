@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+{% load custom_tags %}
+{% load static %}
+{% block content %}
+
+<script src="{% static 'js/jquery.min.js' %}"></script>
+<link href="{% static 'css/form.css' %}" rel="stylesheet">
+<link href="{% static 'css/bootstrap-table.min.css' %}" rel="stylesheet">
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css">
+<script src="{% static 'js/bootstrap-table.min.js' %}"></script>
+<script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
+<script src="{% static 'js/survey.js' %}"></script>
+<script src="{% static 'js/popper.js' %}"></script>
+<div class="modal fade" id="surveyModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+	<div class="modal-dialog">
+	  <div class="modal-content">
+		<div class="modal-header">
+		  <h5 class="modal-title" id="exampleModalLabel">Create a New Survey</h5>
+		  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+		</div>
+		<form action="{%url 'create_survey' survey_id=0 %}" method="POST" >
+			{% csrf_token %}
+			<div class="modal-body">
+				
+				<div class="form-group required mb-4">
+					
+						{{survey_form.title}}	 <label >Title </label>  
+                        <span><small><i>{{survey_help_text.title}}</i></small></span>
+				</div>	
+				<div class="form-group required mb-4">	
+						{{survey_form.description}}
+						<label >Description </label>  
+						<span><small><i>{{survey_help_text.description}}</i></small></span>
+				</div>
+				<div class="form-check form-check-inline mb-4"   >
+					<label class="form-check-label">Scroll Type</label>  
+					<span><small><i>({{survey_help_text.scrolling}})</i></small></span>  	
+					{{ survey_form.scrolling}} 
+				</div>
+			</div>
+			<div class="modal-footer">
+				<input name="create_survey" type="submit"  value="Create" role="button" class="btn btn-primary"  >
+			</div>
+		</form>
+	  </div>
+	
+	</div>
+</div>
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+	<div class="modal-dialog">
+	  <div class="modal-content">
+		<div class="modal-header">
+		  <h5 class="modal-title" id="deleteModalLabel">Delete Survey</h5>
+		  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+		</div>
+		<form id = "deleteSurveyForm" action="{%url 'delete_survey' %}" method="POST" >
+			{% csrf_token %}
+			<div class="modal-body">
+			Confirm to delete survey 
+		</div>
+		<div class="modal-footer">
+		  <input name="delete_survey" value="Confirm" type="submit" class="btn btn-primary" onclick="remove_survey()" >
+		</div>
+		</form>
+	  </div>
+	</div>
+  </div>
+<div class="row mb-4">
+	<ul class="nav nav-tabs">
+	<li class="nav-item">
+	  <a class="nav-link " href="{%url 'home' %}">Studies</a>
+	</li>
+	<li class="nav-item">
+	  <a class="nav-link active" aria-current="page" href="{%url 'survey' %}">Survey</a>
+	</li>
+	<li class="nav-item">
+	  <a class="nav-link" href="{%url 'analytics' study_name='all' %}">Analytics</a>
+	</li>
+  </ul>
+</div> 
+	  
+	<div class="row mb-2" >
+		<div id="toolbar" class="col-md-6 col-lg-6">
+			{% if not request.user|has_group:"Viewer"  %}
+					
+            <input name="create_json" type="submit"
+			role="button" value="New Survey" class="btn btn-outline-primary btn-block mb-8"
+			data-bs-toggle="modal" data-bs-target="#surveyModal" />
+			
+		</div>
+        <div class="col-md-2 col-lg-2"></div>
+        <div class="col-md-4 col-lg-4">
+			<form action="{% url 'create_survey'  survey_id=0 %}" method="post" enctype="multipart/form-data">
+				{% csrf_token %}
+				<div class=" input-group mb-2">
+					{{json_form.json_file}} <button type="submit" value="Upload" name="upload_survey"  ><i class="fa fa-upload fa-lg" aria-hidden="true"></i></button>
+				</div>
+
+			</form>
+		</div>
+        {% endif %}
+	</div>
+
+	<div >
+        <div class="col-md-6 col-lg-6">
+			{% if messages %}
+            <ul class="messages">
+                {% for message in messages %}
+                <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+           
+		</div>
+		<table id ="survey_table" class="table-responsive"
+			data-search="true"
+			data-pagination="true"
+			data-id-field="survey_id"
+			data-sort-name="created_date"
+			data-sort-order="desc"
+			data-page-list="[10, 30, 50, 100, all]">
+			<thead>
+				<tr>
+				<th data-field="survey_id" >Id</th>
+				<th data-field="survey_title" >Title</th>
+				<th data-field="study_name" >Study associated</th>
+				<th data-field="created_date" data-sortable="true">Created date</th>
+				<th data-events="survey_operateEvents">Actions</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for survey in survey_list %}
+				<tr>
+				<td id="survey_id">{{survey.id}}</td>
+				<td id='survey_title'>{{survey.title}}</td>
+				<td id='study_name'>{{survey.study_name}}</td>
+				<td id='created_date'>{{survey.createdDate}}</td>
+					{% if survey.id == '999' %}
+					<td>
+						<a class="view"  href="{%url 'edit_survey' study_name=survey.study_name %}" 
+                                         title="Edit"   ><i class="fa fa-edit fa-lg"></i></a>
+					</td>
+					{% else %}
+						
+					<td>
+						<a class="edit"  href="{%url 'create_survey' survey_id=survey.id %}" title="Edit"   ><i class="fa fa-edit fa-lg"></i></a>
+                        <a class="copy"  href="{%url 'duplicate_survey' survey_id=survey.id %}" title="Duplicate"   ><i class="fa fa-copy  fa-lg"></i></a>
+						<a class="delete" href="#" title="Delete"
+                            data-id="{{survey}}" data-bs-toggle="modal" data-bs-target="#deleteModal"  ><i class="fa fa-trash fa-lg"></i></a>
+					</td>
+					{% endif %}
+
+				</tr>
+				{% endfor  %}
+			</tbody>
+    	</table>
+	</div>
+	
+{% endblock %}

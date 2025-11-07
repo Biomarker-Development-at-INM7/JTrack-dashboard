@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% load custom_tags %}
+{% load static %}
+{% block content %}
+
+<script src="{% static 'js/jquery.min.js' %}"></script>
+<link href="{% static 'css/form.css' %}" rel="stylesheet">
+<link href="{% static 'css/bootstrap-table.min.css' %}" rel="stylesheet">
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css">
+<script src="{% static 'js/bootstrap-table.min.js' %}"></script>
+<script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
+<script src="{% static 'js/main.js' %}"></script>
+<script src="{% static 'js/popper.js' %}"></script>
+
+<div class="row mb-4">
+	<ul class="nav nav-tabs">
+	<li class="nav-item">
+	  <a class="nav-link active" aria-current="page" href="{%url 'home' %}"   >Studies</a>
+	</li>
+	<li class="nav-item">
+	  <a class="nav-link"  href="{%url 'survey' %}">Survey</a>
+	</li>
+	<li class="nav-item">
+	  <a class="nav-link" href="{%url 'analytics' study_name='all' %}">Analytics</a>
+	</li>
+  </ul>
+</div> 
+	
+<div >
+    <div class="inline-container">
+        <a class="view" href="{% url 'details' study_name=study.title %}"  >
+            <i class="fa fa-eye fa-lg"></i></a>
+        <h2>{{study.title}}</h2>
+    </div>
+    <div id="toolbar" class="toolbar-container">
+        {% if request.user|has_group:"Investigator"  %}
+            <button name="select_all" id="select_all"  onclick="toggleSelectAll('owner', this)" class="btn btn-primary" >Select All</button>
+        {% else %}
+            <button name="select_all" id="select_all" onclick="toggleSelectAll('admin', this)" class="btn btn-primary" >Select All</button>
+        {% endif %}
+        <form id="testcaseForm" name="testcaseForm" action="{% url 'qc_study' study_name=study.title %}" method="POST">
+         {% csrf_token %}
+         <input type="hidden" id="testCaseFlagsInput" name="test_case_flags" value="">
+            <input name="update_test_flags" id="update_test_flags"
+                    type="submit" onclick="sendCheckedFlagsToServer('{{ study.title }}')"
+            class="btn btn-primary" value="Update">
+        </form>
+    </div>
+    <div class="col-md-6 col-lg-6">
+        {% if messages %}
+        <ul class="messages">
+            {% for message in messages %}
+            <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div> 
+    <table id ="qc_table" class="table-responsive"
+    data-toolbar="#toolbar"
+        data-search="true"
+        data-pagination="true"
+        data-id-field="testcase_id"
+        data-page-list="[10, 30, 50, 100, all]">
+        <thead>
+            <tr>
+                <th data-field="tested_by_admin">Admin</th>
+                <th data-field="tested_by_owner" >Owner</th>
+                <th data-field="testcase_db_id" >Id</th>
+                <th>Description</th>
+                <th>Steps</th>
+                <th>Expected Outcome</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for test in test_list %}
+            <tr>
+                <td>
+                <input type="checkbox" class="custom-control-input admin-checkbox"
+                       id="admin_checkbox{{ forloop.counter }}" {% if test.tested_by_admin %} checked {% endif %}
+                       {% if request.user|has_group:"Investigator" %} disabled {% endif %}>
+                </td>
+                <td> <input type="checkbox" class="custom-control-input
+                                                 owner-checkbox"
+                       id="owner_checkbox{{ forloop.counter }}" {% if test.tested_by_owner %}checked{% endif %}
+                    </td>
+                <td id="testcase_db_id">{{test.id}}</td>
+                <td id='description'>{{test.description}}</td>
+                <td id='steps'>{{test.steps}}</td>
+                <td>{{test.expected_outcome}}</td>
+            </tr>
+            {% endfor  %}
+        </tbody>
+    </table>
+</div>
+	
+{% endblock %}

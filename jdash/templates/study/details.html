@@ -1,0 +1,502 @@
+
+{% extends 'base.html' %}
+{% load static %}
+{% load custom_tags %}
+{% block content %}
+<link href="{% static 'css/bootstrap-table.min.css' %}" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.0/font/bootstrap-icons.css" rel="stylesheet">
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css">
+<script src="{% static 'js/bootstrap-table.min.js' %}"></script>
+<script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
+<script src="{% static 'js/main.js' %}"></script>
+
+  <script>
+    function download_study_data(){
+      $("#downloadStudyDataModal").hide();
+
+    }
+
+    function confirm_download_data(){
+      const dataDownloadForm = document.forms.dataDownloadForm;
+      dataDownloadForm.submit(); 
+      
+
+    }
+    function delete_subject_data(){
+      const deletedataForm = document.forms.deletedataForm;
+      deletedataForm.submit(); 
+    }
+
+    function form_innerhtml_modal() {
+        var items=document.getElementsByName('check-subject-id');
+        var selectedItems="";
+        k= 0;
+        for(var i=0; i<items.length; i++){
+            if(items[i].type=='checkbox' && items[i].checked==true){
+                selectedItems+=items[i].value+";";
+                k++ ;
+              }
+        }
+        if (k==0)  {
+              alert("Please select subject id to delete");
+              $("#deleteDataModal").modal('hide');
+        }else{
+          var label_str= " Please type " + selectedItems + " to confirm"
+
+          $("#label-subject").html(label_str);
+          $("#deleteDataModal").modal('show');
+        }
+        
+
+    } 
+</script>
+
+    <div class="modal fade" id="downloadStudyDataModal" tabindex="-1" aria-labelledby="downloadStudyDataModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="downloadStudyDataModalLabel">Download Study Data</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+              <form id="dataDownloadForm" action="{%url 'download' arg='data' %}" method="POST">
+                {% csrf_token %}
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+                  <label class="form-check-label" for="flexCheckDefault">
+                    Processed Data
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="" id="flexCheckChecked" checked>
+                  <label class="form-check-label" for="flexCheckChecked">
+                    Raw Data
+                  </label>
+                </div>
+                <input name="type" value="raw" type="hidden"/>
+                <input name="study_name" value={{meta_data.name}} type="hidden"/>
+                {% if email != '' %}
+                <input name="user_email" value={{email}} type="hidden"/>
+                {% else %}
+                <div class="form-group mt-4 mb-3">
+                  <label for="user_email">Email address</label>
+                  <input type="email" class="form-control" id="user_email"
+                  name="user_email" aria-describedby="emailHelp" placeholder="Enter email">
+                  </div>
+                  <small id="emailHelp" class="form-text text-muted">
+                      Enter email to which download link will be sent. This email will be used for further communications</small>
+                {% endif  %}
+              </form>
+          </div>
+          <div class="modal-footer">
+            <input data-bs-toggle="modal" data-bs-target="#confirmationModal" value="Download" type="submit" class="btn btn-primary" onclick="download_study_data()" >
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal fade" id="deleteDataModal" tabindex="-1" aria-labelledby="deleteDataModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="deleteDataModalLabel">Delete Subject Data</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <form id ="deletedataForm" action="{%url 'details' study_name=meta_data.name %}" method="POST">
+              {% csrf_token %}
+          <div class="modal-body">
+              <div class="input-group mb-3">
+                <label id="label-subject" class="control-label"> </label>
+                </div>
+              <div class="input-group mb-3">
+                  <input class="form-control" id="subjectId"
+                  name="subjectId"  placeholder="Subject IDs to delete" required>
+              </div>
+          </div>
+          <div class="modal-footer">
+            <input name= "delete_subject_data" value="I understand the consequence, delete data" type="submit" class="btn btn-danger" onclick="delete_subject_data()" >
+          </div>
+          </form>
+        </div>
+      </div>
+    </div>
+      <div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="exampleModalLabel">Remove Subject</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Confirm to remove subject
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+              <input type="button"  value="Confirm" type="submit" class="btn btn-primary" onclick="remove_subject()" >
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal fade" id="confirmationModal" tabindex="-1" aria-labelledby="confirmationModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="confirmationModalLabel">Email
+                  Notification</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+             Email will be sent to you with the link to download the dataset on you registered email address.
+              
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-primary" data-bs-dismiss="modal"
+                  onclick="confirm_download_data()">Confirm</button>
+              </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal fade" id="closeModal" tabindex="-1" aria-labelledby="closeModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="closeModalLabel">Close Study</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              Confirm to close study
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+              <input type="button"  value="Confirm" type="submit" class="btn btn-primary" onclick="close_study()" >
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="row mb-4">
+          <ul class="nav nav-tabs">
+            <li class="nav-item">
+              <a class="nav-link active" aria-current="page" href="{%url 'home' %}">Studies</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{%url 'survey' %}">Survey</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{%url 'analytics' study_name='all' %}">Analytics</a>
+            </li>
+          </ul>
+      </div> 
+      <div class="row">
+          <div class="col-xs-12 col-sm-3">
+            <div class="row">
+              <div class="inline-container">
+                  <a class="" href="{% url 'qc_study' study_name=meta_data.name %}"  >
+                      <i class="fa fa-check-square fa-lg" aria-hidden="true"></i></a>
+                  <h2>{{meta_data.name}} </h2></div>
+              <div class="col-lg-6">
+                
+                  
+              </div>
+              
+            </div>
+            
+          </div>
+          <div class="col-xs-12 col-sm-9" style="display: flex; justify-content: flex-end">
+              
+            {% if messages %}
+            <ul class="messages">
+                {% for message in messages %}
+                <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+              
+                
+          </div>
+      </div>
+      <div class="row">
+        <div class="col-xs-12 col-sm-4" style="background-color: lightgray;">
+          <div class="card-body">
+            
+              <h6 class="heading-small text-muted mb-4">Information</h6>
+              <div class="pl-lg-4">
+                <div class="row">
+                    <div class="col-lg-4">
+                        <label class="form-label" >Duration</label>
+                    </div>
+                    <div class="col-lg-4">
+                      <p> {{meta_data.duration}} days</p>
+                  </div>
+                </div>
+                <div class="row"> 
+                    <div class="col-lg-4">
+                      <label class="form-control-label" >Sensors</label>
+                    </div>
+                      <div class="col-lg-4">
+                        {% for sensor in meta_data.sensor_list %}
+                        <p> {{sensor}}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% if  meta_data.sensor_list_limited %}
+                <div class="row">
+                  <div class="col-lg-4">
+                    <label class="form-control-label" >Active Sensors</label>
+                  </div>
+                    <div class="col-lg-4">
+                      {% for sensor in meta_data.sensor_list_limited %}
+                      <p> {{sensor}}</p>
+                      {% endfor %}
+                  </div>
+                </div>
+                {% endif %}
+                {% if  meta_data.survey %}
+                <div class="row"> 
+                  <div class="col-lg-4">
+                    <label class="form-control-label" >EMA</label>
+                  </div>
+                    <div class="col-lg-4">
+                      <p> active</p>
+                  </div>
+              </div>
+              {% endif %}
+              </div>               
+          </div>
+          <hr class="my-4">
+          <div class="card-body">           
+              <h6 class="heading-small text-muted mb-4">Subjects information</h6>
+              <div class="pl-lg-4">
+                  <div class="row">
+                      <div class="col-lg-7">
+                          <label class="form-label" >Total Number of Subjects</label>
+                      </div>
+                      <div class="col-lg-2">
+                        <div> {{total_count}}</div>
+                    </div>
+                  </div>
+                  <div class="row"> 
+                      <div class="col-lg-7">
+                        <label class="form-control-label" >Number of enrolled
+                            subjects</label>
+                      </div>
+                        <div class="col-lg-2">
+                          <div> {{meta_data.number_of_enrolled_subjects}}</div>
+                      </div>
+                  </div>
+                
+                  <div class="row">
+
+                    <form name="createSubjectForm"  class="row row-cols-lg-auto g-3 align-items-center" action="{%url 'details' study_name=meta_data.name %}" method="POST">
+                      {% csrf_token %}
+                      <div class="col-12">
+                        {{new_subjects_form}}
+                      </div>  
+                      <div class="col-12">
+                        <input name="create_subjects" type="submit" value="Create" class="btn btn-primary" role="button" />
+                      </div>
+                      
+                    </form>
+                  </div>     
+              </div>
+              
+          </div>
+          <hr class="my-4">
+          <div class="card-body">
+                <h6 class="heading-small text-muted mb-4">Remove Subject</h6>
+                <div class="pl-lg-4">
+                  <form name="removeForm" class="row row-cols-lg-auto g-3 align-items-center" action="{%url 'details' study_name=meta_data.name %}" method="POST">
+                    {% csrf_token %}
+                    <div class="col-12">
+                      {{remove_subjects_form}}
+                    </div>
+                    <input name="remove_subjects" value="Remove" type="hidden"/>
+                    <div class="col-12">
+                      <a  href="#"  type="submit"  value="Remove" class="btn
+                          btn-primary" data-bs-toggle="modal" data-bs-target="#exampleModal" > Remove</a>
+                      
+                    </div>
+                  </form>   
+                </div>
+            </div>
+            <hr class="my-4">
+            <div class="card-body">
+                  <h6 class="heading-small text-muted mb-4">Send Notification</h6>
+                  <form action="{%url 'details' study_name=meta_data.name %}" method="POST">
+                    {% csrf_token %}
+                    {{notification_form.as_p}}
+                    <input type="button" value= "All IDs" onclick="select_all_ids()"
+                     class="btn btn-secondary btn-block mb-4" role="button" name="all_id_submit"/>
+                     <input  type="button" value= "Missing IDs" onclick="select_missing_ids()" 
+                      name="missing_id_submit" role="button"  class="btn btn-warning btn-block mb-4"/>
+                    
+                    <!-- Submit button -->
+                    <p><input name="send_notification" type="submit" value="Send notification" class="btn btn-primary" /></p>
+                  </form> 
+                  </div>
+              <hr class="my-4">
+              {% if request.user|has_group:"Investigator" or request.user|has_group:"administrator" %}
+              <div class="card-body">
+                  <h6 class="heading-small text-muted mb-4">Close Study</h6>
+                  <form name="closeForm" action="{%url 'close' study_name=meta_data.name %}" method="POST">
+                    {% csrf_token %}
+                  <input name="close" type="button" value="Close Study"
+                  class="btn btn-danger btn-block mb-4" role="button"
+                  data-bs-toggle="modal" data-bs-target="#closeModal" />
+                </form>
+                </div>
+              {% endif %}
+        </div>
+        <div class="col-xs-12 col-sm-8">
+              <div class="row mb-4">
+                <div class="col-xs-12 col-sm-9">
+                  <!--- <input name="generate_files" type="submit" 
+                  role="button" value="Generate CSV files" class="btn btn-outline-primary btn-block mb-8"
+                  data-toggle="modal" data-target="#confirmationModal" /> !-->
+                    
+                </div>
+                <div class="col-xs-12 col-sm-3 justify-content-end d-flex">
+                  <a href="{%url 'details' study_name=meta_data.name %}" data-bs-toggle="tooltip" title="Refresh">
+                    <img src="{% static 'icons/refresh-64.png' %}" height="35"></a>
+                  
+                  <a name="user_unused_sheet" href="{%url 'download' arg=meta_data.name  %}" data-bs-toggle="tooltip" title="Download unused user sheets" download >
+                    <img src="{% static 'icons/icon-pdf-100.png' %}" height="35"></a>
+                  <a name="study_data_download" data-bs-toggle="modal" data-bs-target="#downloadStudyDataModal" data-bs-toggle="tooltip" title="Download data">
+                    <img src="{% static 'icons/download-128.png' %}" height="35"></a>
+                  <button type="button" class="btn "  data-bs-toggle="modal"
+                      data-bs-target="#deleteDataModal" data-bs-toggle="tooltip" title="Delete" id="delete_subjects" onclick="form_innerhtml_modal()">
+                    <img src="{% static 'icons/remove-data-100.png' %}" height="35"> </button>
+                </div>
+                
+
+                
+              </div>
+              <div class="row" style="display: none;">
+                <div class="col-xs-12 col-sm-6">
+                      <ul>
+                        <li class="text-danger">No data sent for 2 days</li>
+                        <li class="text-primary">Left study too early</li>
+                        <li class="text-info">Study duration reached, not left</li>
+                        <li class="text-success">Study duration reached, left</li>
+                        <li class="text-warning">Multiple QR Codes of one user active</li>
+                      </ul>
+                </div>
+
+                <div class="col-xs-12 col-sm-6">
+                    <ul>
+                      <li>Empty - Everything is fine</li>
+                      <li>1 - User left study with this QR Code</li>
+                      <li>2 - User reached study duration and left automatically</li>
+                      <li>3 - User removed by dashboard</li>
+                    </ul>
+                </div>
+              </div>
+              
+              
+             <div>
+              
+                    <table id ="metadata_table" class=" table table-responsive"  
+                    data-show-header="true" 
+                    data-checkbox-header="false"
+                    data-click-to-select="true"
+                    data-pagination="true" 
+                    data-filter-control="true"
+                    data-id-field="subject_id"
+                    data-page-list="[  30,50, 75, 100, ALL]"
+                    data-page-size="30"
+                    data-detail-filter="detailFilter"
+                    data-detail-formatter="detailFormatter"
+                    data-detail-view="true"
+                    data-escape="false"
+                    data-pagination-h-align="right"
+                    data-pagination-detail-h-align="left"
+                    data-response-handler="responseHandler">
+                        <thead class="table-dark">
+                          <tr >
+                                              
+                            <th data-field="subject_id" data-filter-control="input" rowspan="2">Subject ID</th>                             
+                            <th data-field="appName" data-filter-control="select" rowspan="2">App</th>
+                                                                         
+                            <th data-field="duration" data-filter-control="input" rowspan="2">Duration</th>
+                            <th data-field="sensor_info" data-filter-control="select" data-filter-data="var:{{meta_data.sensor_list}}" data-filter-strict-search="false" rowspan="2">Sensor Information</th> 
+                             
+                            <th data-field="status" data-filter-control="select" data-filter-data="var:filterDefaults" data-filter-strict-search="false" rowspan="2">Status</th>
+                            
+                            {% if meta_data.sensor_size > 0  %}
+                            
+                            <th colspan = '{{ meta_data.sensor_size |add:7  }}' data-visible="false">More Details </th>
+                            {% else%}
+                            
+                            <th colspan = '7' data-visible="false">More Details </th>
+                            {% endif %}
+                              
+                          </tr>
+                          <tr >
+                            <th data-field="device_id"  data-visible="false"> device_id</th>
+                            <th data-field="date_registered"  data-visible="false"> date_registered</th> 
+                            <th data-field="date_left_study" data-visible="false"> date_left_study</th>
+                            <th data-field="n_batches_ema" data-visible="false">n_batches_ema</th>
+                            <th data-field="last_time_received_ema" data-visible="false">last_time_received_ema</th>
+                            <th data-field="sensor_list"  data-visible="false"> sensor_list</th>
+                            <th data-field="sensor_list_limited"  data-visible="false"> sensor_list_limited</th>
+                            {% for sensor in meta_data.sensor_list_limited %}
+                            <th data-field='n_batches_{{sensor}}' data-visible="false">n_batches_{{sensor}}</th>
+                            <th data-field='last_time_received_{{sensor}}' data-visible="false">last_time_received_{{sensor}}</th>
+                            
+                            {% endfor %} 
+                            {% for sensor in meta_data.sensor_list %}
+                            <th data-field='n_batches_{{sensor}}' data-visible="false">n_batches_{{sensor}}</th>
+                            <th data-field='last_time_received_{{sensor}}' data-visible="false">last_time_received_{{sensor}}</th>
+                            
+                            {% endfor %} 
+                          </tr>
+                        </thead>                       
+                          <!-- looping through the json array -->
+                          <tbody>
+                          {% for k,v in d.items %}
+                          <tr class="group" >
+                            <td colspan="5">
+                            <input class="form-check-input" type="checkbox" value="{{k}}" name="check-subject-id" >
+                            <a name='user_sheet' download href="{%url 'download' arg=k  %}" >{{k}}</a></td>
+                            
+                          </tr>
+                          
+                            {% for i in v %}
+                              <tr colspan="5" > 
+                                                            
+                                <td data-field="subject_id" data-filter-control="input" >{{i.subject_name}} </td>
+                                <td data-field="appName" >{{i.app}}</td>
+                                <td data-field="duration" data-filter-control="input">{{i.time_in_study}}</td>
+                                <td data-field="sensor_info" id="sensors_info" >{{ i | get_sensor_tag:meta_data|safe }}</td>
+                                <td data-field="status" data-filter-control="select" >{{ i.status_code | get_status_tag|safe}} </td>
+                                <td data-field="device_id" data-visible="false">{{i.device_id}}</td>
+                                <td data-field="date_registered" data-visible="false"> {{i.date_registered}} </td>
+                                <td data-field="date_left_study" data-visible="false">{{i.date_left_study}}</td>
+                                <td data-field="n_batches_ema" data-visible="false">{{i | get_n_batches:"ema"|safe}}</td>
+                                <td data-field="last_time_received_ema" data-visible="false">{{i | get_last_time_received:"ema"|safe}}</td>
+                                <td data-field="sensor_list"  data-visible="false"> {{meta_data.sensor_list}}</td>
+                                <td data-field="sensor_list_limited"  data-visible="false"> {{meta_data.sensor_list_limited}}</td>
+                                {% for sensor in meta_data.sensor_list_limited %}
+                                <td data-field='n_batches_{{sensor}}' data-visible="false">{{i | get_n_batches:sensor|safe}}</td>
+                                <td data-field='last_time_received_{{sensor}}' data-visible="false">{{i | get_last_time_received:sensor|safe}}</td>
+                                
+                                {% endfor %} 
+                                {% for sensor in meta_data.sensor_list %}
+                                <td data-field='n_batches_{{sensor}}' data-visible="false">{{i | get_n_batches:sensor|safe}}</td>
+                                <td data-field='last_time_received_{{sensor}}' data-visible="false">{{i | get_last_time_received:sensor|safe}}</td>
+                                {% endfor %}    
+                                       
+                              </tr>
+                             
+                              
+                              {% endfor %}
+                            {% endfor %}
+                            </tbody>
+                    </table>
+                    
+              </div>
+              
+          </div>
+        
+  </div>
+{% endblock %}

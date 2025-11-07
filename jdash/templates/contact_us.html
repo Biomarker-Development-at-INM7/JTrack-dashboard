@@ -1,0 +1,48 @@
+{% extends 'login_base.html' %}
+{% load static %}
+{% block content %}
+<div class="row justify-content-center mt-5">
+  
+    <div class="col-xl-6 col-lg-6 col-md-6">
+
+      <div class="card-body " style="background-color: #6c757d;">
+            {% if error_message %}
+            <p class="bg-danger p-d ml-b">{{ error_message }}</p>
+            {% endif %}
+            <h5 style="text-align: center;color: white;">Reach out Today! </h5>
+            <form action="{%url 'contact_email' %}" method="POST" >
+                {% csrf_token %}
+                <div >
+                    
+                    <!-- Name input -->
+                    <div class="form-outline mb-4">{{contact_form.fullname}}
+                      
+                    </div>
+                    
+                    <!-- Email input -->
+                    <div class="form-outline mb-4">{{contact_form.email}}
+                      
+                    </div>
+                    
+                
+                    <!-- Message input -->
+                    <div class="form-outline mb-4">{{contact_form.message}}
+                    </div>
+      
+                    <!-- Checkbox 
+                    <div class="form-check d-flex justify-content-center mb-4">
+                      <input class="form-check-input me-2" type="checkbox" value="" id="form4Example4" checked />
+                      <label class="form-check-label" for="form4Example4">
+                        Send me a copy of this message
+                      </label>
+                    </div>-->
+                </div>
+                <div >
+                    <input name="contact_message" type="submit"  value="Send Message" role="button" class="btn btn-outline-light"  >
+                </div>
+            </form>
+            </div>
+    </div>
+  </div>
+ 
+{% endblock %}
