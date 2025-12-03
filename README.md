@@ -1,127 +1,284 @@
 # 🧭 JDash System Overview  
 **By Biomarker Development Group, INM-7**
-
-## 1. Introduction  
-
 JDash is a Django-based web platform developed by the **Biomarker Development Group, INM-7**, for managing digital health studies conducted through **JTrack** mobile applications. It provides a unified interface to design, monitor, and manage behavioral and sensor-based research studies.
 
 The system connects mobile app data with researcher-controlled dashboards. Its main goal is to simplify the lifecycle of digital studies — from **study setup and survey design** to **subject enrollment, progress monitoring, and data validation**.
 
-## 2. System Architecture  
+# 🚀 JTrack Dashboard — Deployment Instructions
 
-JDash follows a **modular Django MVC structure** integrated with a clean Bootstrap-based frontend and optional Plotly-Dash analytics components.
+Comprehensive guide to deploying the **JTrack Dashboard (JDash)** both **locally** for development and **in production** using **Apache + mod_wsgi**.
 
-**Core Components:**
-- **Backend:** Django framework managing user authentication, database models, and view rendering.  
-- **Frontend:** HTML templates with Bootstrap, BootstrapTables, and AJAX for dynamic UI.  
-- **Data Layer:** Centralized database storing study metadata, subjects, sensor configurations, and EMA survey definitions.  
-- **Analytics Integration:** Optional Dash/Plotly apps embedded using Django templates for visualization.  
-- **Mobile Link:** JTrack and JTrack-EMA mobile apps connect to JDash for study configuration and data upload.  
+---
 
-## 3. Main Modules  
+## 🧩 Local Deployment (Development)
 
-### 3.1 Login Module  
-Provides authentication for registered users such as investigators and administrators.  
-- Users log in with a username and password.  
-- A default demo user (`demouser`) is available for testing.  
-- Footer links connect to Biomarker Development information, App Store badges, and collaboration contact details.  
-- Once authenticated, users access the **Studies** interface as the entry point.
+Local deployment is intended for **development**, **testing**, and **debugging**.  
+Django’s built-in development server is used for this mode.
 
-### 3.2 Studies Module  
-Central hub for study management, showing all studies the user can access or create.  
+### Requirements
 
-**Interface Elements:**
-- **Add Study Button:** Opens a form for creating a new study.  
-- **Grid/List Toggle:** Allows switching between study card and list layouts.  
-- **Search Bar:** Filters displayed studies.  
+Install system prerequisites:
 
-Each study card shows the title, description, and quick actions:
-- **View:** Open study details.  
-- **Edit:** Modify configuration or metadata.  
-- **QC:** Access quality control section.
+```bash
+sudo apt update
+sudo apt install python3 python3-venv python3-pip git
+```
 
-#### 3.2.1 Create New Study  
-Accessible from **Add Study**.
+Clone the repository:
 
-**Form Sections:**
-- **Study Metadata:** Name, duration, subject count, recording frequency, description.  
-- **Sensors Configuration:**  
-  - *Passive sensors* (e.g., accelerometer, application usage, barometer, gravity, gyroscope, location).  
-  - *Active sensors* for specific triggered data capture.  
-- **EMA (Ecological Momentary Assessment):**  
-  - Checkbox to enable EMA surveys.  
-  - Dropdown to select existing survey.  
-  - JSON/ZIP upload options for EMA question and image definitions.  
-- **Task Management:** Add or remove study tasks with preparation and duration times.  
+```bash
+git clone https://github.com/mamaka7/JTrack-dashboard.git
+cd JTrack-dashboard
+```
 
-#### 3.2.2 Study Details and Subjects View  
-Displays overview panel and subject table.
+---
 
-**Left Panel – Study Information:**
-- Duration, selected sensors, and associated EMA surveys.  
-- Button for viewing **Survey details**.  
+### Create Virtual Environment
 
-**Subjects Section:**
-- Displays total and enrolled subject counts.  
-- “Number of Subjects” dropdown defines how many new subject IDs to generate.  
-- “Create” button adds new participant identifiers linked to the study.  
-- “Remove” button deregisters specific subjects from the study.
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
 
-**Right Panel – Subject Table:**
-- Lists all study participants and related applications (main, EMA).  
-- Columns include Subject ID, App Type, Duration, Sensor Information, and Status (e.g., *Instudy*, *Left study*).  
-- Color-coded labels (red for inactive, yellow for active) provide a quick overview of status.
+Install dependencies:
 
-#### 3.2.3 Notifications and Study Closure  
-**Notification Section:**
-- Fields for message title and text.  
-- Target selection (All IDs or Missing IDs).  
-- “Send notification” button dispatches push notifications to participants’ devices via JTrack-EMA.
+```bash
+pip install --upgrade pip
+pip install -r requirements.txt
+```
 
-**Close Study Section:**
-- “Close Study” button deactivates data collection and marks the study as completed.
+(Optional setup script):
 
-### 3.3 Survey Module  
-Manages EMA (Ecological Momentary Assessment) questionnaires linked to studies.
+```bash
+chmod +x setup.sh
+./setup.sh
+```
 
-**Components:**
-- **Survey List Page:** Displays existing surveys with title, study association, creation date, and actions (edit, clone, delete).  
-- **Upload Section:** Allows importing survey definitions via JSON files.  
-- **New Survey Button:** Creates a blank survey structure for manual question entry.
+---
 
-#### 3.3.1 Survey Details View  
-Displays internal structure of an EMA survey.  
-Each survey question is listed with metadata such as id, title, subText, questionType, category, frequency, and activation times.
+### Database Setup (MariaDB)
 
-Users can edit or delete questions using icons in the “actions” column.
+JDash uses **MariaDB** for both development and production.
 
-#### 3.3.2 Edit Question Form  
-Provides a complete definition for each question:
+Ensure MariaDB is running:
 
-- **Sequence ID:** Ordering number in the survey.  
-- **Type:** Expected answer type.  
-- **Title and Description:** Main question and English translation.  
-- **Category and Frequency:** Group and timing parameters.  
-- **DeactivateOnAnswer / DeactivateOnDate:** Conditions to stop showing the question.  
-- **Activate/Deactivate Question Lists:** Define dependencies between questions.  
-- **ClockTime Settings:** Define when push notifications are triggered.  
-- **Image URL / Link URL:** Optional visual or external reference content.
+```bash
+sudo systemctl enable mariadb
+sudo systemctl start mariadb
+```
 
-### 3.4 Analytics Module  
-The Analytics tab  integrates visual dashboards through **django-plotly-dash**. It allows analysis of data collected from mobile apps, such as:
+Run the MariaDB setup script from the project root:
 
-- Sensor activity over time  
-- EMA response   
-- Participant-level metrics  
+```bash
+chmod +x setup_mysql.sh
+./setup_mysql.sh
+```
 
+This script typically:
+- Creates a database (e.g., `jtrack`)
+- Creates a database user with privileges
+- Optionally imports schema/data from `jtrack.sql`
 
-**Workflow Summary:**
-1. User logs in to JDash.  
-2. Creates or opens a study.  
-3. Defines study metadata and sensor/EMA configuration.  
-4. Enrolls subjects.  
-5. Associates or uploads surveys.  
-6. Monitors progress and sends notifications.  
-7. Optionally analyzes data through Analytics tab.
+Then apply Django migrations:
+
+```bash
+python manage.py migrate
+```
+
+---
+
+### Run the Development Server
+
+Start Django’s built-in server:
+
+```bash
+python manage.py runserver
+```
+
+Open in your browser:
+
+👉 **http://127.0.0.1:8000**
+
+In this mode:
+- Debug is active  
+- Auto-reload is enabled  
+- No external web server is required  
+
+---
+
+## 🌐 Production Deployment (Apache + mod_wsgi)
+
+This configuration is recommended for real-world hosting.
+
+---
+
+### Prerequisites
+
+Install required packages:
+
+```bash
+sudo apt update
+sudo apt install python3 python3-venv python3-pip                  apache2 libapache2-mod-wsgi-py3 git
+```
+
+---
+
+### Clone Application into Server Directory
+
+Example installation directory: `/srv/jdash`
+
+```bash
+sudo mkdir -p /srv/jdash
+sudo chown $USER:$USER /srv/jdash
+cd /srv/jdash
+
+git clone https://github.com/mamaka7/JTrack-dashboard.git .
+```
+
+---
+
+### Create Virtual Environment
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+---
+
+### Database Setup (MariaDB)
+
+Run the setup script:
+
+```bash
+cd /srv/jdash
+chmod +x setup_mysql.sh
+./setup_mysql.sh
+```
+
+(or, if named `mysql_set.sh`):
+
+```bash
+chmod +x mysql_set.sh
+./mysql_set.sh
+```
+
+This will:
+- Create the MariaDB database (e.g., `jtrack`)
+- Create a DB user and grant privileges
+- Optionally import the base schema (`jtrack.sql`)
+
+---
+
+### Django Database Configuration
+
+Edit `jdash/settings.py`:
+
+```python
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.mysql",  # MariaDB-compatible
+        "NAME": "jtrack",
+        "USER": "jtrack_user",
+        "PASSWORD": "securepassword",
+        "HOST": "localhost",
+        "PORT": "3306",
+    }
+}
+```
+
+Disable DEBUG mode:
+
+```python
+DEBUG = False
+```
+
+Set Allowed Hosts:
+
+```python
+ALLOWED_HOSTS = ["your-domain.com", "127.0.0.1"]
+```
+
+Apply migrations:
+
+```bash
+python manage.py migrate
+```
+
+---
+
+### Collect Static Files
+
+Edit settings:
+
+```python
+STATIC_ROOT = "/srv/jdash/static_collected"
+```
+
+Then collect static assets:
+
+```bash
+python manage.py collectstatic
+```
+
+---
+
+### Configure Apache (mod_wsgi)
+
+Create a new Apache config file:  
+`/etc/apache2/sites-available/jdash.conf`
+
+```apache
+<VirtualHost *:80>
+    ServerName your-domain.com
+
+    Alias /static/ /srv/jdash/static_collected/
+    <Directory /srv/jdash/static_collected/>
+        Require all granted
+    </Directory>
+
+    <Directory /srv/jdash/jdash>
+        <Files wsgi.py>
+            Require all granted
+        </Files>
+    </Directory>
+
+    WSGIDaemonProcess jdash python-path=/srv/jdash                       python-home=/srv/jdash/venv
+    WSGIProcessGroup jdash
+    WSGIScriptAlias / /srv/jdash/jdash/wsgi.py
+
+    ErrorLog ${APACHE_LOG_DIR}/jdash_error.log
+    CustomLog ${APACHE_LOG_DIR}/jdash_access.log combined
+</VirtualHost>
+```
+
+Enable the site and module:
+
+```bash
+sudo a2enmod wsgi
+sudo a2ensite jdash.conf
+sudo systemctl reload apache2
+```
+
+(Optional) disable the default site:
+
+```bash
+sudo a2dissite 000-default.conf
+sudo systemctl reload apache2
+```
+
+---
+
+### 🔒 Enable HTTPS (Recommended)
+
+Use Let’s Encrypt for automatic SSL certificates:
+
+```bash
+sudo apt install certbot python3-certbot-apache
+sudo certbot --apache -d your-domain.com
+```
+
+---
 
 
