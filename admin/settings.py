@@ -13,24 +13,31 @@ https://docs.djangoproject.com/en/3.2/ref/settings/
 from pathlib import Path
 import os
 import datetime
+from dotenv import load_dotenv
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-LOG_FILENAME = os.path.join(BASE_DIR,'logs',              
-                f"debug_{datetime.datetime.now().strftime('%Y-%m-%d')}.log")
+JDASH_DIR = BASE_DIR / "jdash"
+SECRETS_DIR = BASE_DIR / "secrets"
 
+load_dotenv(BASE_DIR / "secrets" / "tokens.env")
+
+LOG_FILENAME = os.path.join(os.getenv("LOG_DIR", ''),
+                f"debug_{datetime.datetime.now().strftime('%Y-%m-%d')}.log")
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = ''
+SECRET_KEY = os.environ['DJANGO_SECRET_KEY']
 
 # SECURITY WARNING: don't run with debug turned on in production!
-#DEBUG = True
-DEBUG = False
+DEBUG = os.environ.get("DEBUG", "True").lower() == "true"
 
-ALLOWED_HOSTS = [ "127.0.0.1", "localhost"]
+ALLOWED_HOSTS = os.getenv(
+    "DJANGO_ALLOWED_HOSTS",
+    "jdash.inm7.de,jutrack.inm7.de,127.0.0.1,localhost"
+).split(",")
 
 
 # Application definition
@@ -46,7 +53,8 @@ INSTALLED_APPS = [
     "django_browser_reload",
     'django_plotly_dash.apps.DjangoPlotlyDashConfig',
     'dpd_static_support',
-    'jdash'
+    'jdash.apps.jdashConfig', 
+    'auditlog',
 ]
 
 MIDDLEWARE = [
@@ -55,11 +63,14 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',   
+    "django_browser_reload.middleware.BrowserReloadMiddleware",
+    'django.middleware.locale.LocaleMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    'jdash.maintainence_middleware.MaintenanceModeMiddleware',
+    'jdash.maintenance_middleware.MaintenanceModeMiddleware',
     'django_plotly_dash.middleware.BaseMiddleware',
     'django_plotly_dash.middleware.ExternalRedirectionMiddleware',
+    'auditlog.middleware.AuditlogMiddleware',
 ]
 
 ROOT_URLCONF = 'admin.urls'
@@ -85,17 +96,19 @@ ASGI_APPLICATION = 'admin.routing.application'
 
 CRISPY_TEMPLATE_PACK = 'bootstap5'
 
+
 # Database
 # https://docs.djangoproject.com/en/3.2/ref/settings/#databases
+
 
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        'NAME': 'jtrack',
-        "USER": "jtrackuser",
-        "PASSWORD": "jtrackuser@JDASH123",
-        "HOST": "localhost",
-        "PORT": "3306",
+        'NAME': os.environ['DB_NAME'],
+        "USER": os.environ["DB_USER"],
+        "PASSWORD": os.environ["DB_PASSWORD"],
+        "HOST": os.environ["DB_HOST"],
+        "PORT": os.environ["DB_PORT"],
     }
 }
 
@@ -119,10 +132,11 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
-     'filters': {
+    'filters': {
         'username_filter': {
             '()': 'jdash.logging_filters.UsernameLoggingFilter',
         },
@@ -157,32 +171,70 @@ LOGGING = {
         },
         
     },
+
 }
-MAINTENANCE_MODE = False # Set to True to enable maintenance mode
+SSH_RUNTIME_DIR = os.getenv("SSH_RUNTIME_DIR", "")
+MAINTENANCE_MODE = os.environ.get("MAINTENANCE_MODE", "False").lower() == "true"
+MAINTENANCE_ALLOWED_USERNAMES = [
+    username.strip()
+    for username in os.getenv("MAINTENANCE_ALLOWED_USERNAMES", "").split(",")
+    if username.strip()
+]
 #Email settings
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'mail.fz-juelich.de'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = ''
-EMAIL_HOST_PASSWORD = ''
-   
+EMAIL_HOST = os.environ['EMAIL_HOST']
+EMAIL_PORT = int(os.environ['EMAIL_PORT'])
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true'
+EMAIL_HOST_USER = os.environ['EMAIL_HOST_USER']
+EMAIL_HOST_PASSWORD = os.environ['EMAIL_HOST_PASSWORD']
+
+STORAGE_FOLDER = os.getenv("STORAGE_FOLDER", "")
+DASH_FOLDER = os.getenv("DASH_FOLDER", "")
+FIREBASE_URL = os.getenv('FIREBASE_URL', '')
+FIREBASE_URL_EMA = os.getenv("FIREBASE_URL_EMA", "")
+FIREBASE_URL_MAIN = os.getenv("FIREBASE_URL_MAIN", "")
+SMTP_SERVER = os.getenv("SMTP_SERVER", EMAIL_HOST)
+SMTP_PORT = int(os.getenv("SMTP_PORT", str(EMAIL_PORT)))
+SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", EMAIL_HOST_USER)
+SUPPORT_PWD = os.environ["SUPPORT_PWD"]
+SUPPORT_EMAIL_G = os.environ["SUPPORT_EMAIL_G"]
+JUSELESS_SERVER = os.getenv('JUSELESS_SERVER', 'juseless.inm7.de')
+REMOTE_USERNAME = os.getenv('REMOTE_USERNAME', 'mnarava')
+ANALYTICS_PIPELINE_REMOTE_SCRIPT = os.getenv("ANALYTICS_PIPELINE_REMOTE_SCRIPT", "")
+ANALYTICS_PIPELINE_SSH_KEY = os.getenv(
+    "ANALYTICS_PIPELINE_SSH_KEY",
+    "",
+)
+JUSELESS_SCRIPT_FOLDER = os.getenv('JUSELESS_SCRIPT_FOLDER', '')
+JUSELESS_STUDIES_FOLDER = os.getenv('JUSELESS_STUDIES_FOLDER', '')
+SERVICE_ACCOUNT_FILE_EMA = os.getenv(
+    'SERVICE_ACCOUNT_FILE_EMA',
+    str(SECRETS_DIR / '')
+) or str(SECRETS_DIR / '')
+SERVICE_ACCOUNT_FILE_MAIN = os.getenv(
+    'SERVICE_ACCOUNT_FILE_MAIN',
+    str(SECRETS_DIR / '')
+) or str(SECRETS_DIR / '')
+ 
 # Internationalization
 # https://docs.djangoproject.com/en/3.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+# Enable i18n and localization
+USE_I18N = True
+LANGUAGE_CODE = 'en'
+
+LANGUAGES = [
+    ('en', 'English'),
+    ('de', 'Deutsch'),
+]
+
+LOCALE_PATHS = [BASE_DIR / "locale"]
 
 TIME_ZONE = 'Europe/Berlin'
 
-USE_I18N = True
-
-USE_L10N = True
-
-USE_TZ = True
 DEFAULT_CHARSET = "utf-8"
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 SESSION_COOKIE_SAMESITE = "Lax"  # or "Strict"
-SESSION_COOKIE_SAMESITE = "None"
 SESSION_COOKIE_SECURE = True  # Required when SameSite=None
 
 # Static files (CSS, JavaScript, Images)
@@ -196,7 +248,7 @@ CSRF_FAILURE_VIEW = 'jdash.views.csrf_failure'
 STATICFILES_FINDERS = (                                                          
      'django.contrib.staticfiles.finders.FileSystemFinder',                       
      'django.contrib.staticfiles.finders.AppDirectoriesFinder',             
-  #   'django.contrib.staticfiles.finders.DefaultStorageFinder',   
+  #   'django.contrib.staticfiles.finders.DefaultStorageFinder',
     'django_plotly_dash.finders.DashAssetFinder',  # Critical for Dash components
     'django_plotly_dash.finders.DashComponentFinder',
                    
@@ -219,6 +271,8 @@ LOGIN_URL='/login/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGOUT_REDIRECT_URL = "login"
 
+
+
 #session
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 #session
@@ -229,3 +283,5 @@ SESSION_IDLE_TIMEOUT = INACTIVE_TIME  # logout
 SESSION_EXPIRE_SECONDS = INACTIVE_TIME
 SESSION_EXPIRE_AFTER_LAST_ACTIVITY = True
 SESSION_TIMEOUT_REDIRECT = '/login' # Add your URL
+USE_TZ = False
+

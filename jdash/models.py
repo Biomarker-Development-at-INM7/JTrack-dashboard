@@ -10,9 +10,11 @@ from datetime import datetime,timezone, timedelta
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from jdash.apps import constants as constants
+from jdash.config import constants as constants
+from django.utils import timezone as dj_timezone
 
 
+    
 class Survey(models.Model): 
     """Class representing a Survey"""
     title = models.CharField(max_length=100)
@@ -20,9 +22,9 @@ class Survey(models.Model):
     topN = models.IntegerField(default = -1)
     splitbyCategory = models.BooleanField(default=False)
     scrolling = models.CharField(default='H',null=False,max_length=1,blank=False)
-    owner = models.ForeignKey(User, on_delete=models.PROTECT,null=False, editable=False)
-    createdDate = models.DateTimeField(default=datetime.now().astimezone())
-
+    owner = models.ForeignKey(User, default=1,on_delete=models.PROTECT,null=False, editable=False)
+    createdDate = models.DateTimeField(default=dj_timezone.now)
+    
     def __str__(self):
         return self.title or f"Survey #{self.pk}"
     
@@ -35,12 +37,13 @@ class Study(models.Model):
     numberOfSubjects = models.IntegerField(default=0)
     description = models.TextField(max_length=1000,blank=True, null=True)
     enrolled_subjects = models.CharField(null=True,max_length=10000,blank=True)
-    createdDate = models.DateTimeField(default=datetime.now().astimezone())
-    owner = models.ForeignKey(User, on_delete=models.PROTECT, null=False, editable=False)
+    createdDate = models.DateTimeField(default=dj_timezone.now)
+    owner = models.ForeignKey(User,default=1, on_delete=models.PROTECT, null=False, editable=False)
 
     passive_monitoring = models.BooleanField(default=False)
     frequency = models.IntegerField(default=50 , choices= constants.RECORDING_FREQUENCIES)
-    sensor_list = models.CharField(max_length=150, default="",choices= constants.SENSORS_LIST)
+    sensor_list = models.JSONField( default=list,blank=True)
+    sensor_list_limited = models.JSONField( default=list,blank=True)
     labeling = models.IntegerField(default=0,choices= constants.LABELLING)
     ecological_momentary_assessment = models.BooleanField(default=False)
     #check for how to store if ema is not choosen
@@ -64,7 +67,7 @@ class Question(models.Model):
     title = models.TextField(max_length=10000)
     active = models.BooleanField(default=True)
     subText = models.TextField(max_length=1000,blank=True,null=True) 
-    questionType = models.IntegerField( choices= constants.QUESTION_TYPES)
+    questionType = models.IntegerField(default= 0,choices= constants.QUESTION_TYPES)
     category = models.IntegerField(default=1)
     imageURL = models.CharField(blank=True,max_length=100)
     url = models.CharField(blank=True,max_length=100)
@@ -73,15 +76,16 @@ class Question(models.Model):
     clockTime_start = models.JSONField(default=list,blank=True, null=True)
     clockTime_end = models.JSONField(default=list,blank=True, null=True)
     clockTime_timezone = models.CharField(max_length=100, blank=True, null=True)
-    nextDayToAnswer = models.IntegerField(default=0)
+    nextDayToAnswer = models.IntegerField(default=1)
     deactivateOnAnswer = models.CharField(blank=True,max_length=5)
     deactivateOnDate = models.IntegerField(default=0)
     activate_question = models.JSONField(default=list,blank=True, null=True)
     deactivate_question = models.JSONField(default=list,blank=True, null=True)
     activation_condition = models.CharField(max_length=100,blank=True,null=True) 
-    deactivation_condition = models.CharField(max_length=100,blank=True,null=True) 
+    deactivation_condition = models.CharField(max_length=100,blank=True,null=True)
     survey = models.ForeignKey(Survey, on_delete=models.CASCADE,blank=True, null=True)
 
+    
     def clean(self):
         """_summary_
 
@@ -100,10 +104,11 @@ class Question(models.Model):
             if not isinstance(item, (int)):
                 raise ValidationError({'activate_question': 'All elements must be numbers (integers).'})
         
-        # Check that every item in the list is a number (either integer or float)
+        # Check that every item in the list is a number (only integers)
         for item in deactivate_question_list:
             if not isinstance(item, (int)):
                 raise ValidationError({'deactivate_question': 'All elements must be numbers (integers).'})
+            
         if self.clockTime_start is not None and len(self.clockTime_start) > 1:
             if self.clockTime_end is not None:  
                 if len(self.clockTime_start) != len(self.clockTime_end):
@@ -122,7 +127,7 @@ class Answer(models.Model):
     maxValue = models.FloatField(default=0.1)
     minText = models.CharField(max_length=100,blank=True)
     maxText = models.CharField(max_length=100,blank=True)
-    question = models.OneToOneField(Question,on_delete=models.CASCADE,blank=False, null=False)
+    question = models.ForeignKey(Question,on_delete=models.CASCADE,blank=False, null=False)
 
 
 
@@ -152,38 +157,210 @@ class Subject(models.Model):
     time_left = models.DateTimeField()
     timejoined_timezone = models.TextField(max_length=50)
     timeZoneOffSetMinutes = models.TextField(max_length=10)
+    deleted = models.BooleanField(default=False)
 
-# class Task(models.Model): 
-#     """Class representing a Task"""
-#     sortId = models.IntegerField(default=1)
-#     task_title = models.CharField(max_length=100)
-#     task_description = models.TextField(max_length=512)
-#     task_preparation = models.IntegerField(default = 0)
-#     task_duration = models.IntegerField(default = 0)
-#     study = models.ForeignKey(Study, on_delete=models.PROTECT, blank=True, editable=False)
 
+class DeviceCatalog(models.Model):
+    """Class representing a Wearable Device Catalog"""
+    name = models.CharField(max_length=255)  # e.g., "Garmin", "fitbit"
+    manufacturer = models.CharField(max_length=255, blank=True, null=True)
+    model = models.CharField(max_length=255, blank=True, null=True)
+    device_type = models.CharField(max_length=50,
+        choices=[
+            ("watch", "Smartwatch"),
+            ("band", "Fitness Band"),
+            ("patch", "Wearable Patch"),
+            ("ring", "Smart Ring"),
+        ],
+        blank=True
+    )
+    is_active = models.BooleanField(default=True)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.name}    ({self.model})"
+
+class SensorCatalog(models.Model):
+    code = models.CharField(max_length=50)
+    label = models.CharField(max_length=100)
+    sensor_type = models.CharField(max_length=50,
+        choices=[
+            ("motion", "Motion"),
+            ("physio", "Physiological"),
+            ("location", "Location"),
+            ("environmental", "Environmental"),
+        ],
+        blank=True
+    )
+    is_active = models.BooleanField(default=True)
+    def __str__(self):
+        return self.label
+
+
+# # catalogs
+# class ResolutionCatalog(models.Model):
+#     value = models.CharField(max_length=100)
+#     sensor = models.ForeignKey(SensorCatalog, default= 1,on_delete=models.PROTECT, related_name="sensor_resolutions")
+#     class Meta:
+#         constraints = [
+#             models.UniqueConstraint(fields=["sensor", "value"], name="uniq_resolution_per_sensor")
+#         ]
+#     def __str__(self):
+#         return self.value
+
+
+class SamplingRateCatalog(models.Model):
+    value = models.CharField(max_length=100)
+    sensor = models.ForeignKey(SensorCatalog,default= 1, on_delete=models.PROTECT, related_name="sensor_sampling_rates")
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["sensor", "value"], name="uniq_sampling_per_sensor")
+        ]
+    def __str__(self):
+        return self.value
+
+
+class UnitCatalog(models.Model):
+    value = models.CharField(max_length=50)
+    sensor = models.ForeignKey(SensorCatalog, default= 1, on_delete=models.PROTECT, related_name="sensor_units")
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["sensor", "value"], name="uniq_unit_per_sensor")
+        ]
+    def __str__(self):
+        return self.value
+         
+class DeviceSensor(models.Model):
+    device = models.ForeignKey(DeviceCatalog, on_delete=models.CASCADE, related_name="device_sensors")
+    sensor = models.ForeignKey(SensorCatalog, on_delete=models.PROTECT, related_name="sensor_devices")
+
+    #default_resolution = models.ForeignKey(ResolutionCatalog, on_delete=models.PROTECT )
+    default_sampling_rate = models.ForeignKey(SamplingRateCatalog, on_delete=models.PROTECT)
+    default_unit = models.ForeignKey(UnitCatalog, on_delete=models.PROTECT)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["device", "sensor"], name="uniq_sensor_per_device")
+        ]
+
+    
+    
+    
+    def __str__(self):
+        return f"{self.device} - {self.sensor}"
+
+    
+class StudyDeviceSensor(models.Model):
+    study = models.ForeignKey(Study, on_delete=models.PROTECT, related_name="study_device_sensors")
+    device_sensor = models.ForeignKey(DeviceSensor, on_delete=models.PROTECT, related_name="study_configs")
+
+    # optional overrides; if null => use defaults from device_sensor
+    #resolution = models.ForeignKey(ResolutionCatalog, on_delete=models.PROTECT, null=True, blank=True)
+    sampling_rate = models.ForeignKey(SamplingRateCatalog, on_delete=models.PROTECT, null=True, blank=True)
+    unit = models.ForeignKey(UnitCatalog, on_delete=models.PROTECT, null=True, blank=True)
+
+    is_enabled = models.BooleanField(default=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["study", "device_sensor"], name="uniq_device_sensor_per_study")
+        ]
+
+    
+    
+    
+    
+class Task(models.Model):
+    """
+    Model backing TaskForm (used as a formset in CreateStudyForm)
+    Each Task is linked to a Study.
+    """
+
+    study = models.ForeignKey(
+        Study,
+        on_delete=models.PROTECT,
+        related_name="tasks",
+        editable=False
+    )
+
+    # task_name <-> task_name
+    task_name = models.CharField(
+        max_length=100,
+        help_text="Name of the task."
+    )
+
+    # task_preparation <-> task_preparation (IntegerField, min=0 in form)
+    task_preparation = models.IntegerField(
+        default = 0,
+        help_text="Preparation time for the task (e.g. minutes)."
+    )
+
+    # task_description <-> task_description
+    task_preparation_text = models.TextField(
+        blank=True,
+        help_text="Optional description of the task."
+    )
+
+    # task_duration <-> task_duration (IntegerField, min=0 in form)
+    task_duration = models.IntegerField(
+        default = 0,
+        help_text="Duration of the task (e.g. minutes)."
+    )
+
+    # task_description <-> task_description
+    task_description = models.TextField(
+        blank=True,
+        help_text="Optional description of the task."
+    )
+    # sortId <-> sortId (PositiveIntegerField, min=1 in form)
+    sortId = models.PositiveIntegerField(
+        default=0,
+        help_text="Order of the task within the study."
+    )
+
+    class Meta:
+        ordering = ["sortId", "id"]
+
+    def save(self, *args, **kwargs):
+        if self._state.adding and not self.sortId:
+            max_sort_id = (
+                Task.objects
+                .filter(study=self.study)
+                .aggregate(max_sort_id=models.Max("sortId"))
+                .get("max_sort_id")
+                or 0
+            )
+            self.sortId = max_sort_id + 1
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.study.title} - {self.task_name}"
+    
 
 class FileDownloadToken(models.Model):
     """Class representing a FileDownloadToken"""
     code = models.CharField(max_length=6,default=000000)
-    created_at = models.DateTimeField(default=datetime.now().astimezone())
+    created_at = models.DateTimeField(default=dj_timezone.now)
     first_name = models.CharField(max_length=255,default="")
     email = models.EmailField(blank=True)
     file_name = models.CharField(max_length=1024)
     token = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     expiration_date = models.DateTimeField()
     status = models.CharField(max_length=20,default="")
-    code_emailed = models.DateTimeField(default=datetime.now().astimezone())
-    downloaded = models.DateTimeField(default=datetime.now().astimezone())
+    code_emailed = models.DateTimeField(default=dj_timezone.now)
+    downloaded = models.DateTimeField(default=dj_timezone.now)
     link = models.CharField(max_length=10000,default="")
 
     def is_code_valid(self):
         """Check if the code is still valid (e.g., within 10 minutes of creation)."""
-        return datetime.now().astimezone() - self.created_at <= timedelta(minutes=10)
+        return dj_timezone.now - self.created_at <= timedelta(minutes=10)
     
     def is_token_valid(self):
         """Check if the token is still valid by comparing with the current time."""
-        return datetime.now().astimezone() < self.token_expiration_date
+        return dj_timezone.now() < self.expiration_date
 class QualityControlTests(models.Model):
     """
     Generalized model to track test cases for study quality control.

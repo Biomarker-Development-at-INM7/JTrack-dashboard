@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load custom_tags %}
 {% load static %}
+{% load i18n %}
 {% block content %}
 
 <script src="{% static 'js/jquery.min.js' %}"></script>
@@ -15,35 +16,38 @@
 <div class="row mb-4">
 	<ul class="nav nav-tabs">
 	<li class="nav-item">
-	  <a class="nav-link active" aria-current="page" href="{%url 'home' %}"   >Studies</a>
+	  <a class="nav-link active" aria-current="page" href="{%url 'home' %}"   >{% trans "index_tab1" %}</a>
 	</li>
 	<li class="nav-item">
-	  <a class="nav-link"  href="{%url 'survey' %}">Survey</a>
+	  <a class="nav-link"  href="{%url 'survey' %}">{% trans "index_tab2" %}</a>
 	</li>
 	<li class="nav-item">
-	  <a class="nav-link" href="{%url 'analytics' study_name='all' %}">Analytics</a>
+	  <a class="nav-link" href="{%url 'analytics' study_name='all' %}">{% trans "index_tab3" %}</a>
 	</li>
   </ul>
 </div> 
 	
 <div >
-    <div class="inline-container">
-        <a class="view" href="{% url 'details' study_name=study.title %}"  >
-            <i class="fa fa-eye fa-lg"></i></a>
-        <h2>{{study.title}}</h2>
+    <div class="d-flex justify-content-between align-items-center">
+        <div class="d-flex justify-content-start align-items-center">
+        <a class="" href="{% url 'details' study_name=study.title %}"  >
+            <h3 >{{study.title}}</h3></a>
+       
+        </div>
+        <a class="btn btn-outline-primary" href="{% url 'study_audit' study_name=study.title %}">{% trans "global_history" %}</a>
     </div>
     <div id="toolbar" class="toolbar-container">
         {% if request.user|has_group:"Investigator"  %}
-            <button name="select_all" id="select_all"  onclick="toggleSelectAll('owner', this)" class="btn btn-primary" >Select All</button>
+            <button name="select_all" id="select_all"  onclick="toggleSelectAll('owner', this)" class="btn btn-primary" >{% trans "study_sop_select_all" %}</button>
         {% else %}
-            <button name="select_all" id="select_all" onclick="toggleSelectAll('admin', this)" class="btn btn-primary" >Select All</button>
+            <button name="select_all" id="select_all" onclick="toggleSelectAll('admin', this)" class="btn btn-primary" >{% trans "study_sop_select_all" %}</button>
         {% endif %}
         <form id="testcaseForm" name="testcaseForm" action="{% url 'qc_study' study_name=study.title %}" method="POST">
          {% csrf_token %}
          <input type="hidden" id="testCaseFlagsInput" name="test_case_flags" value="">
             <input name="update_test_flags" id="update_test_flags"
                     type="submit" onclick="sendCheckedFlagsToServer('{{ study.title }}')"
-            class="btn btn-primary" value="Update">
+            class="btn btn-primary" value="{% trans 'study_sop_update' %}">
         </form>
     </div>
     <div class="col-md-6 col-lg-6">
@@ -59,16 +63,16 @@
     data-toolbar="#toolbar"
         data-search="true"
         data-pagination="true"
-        data-id-field="testcase_id"
+        data-id-field="testcase_db_id"
         data-page-list="[10, 30, 50, 100, all]">
         <thead>
             <tr>
-                <th data-field="tested_by_admin">Admin</th>
-                <th data-field="tested_by_owner" >Owner</th>
-                <th data-field="testcase_db_id" >Id</th>
-                <th>Description</th>
-                <th>Steps</th>
-                <th>Expected Outcome</th>
+                <th data-field="tested_by_admin">{% trans "study_sop_admin" %}</th>
+                <th data-field="tested_by_owner" >{% trans "study_sop_owner" %}</th>
+                <th data-field="testcase_db_id" >{% trans "study_sop_id" %}</th>
+                <th>{% trans "global_desc" %}</th>
+                <th>{% trans "study_sop_steps" %}</th>
+                <th>{% trans "study_sop_expected_outcome" %}</th>
             </tr>
         </thead>
         <tbody>
@@ -76,8 +80,11 @@
             <tr>
                 <td>
                 <input type="checkbox" class="custom-control-input admin-checkbox"
-                       id="admin_checkbox{{ forloop.counter }}" {% if test.tested_by_admin %} checked {% endif %}
-                       {% if request.user|has_group:"Investigator" %} disabled {% endif %}>
+                       id="admin_checkbox{{ forloop.counter }}" 
+                       {% if test.tested_by_admin %} 
+                        checked {% endif %}
+                       {% if request.user|has_group:Investigator %} 
+                            disabled {% endif %}>
                 </td>
                 <td> <input type="checkbox" class="custom-control-input
                                                  owner-checkbox"

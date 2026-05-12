@@ -1,14 +1,59 @@
 from django import forms
 from django.utils.safestring import mark_safe
-from django.forms import formset_factory
+from django.forms import (formset_factory,inlineformset_factory,
+                          modelformset_factory,BaseModelFormSet)
 from django.core.validators import RegexValidator
 from django.forms import widgets
 from django.forms.widgets import Widget
-from jdash.models import Answer, Question, Study, Survey, Category
-from jdash.apps import constants as constants
+from jdash.models import (Answer, Question, Study, 
+                          Survey, Category, DeviceSensor,
+                          DeviceCatalog,StudyDeviceSensor,
+                          # ResolutionCatalog,
+                          SamplingRateCatalog, UnitCatalog)
+from jdash.config import constants as constants
+import json
+
+class StrictValidationMixin:
+    """
+    Mixin that raises an exception with detailed debug info when form validation fails.
+    Useful for debugging during tests.
+    """
+    def is_valid(self):
+        valid = super().is_valid()
+        if not valid:
+            error_info = {
+                "form_class": self.__class__.__name__,
+                "is_bound": self.is_bound,
+                "form_errors": self.errors,
+                "cleaned_data": getattr(self, 'cleaned_data', None),
+                "raw_data": dict(self.data.copy()) if hasattr(self, 'data') else "N/A",
+            }
+            raise RuntimeError("Form validation failed:\n" + "\n".join(f"{k}: {v}" for k, v in error_info.items()))
+        return valid
 
 
 TITLE_REGEX = RegexValidator(r'^[a-zA-Z0-9_]*$','Only alphanumeric characters are allowed in study label.')
+
+class CommaSeparatedIntegerField(forms.Field):
+    widget = forms.TextInput
+
+    def to_python(self, value):
+        """Convert the input string to a list of ints."""
+        if not value:
+            return []
+        return [int(item.strip()) for item in value.split(",") if item.strip()]
+
+    def prepare_value(self, value):
+        """Convert the list of ints back to a comma-separated string for display."""
+        if isinstance(value, str):
+            try:
+                # If it's a JSON string
+                value = json.loads(value)
+            except json.JSONDecodeError:
+                return value
+        if isinstance(value, list):
+            return ",".join(str(v) for v in value)
+        return value
 
 class TaskForm(forms.Form):
     """Class representing a TaskForm"""
@@ -17,7 +62,7 @@ class TaskForm(forms.Form):
             'class': 'form-control'
         }
     ), label = False,
-    required=False)
+    required=True)
     task_preparation = forms.IntegerField(widget=forms.NumberInput(  
         attrs={
       
@@ -25,12 +70,21 @@ class TaskForm(forms.Form):
         }
     ), min_value= 0 ,label = False,
     required=False)
+    task_preparation_text = forms.CharField(widget=forms.Textarea(  
+        attrs={
+            'rows' : 2,
+            'class': 'form-control'
+        }
+    ), label = False,
+    required=False)
+
+    # Duration cannot be zero -> needs a default
     task_duration = forms.IntegerField(widget=forms.NumberInput(  
         attrs={
       
             'class': 'form-control'
         }
-    ), min_value= 0 ,label = False,
+    ), min_value= 1 ,label = False,
     required=False)
 
     task_description = forms.CharField(widget=forms.Textarea(  
@@ -44,9 +98,103 @@ class TaskForm(forms.Form):
     def __init__(self, *args, **kwargs):
         #self.extra = kwargs.pop('extra', self.extra)
         super(TaskForm, self).__init__(*args, **kwargs)
-        
 
-class CreateStudyForm(forms.Form):
+class StudyDeviceSensorForm(forms.ModelForm):
+    """
+    One row = one configured (study, device, sensor) for a given device-block.
+    IMPORTANT: device_sensor FK points to DeviceSensor (mapping).
+    UI can show labels via device_sensor.sensor.label, etc.
+
+    Overrides are optional; if empty, backend can interpret as "use defaults"
+    from DeviceSensor.
+    """
+    class Meta:
+        model = StudyDeviceSensor
+        fields = [
+            "device_sensor",
+            # Resolution support is currently disabled in the study UI.
+            # "resolution",
+            "sampling_rate",
+            "unit",
+        ]
+        widgets = {
+            "device_sensor": forms.Select(attrs={"class": "form-control"}),
+            # "resolution": forms.Select(attrs={"class": "form-control"}),
+            "sampling_rate": forms.Select(attrs={"class": "form-control"}),
+            "unit": forms.Select(attrs={"class": "form-control"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        device = kwargs.pop("device", None)
+        super().__init__(*args, **kwargs)
+
+        qs = DeviceSensor.objects.select_related("sensor")
+        if device is not None:
+            qs = qs.filter(device=device)
+        self.fields["device_sensor"].queryset = qs
+
+        # self.fields["resolution"].queryset = ResolutionCatalog.objects.none()
+        self.fields["sampling_rate"].queryset = SamplingRateCatalog.objects.none()
+        self.fields["unit"].queryset = UnitCatalog.objects.none()
+        self.fields["sampling_rate"].empty_label = None
+        self.fields["unit"].empty_label = None
+
+        sensor_obj = None
+
+        if self.is_bound:
+            ds_id = self.data.get(self.add_prefix("device_sensor"))
+            if ds_id:
+                try:
+                    ds = DeviceSensor.objects.select_related("sensor").get(pk=ds_id)
+                    sensor_obj = ds.sensor
+                except DeviceSensor.DoesNotExist:
+                    sensor_obj = None
+        elif self.instance and self.instance.pk and self.instance.device_sensor_id:
+            sensor_obj = self.instance.device_sensor.sensor
+
+        if sensor_obj is not None:
+            # self.fields["resolution"].queryset = ResolutionCatalog.objects.filter(sensor=sensor_obj)
+            self.fields["sampling_rate"].queryset = SamplingRateCatalog.objects.filter(sensor=sensor_obj)
+            self.fields["unit"].queryset = UnitCatalog.objects.filter(sensor=sensor_obj)
+
+
+class BaseStudyDeviceSensorFormSet(BaseModelFormSet):
+    """
+    Allows passing device=<DeviceCatalog> at formset instantiation time,
+    and forwards it into each form so device_sensor queryset is filtered.
+    """
+    def __init__(self, *args, **kwargs):
+        self.device = kwargs.pop("device", None)
+        super().__init__(*args, **kwargs)
+
+    def get_form_kwargs(self, index):
+        kw = super().get_form_kwargs(index)
+        kw["device"] = self.device
+        return kw
+
+
+StudyDeviceSensorFormSet = modelformset_factory(
+    StudyDeviceSensor,
+    form=StudyDeviceSensorForm,
+    formset=BaseStudyDeviceSensorFormSet,
+    extra=0,
+    can_delete=True,
+)
+              
+class StudyDeviceForm(forms.Form):
+    """Class representing a WBDeviceForm"""
+    device = forms.ModelChoiceField(
+        queryset=DeviceCatalog.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={"class": "form-control device-select"}),
+    )
+StudyDeviceFormSet = formset_factory(StudyDeviceForm, extra=1, can_delete=True)
+
+    
+
+
+  
+class CreateStudyForm(StrictValidationMixin, forms.Form):
     """Class representing a CreateStudyForm"""
     study_label = forms.CharField(widget=forms.TextInput(  
         attrs={
@@ -158,18 +306,20 @@ class CreateStudyForm(forms.Form):
 
     taskformset = formset_factory(TaskForm)
     
-    
+    device_formset = formset_factory(
+    form = StudyDeviceForm, 
+    can_delete=True,
+    )
     def __init__(self, *args, **kwargs):
         survey = kwargs.pop('survey', [])
         initial_survey_id = kwargs.pop('initial_survey_id', None)
-        json_data = kwargs.pop('data', None)
-        super(CreateStudyForm, self).__init__(*args, **kwargs)
+        json_data = kwargs.pop('json_data', None)  # avoid popping 'data'
+        super().__init__(*args, **kwargs)
 
         self.fields['survey'].choices = [('', 'Select survey')] + [(data['id'], data['title']) for data in survey]
 
         if json_data != None:
-            
-            self.fields['study_label'].initial = json_data["name"]
+            self.fields['study_label'].initial = json_data["name"]  # ← change 'name' to 'study_label'
             self.fields['study_duration'].initial = json_data["duration"]
             self.fields['number_of_subjects'].initial = json_data["number_of_subjects"]
             self.fields['study_description'].initial = json_data["description"]
@@ -270,47 +420,38 @@ class JSONUploadForm(forms.Form):
         attrs={
             'name' : "json_file",
             'class' : "form-control",
-             'type' : "file"
+             'type' : "file",
+             'accept': '.json,.csv,.xls,.xlsx,.xlsm',
+             'title': 'Support JSON, CSV, XLS, XLSX, XLSM. Excel uploads use the first sheet.'
         }
     ))
 
 class SurveyForm(forms.ModelForm):
     """Class representing a SurveyForm"""
 
-    def __init__(self, *args, **kwargs):
-
-        json_data = kwargs.pop('data', None)
+    def __init__(self, *args, json_data=None, **kwargs):
         super(SurveyForm, self).__init__(*args, **kwargs)
-    
+
         if json_data is not None:
-            self.fields['title'].initial = json_data["title"]
-            self.fields['description'].initial = json_data["description"]
-            self.fields['splitbyCategory'].initial = json_data["splitbyCategory"]
-            self.fields['scrolling'].initial = json_data["scrolling"]
-            self.fields['topN'].initial = json_data["topN"]
+            self.fields['title'].initial = json_data.get("title", "")
+            self.fields['description'].initial = json_data.get("description", "")
+            self.fields['splitbyCategory'].initial = json_data.get("splitbyCategory", False)
+            self.fields['scrolling'].initial = json_data.get("scrolling", "H")
+            self.fields['topN'].initial = json_data.get("topN", -1)
 
     class Meta:
         model = Survey
-        fields = ['title', 'description', 'splitbyCategory','scrolling' ,'topN']
-        exclude = ['id','study']
+        fields = ['title', 'description', 'splitbyCategory', 'scrolling', 'topN']
+        exclude = ['id', 'study']
         widgets = {
-            'title' : forms.TextInput(attrs={
-                'id' : 'surveyTitle'
-                }),
-            'description': forms.Textarea(attrs={'rows' : 4}),
-            'splitbyCategory' : forms.CheckboxInput(
-                attrs={
-                'class' : 'form-check-input',
-                'placeholder' : 'Use default values for below form'  ,
-                'id' : 'splitCheck',
-
-                }
-            ),
-            'scrolling' : forms.RadioSelect(
-                choices= constants.SCROLLING_CHOICES
-            ),
-            'topN' : forms.NumberInput(attrs={
-                'placeholder': 'TopN'})  
+            'title': forms.TextInput(attrs={'id': 'surveyTitle'}),
+            'description': forms.Textarea(attrs={'rows': 4}),
+            'splitbyCategory': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+                'id': 'splitCheck'
+            }),
+            'scrolling': forms.RadioSelect(choices=constants.SCROLLING_CHOICES),
+            'topN': forms.NumberInput(attrs={'placeholder': 'TopN'})
         }
         
     
@@ -322,22 +463,25 @@ class CategoryForm(forms.ModelForm):
         self.fields['categoryTitle'].required = False
         #self.fields['didSubjectAsk'].required = False
         #self.fields['categoryValue'].required = False
+        #self.fields['didSubjectAsk'].required = False
+        #self.fields['categoryValue'].required = False
         
     class Meta:
         model = Category
         fields = ['categoryTitle']
+        fields = ['categoryTitle']
         exclude = ['id','survey']
         widgets = {
             'categoryTitle' : forms.TextInput(attrs={
-                 'class': 'form-control'}),
+                 'class': 'form-control'}),            
             'categoryValue' : forms.NumberInput(attrs={
-                 'class': 'form-control'})
+                 'class': 'form-control'}) 
             # 'didSubjectAsk' : forms.CheckboxInput(
             #     attrs={
             #     'class' : 'form-check-input'
 
             #     }
-            # ),
+            # ), 
         }
 
 class AnswerForm(forms.ModelForm):
@@ -413,14 +557,14 @@ class BlankIfEmptyJSONField(forms.JSONField):
         # return the empty string so the widget renders blank
         if value in (None, [], {},""):
             return ''
-
+        
         if isinstance(value, str):
             s = value.strip()
-
+            
             # If it’s surrounded by quotes, remove them:
             if (s.startswith('"') and s.endswith('"')) or (s.startswith("'") and s.endswith("'")):
                 s = s[1:-1].strip()
-
+            
             # If it’s JSON‐bracketed, e.g. "[480,560,800]", drop the brackets:
             if s.startswith("[") and s.endswith("]"):
                 inner = s[1:-1].strip()
@@ -428,20 +572,20 @@ class BlankIfEmptyJSONField(forms.JSONField):
                 # Since JSONField’s normal parsing would accept [1,2,3], but we want the bare CSV,
                 # returning `inner` is fine (no quotes).
                 return inner
-
+            
             # Otherwise, just return the string as‐is (e.g. "480,560,800" no extra quotes).
             return s
-
+        
         return super().prepare_value(value)
         
     def to_python(self, value):
         # When the form posts back an empty string, convert to []
         if value in ('', None):
             return []
-
+        
         if not isinstance(value, str):
             return super().to_python(value)
-
+        
         # 3) It’s a string. If it doesn’t look like JSON (no leading “[” or “{”), treat it as CSV:
         s = value.strip()
         if not (s.startswith("[") or s.startswith("{")):
@@ -452,31 +596,33 @@ class BlankIfEmptyJSONField(forms.JSONField):
                 return [int(p) for p in parts]
             except ValueError:
                 return parts
-
+        
         return super().to_python(s)
-
-
+                  
 class QuestionForm(forms.ModelForm):
+    UNCATEGORIZED_VALUE = 0
+    UNCATEGORIZED_LABEL = "Uncategorized"
+
     """
     A ModelForm class for creating and updating 
     question forms with optional default settings.
     """
-    
+
     default_value = forms.BooleanField(widget=forms.CheckboxInput(
         attrs={
-           'class' : 'form-check-input',
-           'placeholder' : 'Use default values for below form'  ,
-           'id' : 'flexSwitchCheckDefault',
-           'onclick' : 'set_default_values(this)'
-
+            'name': 'default_value',
+            'class': 'form-check-input',
+            'placeholder': 'Use default values for below form',
+            'id': 'flexSwitchCheckDefault',
+            'onclick': 'set_default_values(this)'
         }
-    ),label = True,required=False)
+    ), label=True, required=False)
     title = forms.CharField(widget=forms.Textarea(
                 attrs={
                     'id' :"questionTitle",
                     'rows' : 2
                     } )
-                , required=True,label = False)
+                ,required=True, label = False)
     subText = forms.CharField(widget=forms.TextInput(
         attrs={
             'id' :"subText"
@@ -605,32 +751,42 @@ class QuestionForm(forms.ModelForm):
         help_text="List of start times (leave blank if none)"
     )
     
+
+    activate_question = CommaSeparatedIntegerField(required=False)
+    deactivate_question = CommaSeparatedIntegerField(required=False)
+    clockTime_start = CommaSeparatedIntegerField(required=False)
+    clockTime_end = CommaSeparatedIntegerField(required=False)
+
+
     answer_formset = formset_factory(AnswerForm)
     def __init__(self, *args, categories=None, **kwargs):
-        json_data = kwargs.pop('data', None)
+        json_data = kwargs.pop('json_data', None)
         super(QuestionForm, self).__init__(*args, **kwargs)
-        
-            
+
         if json_data is not None:
+            # Required fields
+            if "title" not in json_data or "questionType" not in json_data:
+                raise KeyError("Both 'title' and 'questionType' must be provided in json_data.")
+
             self.fields['title'].initial = json_data["title"]
-            self.fields['active'].initial = json_data["active"] 
-            self.fields['subText'].initial = json_data["subText"]
             self.fields['questionType'].initial = json_data["questionType"]
-            self.fields['category'].initial = json_data["category"]
-            self.fields['imageURL'].initial = json_data["imageURL"]
-            self.fields['url'].initial = json_data["url"]
-            self.fields['nextDayToAnswer'].initial = json_data["nextDayToAnswer"]
-            self.fields['deactivateOnDate'].initial = json_data["deactivateOnDate"]
-            self.fields['deactivateOnAnswer'].initial = json_data["deactivateOnAnswer"]
-            self.fields['sortId'].initial = json_data["sortId"]
-            self.fields['frequency'].initial = json_data["frequency"]
-            self.fields['clockTime'].initial = json_data["clockTime"]
-            self.fields['clockTime_start'].initial = json_data["clockTime_start"]
-            self.fields['clockTime_end'].initial = json_data["clockTime_end"]
-            self.fields['activate_question'].initial = json_data["activate_question"]
-            self.fields['deactivate_question'].initial = json_data["deactivate_question"]
-            self.fields['activation_condition'].initial = json_data["activation_condition"]
-            self.fields['deactivation_condition'].initial = json_data["deactivation_condition"]
+
+            # Optional fields\
+            self.fields['active'].initial = json_data["active"]
+            self.fields['subText'].initial = json_data.get("subText", "")
+            self.fields['category'].initial = json_data.get("category", "")
+            self.fields['imageURL'].initial = json_data.get("imageURL", "")
+            self.fields['url'].initial = json_data.get("url", "")
+            self.fields['nextDayToAnswer'].initial = json_data.get("nextDayToAnswer", "")
+            self.fields['deactivateOnDate'].initial = json_data.get("deactivateOnDate", "")
+            self.fields['deactivateOnAnswer'].initial = json_data.get("deactivateOnAnswer", "")
+            self.fields['sortId'].initial = json_data.get("sortId", "")
+            self.fields['clockTime_start'].initial = json_data.get("clockTime_start", [])
+            self.fields['clockTime_end'].initial = json_data.get("clockTime_end", [])
+            self.fields['activate_question'].initial = json_data.get("activate_question", [])
+            self.fields['deactivate_question'].initial = json_data.get("deactivate_question", [])
+            self.fields['activation_condition'].initial = json_data.get("activation_condition", "")
+            self.fields['deactivation_condition'].initial = json_data.get("deactivation_condition", "")
             
         self.fields['title'].required = False
         self.fields['active'].required = False
@@ -650,12 +806,44 @@ class QuestionForm(forms.ModelForm):
         self.fields['deactivate_question'].required = False
         self.fields['activation_condition'].required = False
         self.fields['deactivation_condition'].required = False
+        self.fields['activate_question'].widget.attrs.update({
+            'id': 'activate_question',
+            'rows': 1,
+            'oninput': 'toggleActivateConditionsField()',
+        })
+        self.fields['deactivate_question'].widget.attrs.update({
+            'id': 'deactivate_question',
+            'rows': 1,
+            'oninput': 'toggleDeactivateConditionsField()',
+        })
+        self.fields['clockTime_start'].widget.attrs.update({
+            'id': 'clockTime_start',
+            'rows': 1,
+        })
+        self.fields['clockTime_end'].widget.attrs.update({
+            'id': 'clockTime_end',
+            'rows': 1,
+        })
+        if categories:
+            category_choices = [
+                (self.UNCATEGORIZED_VALUE, self.UNCATEGORIZED_LABEL),
+            ]
+            category_choices.extend(
+                (category['categoryValue'], category['categoryTitle'])
+                for category in categories
+                if category['categoryValue'] != self.UNCATEGORIZED_VALUE
+            )
 
-        # Conditionally set category field widget
-        if categories is not None and len(categories) > 0:
-            # If categories exist, show dropdown (Select)
             self.fields['category'].widget = forms.Select(
-                choices=[(category['categoryValue'], category['categoryTitle']) for category in categories],
+                choices=category_choices,
+                attrs={
+                    'id': 'category',
+                    'class': 'form-control'
+                }
+            )
+        else:
+            self.fields['category'].initial = 1
+            self.fields['category'].widget = forms.NumberInput(
                 attrs={
                     'id': 'category',
                     'class': 'form-control'
@@ -668,8 +856,6 @@ class QuestionForm(forms.ModelForm):
         model = Question
         exclude = ['survey']
         fields = '__all__'
-
-
 
 class DeleteSubjectForm(forms.Form):
     """Class representing a DeleteSubjectForm"""
@@ -722,7 +908,6 @@ class ContactUsForm(forms.Form):
 
     class Meta:
         fields = '__all__'
-
 
 class DateForm(forms.Form):
     """Class representing a DateForm"""

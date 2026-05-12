@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+{% load custom_tags %}
+{% load static %}
+{% load i18n %}
+{% block content %}
+
+<script src="{% static 'js/jquery.min.js' %}"></script>
+<link href="{% static 'css/bootstrap-table.min.css' %}" rel="stylesheet">
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css">
+<script src="{% static 'js/bootstrap-table.min.js' %}"></script>
+<script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
+<script src="{% static 'js/main.js' %}"></script>
+<script src="{% static 'js/popper.js' %}"></script>
+
+<div class="row mb-4">
+  <ul class="nav nav-tabs">
+    <li class="nav-item">
+      <a class="nav-link active" aria-current="page" href="{% url 'home' %}">{% trans "index_tab1" %}</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="{% url 'survey' %}">{% trans "index_tab2" %}</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="{% url 'analytics' study_name='all' %}">{% trans "index_tab3" %}</a>
+    </li>
+  </ul>
+</div>
+
+<div class="row mb-4">
+  <div class="col-md-6 col-lg-4">
+    
+  </div>
+  <div class="col-md-6 col-lg-8">
+    {% if messages %}
+      <ul class="messages">
+        {% for message in messages %}
+          <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row">
+  <div class="d-flex justify-content-between align-items-center">
+    <div class="d-flex justify-content-start align-items-center">
+    <a class="" href="{% url 'details' study_name=study.title %}"  >
+      <h3 >{{study.title}}</h3></a>
+    
+    </div>
+    <a class="btn btn-outline-primary" href="{% url 'qc_study' study_name=study.title  %}">{% trans "global_back_overview" %}</a>
+</div>
+  <div class="col-12">
+        
+          <div  id="study-audit-log" 
+            aria-labelledby="study-audit-log">
+            {% if audit_history %}
+              <div class="table-responsive">
+	                <table class="table table-striped table-hover align-middle">
+	                  <thead class="table-dark">
+	                    <tr>
+	                      <th scope="col">{% trans "Timestamp" %}</th>
+	                      <th scope="col">{% trans "Actor" %}</th>
+	                      <th scope="col">{% trans "Object" %}</th>
+                        <th scope="col">{% trans "Action" %}</th>
+	                      <th scope="col">{% trans "Changes" %}</th>
+	                    </tr>
+	                  </thead>
+                  <tbody>
+                    {% for entry in audit_history %}
+                      <tr>
+                        <td>{{ entry.timestamp }}</td>
+                        <td>{% if entry.actor %}{{ entry.actor }}{% else %}-{% endif %}</td>
+                        <td>{{ entry.object_repr }}</td>
+                        <td>{{ entry.action_label }}</td>
+                        <td>
+                          {% if entry.changes %}
+                            {% for field, values in entry.changes.items %}
+                              {% if field not in "id sortId study is_enabled notes" %}
+                                <span class="badge badge-light text-dark mr-1 mb-1">
+                                  {{ field|title|cut:"_" }}:
+                                  <span class="text-danger">{{ values.0|default:"-" }}</span>
+                                  <i class="fa fa-long-arrow-right mx-1"></i>
+                                  <span class="text-success">{{ values.1|default:"-" }}</span>
+                                </span>
+                              {% endif %}
+                            {% endfor %}
+	                          {% else %}
+	                            <span class="text-muted">{% trans "No field diff" %}</span>
+	                          {% endif %}
+	                        </td>
+	                      </tr>
+	                    {% endfor %}
+	                  </tbody>
+	                </table>
+	              </div>
+	            {% else %}
+	              <p class="mb-0 text-muted">{% trans "No audit history available." %}</p>
+	            {% endif %}
+          
+
+  </div>
+</div>
+
+{% endblock %}
+

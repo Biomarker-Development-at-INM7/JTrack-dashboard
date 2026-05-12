@@ -4,7 +4,10 @@ import datetime
 from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
-from datetime import datetime
+from datetime import timezone
+
+utc = timezone.utc
+
 
 class Migration(migrations.Migration):
 
@@ -64,7 +67,7 @@ class Migration(migrations.Migration):
                 ('numberOfSubjects', models.IntegerField(default=0)),
                 ('description', models.TextField(blank=True, max_length=1000, null=True)),
                 ('enrolled_subjects', models.CharField(blank=True, max_length=10000, null=True)),
-                ('createdDate', models.DateTimeField(default=datetime.now().astimezone())),
+                ('createdDate', models.DateTimeField(default=datetime.datetime(2023, 12, 5, 15, 29, 8, 341790, tzinfo=utc))),
                 ('passive_monitoring', models.BooleanField(default=False)),
                 ('frequency', models.IntegerField(choices=[(50, '50 hz'), (100, '100 Hz'), (150, '150 Hz'), (200, '200 Hz')], default=50)),
                 ('sensor_list', models.CharField(choices=[('accelerometer', 'accelerometer'), ('activity', 'activity'), ('application_usage', 'application usage'), ('barometer', 'barometer'), ('gravity_sensor', 'gravity sensor'), ('gyroscope', 'gyroscope'), ('location', 'location'), ('magnetic_sensor', 'magnetic sensor'), ('rotation_vector', 'rotation vector'), ('linear_acceleration', 'linear acceleration'), ('lockUnlock', 'lockUnlock'), ('voice', 'voice')], default='', max_length=150)),

@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load custom_tags %}
 {% load static %}
+{% load i18n %}
 {% block content %}
 
 <script src="{% static 'js/jquery.min.js' %}"></script>
@@ -14,13 +15,13 @@
 <div class="row mb-4">
 	<ul class="nav nav-tabs">
 	<li class="nav-item">
-	  <a class="nav-link active" aria-current="page" href="{%url 'home' %}">Studies</a>
+	  <a class="nav-link active" aria-current="page" href="{%url 'home' %}">{% trans "index_tab1" %}</a>
 	</li>
 	<li class="nav-item">
-	  <a class="nav-link" href="{%url 'survey' %}">Survey</a>
+	  <a class="nav-link" href="{%url 'survey' %}">{% trans "index_tab2" %}</a>
 	</li>
 	<li class="nav-item">
-	  <a class="nav-link" href="{%url 'analytics' study_name='all' %}">Analytics</a>
+	  <a class="nav-link" href="{%url 'analytics' study_name='all' %}">{% trans "index_tab3" %}</a>
 	</li>
   </ul>
 </div> 
@@ -28,7 +29,7 @@
 		<div  class="col-md-6 col-lg-4">
 			{% if not request.user|has_group:"Viewer"  %}
 			<a id="add" class="btn btn-outline-primary btn-block" role="button" href="{%url 'add_study' %}">
-				Add Study
+				{% trans "index_add" %}
 			</a>
 			{% endif %}
 			
@@ -47,10 +48,10 @@
 				<div class="btn-group btn-group-toggle" data-toggle="buttons">
 				  
 				  <label id="grid" class="btn btn-outline-dark"  >
-					<input type="radio" name="layout" id="layout1" checked> Grid 
+					<input type="radio" name="layout" id="layout1" checked> {% trans "index_view1" %}
 				  </label>
 				  <label id="list" class="btn btn-outline-dark " >
-					<input type="radio" name="layout" id="layout2" > List
+					<input type="radio" name="layout" id="layout2" > {% trans "index_view2" %}
 				  </label>
 				</div>
 			</div>
@@ -62,18 +63,18 @@
 			<div id = "toolbar"  role="toolbar" aria-label="Toolbar with button groups">
 				
 				<div class="btn-group mr-4" role="group" aria-label="First group">
-				  <button type="button" class="btn btn-warning btn-sm ">subjects in study </button>
+				  <button type="button" class="btn btn-warning btn-sm ">{% trans "index_overview1" %} </button>
 				  
 				</div>
 				<div class="btn-group mr-4" role="group" aria-label="Second group">
-				  <button type="button" class="btn btn-success btn-sm">subjects completed study</button>
+				  <button type="button" class="btn btn-success btn-sm">{% trans "index_overview2" %}</button>
 				 
 				</div>
 				<div class="btn-group mr-4" role="group" aria-label="Third group">
-				  <button type="button" class="btn btn-primary btn-sm">subjects left study </button>
+				  <button type="button" class="btn btn-primary btn-sm">{% trans "index_overview3" %} </button>
 				</div>
 				<div class="btn-group" role="group" aria-label="Third group">
-					<button type="button" class="btn btn-danger btn-sm">subjects removed</button>
+					<button type="button" class="btn btn-danger btn-sm">{% trans "index_overview4" %}</button>
 				  </div>
 			  </div>
 
@@ -90,12 +91,13 @@
 
 			<thead>
 				<tr>
-					<th data-field="study_name" data-sortable="true"> Name</th> 
-					<th data-field="no_of_subjects" > Enrolled subjects</th>
-					<th data-field="study_desc"> Description</th> 
-					<th data-field="created_date" data-sortable="true" data-visible="false">Created Date</th> 
-					<th data-field="sensors" >Sensors</th>
-					<th data-events="operateEvents">Actions</th>
+					<th data-field="study_name" data-sortable="true"> {% trans "index_overview5" %}</th>
+					<th data-field="no_of_subjects" > {% trans "index_overview6" %}</th>
+					<th data-field="study_desc"> {% trans "global_desc" %}</th>
+					<th data-field="users">Members</th>
+					<th data-field="created_date" data-sortable="true" data-visible="false">{% trans "index_overview8" %}</th>
+					<th data-field="sensors" >{% trans "index_overview9" %}</th>
+					<th data-events="operateEvents">{% trans "global_act" %}</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -117,11 +119,23 @@
 					  	</div>
 					</td>
 					{% else %} 
-					<td>No enrolled subjects</td>
+					<td>{% trans "index_overview_empty" %}</td>
 					{% endif %}
 					<td>{{study.description}}</td>
+					<td>
+						{% if study.investigators or study.viewers %}
+							{% for username in study.investigators %}
+								<span class="badge badge-light text-dark mr-1 member-badge">{{ username }}</span>
+							{% endfor %}
+							{% for username in study.viewers %}
+								<span class="badge badge-light text-muted mr-1 member-badge">{{ username }}</span>
+							{% endfor %}
+						{% else %}
+							<span class="badge badge-light text-primary mr-1 member-badge">admin</span>
+						{% endif %}
+					</td>
 					<td>{{study.createdDate}}</td>
-					<td> {{study.sensor_list | get_sensor_codes:study.current_sensor_list |safe }}</td>
+                    <td> {{study | get_study_sensor_summary:study.current_sensor_list |safe }}</td>
 					<td><a class="view"  href="{% url 'details' study_name=study.title %}"  >
 						<i class="fa fa-eye fa-lg"></i></a>
 						{% if request.user|has_group:"Investigator" or request.user|has_group:"administrator" %}
@@ -156,12 +170,13 @@
 				  </div>
 				  <div class="wrimagecard-topimage_title h-140">
 					<p>{{ study.description }}</p>
+					
 				  </div>
 				  <div class="card-action-bar">
-					<a class="float-lg-none link" href="{% url 'details' study_name=study.title %}">View</a>
+					<a class="float-lg-none link" href="{% url 'details' study_name=study.title %}">{% trans "global_view" %}</a>
 					{% if request.user|has_group:"Investigator" or request.user|has_group:"administrator" %}
-					<a class="float-lg-none link" href="{% url 'edit_study' study_name=study.title %}">Edit</a>
-					<a class="float-lg-none link" href="{% url 'qc_study' study_name=study.title %}">QC</a>
+					<a class="float-lg-none link" href="{% url 'edit_study' study_name=study.title %}">{% trans "global_edit" %}</a>
+					<a class="float-lg-none link" href="{% url 'qc_study' study_name=study.title %}">{% trans "global_qc" %}</a> 
 					{% endif %}
 				  </div>
 				</div>

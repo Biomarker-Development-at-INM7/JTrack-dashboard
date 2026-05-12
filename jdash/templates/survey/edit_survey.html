@@ -242,8 +242,18 @@
               <td>{{question.title}}</td>
               <td>{{question.subText}}</td>
               <td>{{question.questionType | get_question_category}}</td>
-              <td>{{question.category}}</td>
-            <td data-visible="false">{{ question.frequency}}</td>
+              <td>
+                {% if json_meta.survey.categories  %}
+                  {% if question.category == 0 %}
+                    Uncategorized
+                  {% else %}
+                    {{question.category}}
+                  {% endif %}
+                {% else %}
+                  {{question.category}}
+                {% endif %}
+              </td>
+              <td data-visible="false">{{ question.frequency}}</td>
               <td data-visible="false">{{ question.clockTime}}</td>
               <td data-visible="false">{{ question.nextDayToAnswer}}</td>
               <td data-visible="false">{{ question.imageURL}}</td>
@@ -290,7 +300,4 @@
 
 
 {% endblock %}	
-
-
-
 

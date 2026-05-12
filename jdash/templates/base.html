@@ -10,12 +10,11 @@
         <script src="{% static 'js/jquery.min.js' %}"></script>
         <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
         <script src="{% static 'js/jquery.slin.min.js' %}"></script>
-        <script src="{% static 'js/main.js' %}"></script>        
         <link type="text/css" rel="stylesheet" href="{% static 'css/style.css' %}" />
 	</head>
 	<body>
-		{% include "nav.html" %}
-        <div class="container-fluid" >		
+		{% include "nav.html" with request=request %}
+        <div class="container-fluid" >
             {% block content %}
             {% endblock %}
         </div>

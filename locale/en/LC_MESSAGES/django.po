@@ -1,0 +1,1291 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2025 Biomarker Development
+# This file is distributed under the same license as the PACKAGE package.
+# Jona Marcus Fischer <j.fischer@fz-juelich.de>, 2025.
+#
+
+msgid ""
+msgstr ""
+"Project-Id-Version: 2.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-05-14 12:00+0000\n"
+"PO-Revision-Date: 2025-05-14 12:00+0000\n"
+"Last-Translator: Your Name <you@example.com>\n"
+"Language-Team: English/German\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: jdash/templates/survey/survey_audit_list.html:61
+
+msgid "Action"
+msgstr "Action"
+
+#: jdash/templates/study/study_audit_list.html:63 jdash/templates/survey/survey_audit_list.html:59
+
+msgid "Actor"
+msgstr "Actor"
+
+#: jdash/templates/survey/create_question.html:226 jdash/templates/survey/edit_question.html:241
+
+msgid "answer_add_choice"
+msgstr "Add Choice"
+
+#: jdash/templates/survey/create_question.html:242 jdash/templates/survey/edit_question.html:262
+
+msgid "answer_choice"
+msgstr "Choice"
+
+msgid "answer_choice_order"
+msgstr "Choice Order"
+
+#: jdash/templates/survey/create_question.html:281 jdash/templates/survey/edit_question.html:303
+
+msgid "answer_sliding__maximum_text"
+msgstr "Maximum Text"
+
+#: jdash/templates/survey/create_question.html:277 jdash/templates/survey/edit_question.html:299
+
+msgid "answer_sliding__minimum_text"
+msgstr "Minimum Text"
+
+#: jdash/templates/survey/create_question.html:259 jdash/templates/survey/edit_question.html:281
+
+msgid "answer_sliding_default_value"
+msgstr "Default Value"
+
+#: jdash/templates/survey/create_question.html:273 jdash/templates/survey/edit_question.html:295
+
+msgid "answer_sliding_maximum_value"
+msgstr "Maximum Value"
+
+#: jdash/templates/survey/create_question.html:269 jdash/templates/survey/edit_question.html:291
+
+msgid "answer_sliding_minimum_value"
+msgstr "Minimum Value"
+
+#: jdash/templates/survey/create_question.html:263 jdash/templates/survey/edit_question.html:285
+
+msgid "answer_sliding_step_size"
+msgstr "Step Size"
+
+#: jdash/templates/survey/create_question.html:255 jdash/templates/survey/edit_question.html:277
+
+msgid "answer_sliding_value"
+msgstr "Value"
+
+#: jdash/templates/survey/edit_question.html:235
+
+msgid "answer_title"
+msgstr "Answers"
+
+#: jdash/templates/study/study_audit_list.html:65 jdash/templates/survey/survey_audit_list.html:62
+
+msgid "Changes"
+msgstr "Changes"
+
+#: jdash/templates/survey/create_survey.html:103
+
+msgid "create_survey_add_cat"
+msgstr "New Category"
+
+#: jdash/templates/survey/create_survey.html:113
+
+msgid "create_survey_cat"
+msgstr "The category name"
+
+#: jdash/templates/survey/create_survey.html:180
+
+msgid "create_survey_delete"
+msgstr "Delete Question"
+
+#: jdash/templates/survey/create_survey.html:186
+
+msgid "create_survey_delete_conf"
+msgstr "Confirm to delete question"
+
+#: jdash/templates/survey/create_survey.html:246
+
+msgid "create_survey_new_question"
+msgstr "New Question"
+
+#: jdash/templates/survey/create_question.html:348
+
+msgid "question_add_button"
+msgstr "Add Question"
+
+#: jdash/templates/survey/edit_question.html:387
+
+msgid "question_update_button"
+msgstr "Update Question"
+
+msgid "create_survey_seq"
+msgstr "Sequence number for the category"
+
+msgid "create_survey_subj_expl"
+msgstr "(If user id needs to be collected, select the checkbox)"
+
+#: jdash/templates/survey/create_survey.html:99
+
+msgid "create_survey_subj_request"
+msgstr "Request Subject ID (everytime when filling the survey)"
+
+msgid "create_survey_table_answer_type"
+msgstr "Answer Type"
+
+msgid "create_survey_table_answersize"
+msgstr "Answer size"
+
+msgid "create_survey_table_category"
+msgstr "Category"
+
+msgid "create_survey_table_explanation"
+msgstr "Explanation"
+
+msgid "create_survey_table_question"
+msgstr "Question"
+
+#: jdash/templates/survey/create_survey.html:145
+
+msgid "create_survey_update"
+msgstr "Update Survey"
+
+msgid "create_survey_value"
+msgstr "Value"
+
+msgid "delsub_anondesc"
+msgstr " We want to assure you that your privacy is of utmost importance to us. Before any data is used in research or publications, it is thoroughly anonymized to ensure that it cannot be traced back to any individual."
+
+#: jdash/templates/subject/delete_subject.html:13
+
+msgid "delsub_anonhead"
+msgstr "Data Anonymization: "
+
+#: jdash/templates/subject/delete_subject.html:31
+
+msgid "delsub_formdesc"
+msgstr "Fill out this form to have your data deleted"
+
+#: jdash/templates/subject/delete_subject.html:38
+
+msgid "delsub_formexpl"
+msgstr "Please enter the username displayed in your JTrack app. You can find this identifier by clicking on the menu or the info (i) icon."
+
+#: jdash/templates/subject/delete_subject.html:30
+
+msgid "delsub_formhead"
+msgstr "Delete data"
+
+#: jdash/templates/subject/delete_subject.html:8
+
+msgid "delsub_head"
+msgstr "Important Information Regarding Your Data Deletion Request"
+
+#: jdash/templates/subject/delete_subject.html:9
+
+msgid "delsub_intro"
+msgstr "Please read the following information carefully before submitting your request for permanent data deletion."
+
+msgid "delsub_procdesc"
+msgstr " The deletion process begins immediately upon receipt of your request. However, it may take 1–2 business days for the data to be fully removed from our systems. This timeframe allows us to ensure that all associated data is thoroughly and securely deleted."
+
+#: jdash/templates/subject/delete_subject.html:17
+
+msgid "delsub_prochead"
+msgstr "Processing Time: "
+
+msgid "delsub_pubdesc"
+msgstr " It is important to understand that we use anonymized data for scientific research and publications. Once your data has been used in such publications, it may no longer be possible to withdraw or delete it. This is due to the permanent nature of published scientific work and the contribution your data has made to the scientific community."
+
+#: jdash/templates/subject/delete_subject.html:15
+
+msgid "delsub_pubhead"
+msgstr "Use in Scientific Publications: "
+
+msgid "delsub_revdesc"
+msgstr " Once your data deletion request has been processed, the action cannot be undone."
+
+#: jdash/templates/subject/delete_subject.html:19
+
+msgid "delsub_revhead"
+msgstr "Irreversible Action: "
+
+#: jdash/templates/subject/delete_subject.html:22
+
+msgid "delsub_submitdesc"
+msgstr "By clicking 'Submit', you confirm that you have read and understood this information and that you wish to proceed with the data deletion request."
+
+#: jdash/templates/footer.html:113
+
+msgid "footer_contactbtn"
+msgstr "GET IN TOUCH"
+
+#: jdash/templates/footer.html:115
+
+msgid "footer_contactdel"
+msgstr "If you are already collaborating and want to delete your data"
+
+#: jdash/templates/footer.html:116
+
+msgid "footer_contactdelbtn"
+msgstr "request here"
+
+#: jdash/templates/footer.html:112
+
+msgid "footer_contactdesc"
+msgstr "If you are interested in collaborating with us or would like to learn more about JTrack or our studies"
+
+#: jdash/templates/footer.html:109
+
+msgid "footer_contacthead"
+msgstr "Contact us"
+
+#: jdash/templates/footer.html:151
+
+msgid "footer_copyright"
+msgstr "Copyright © 2025, All Rights Reserved"
+
+#: jdash/templates/footer.html:59
+
+msgid "footer_groupdesc"
+msgstr "We develop novel biomarkers that improve diagnosis, prognosis, and disease progression monitoring, which is an important step toward the development of effective treatment options for neuropsychiatric diseases."
+
+#: jdash/templates/footer.html:55
+
+msgid "footer_groupname"
+msgstr "Biomarker Development"
+
+#: jdash/templates/index.html:100 jdash/templates/survey/survey_list.html:158
+
+msgid "global_act"
+msgstr "Actions"
+
+#: jdash/templates/study/study_audit_list.html:51 jdash/templates/survey/create_question.html:60 jdash/templates/survey/edit_question.html:82
+
+msgid "global_back_overview"
+msgstr "Back to Overview"
+
+#: jdash/templates/survey/create_survey.html:86 jdash/templates/survey/create_survey.html:243
+
+msgid "global_categories"
+msgstr "Categories"
+
+#: jdash/templates/survey/survey_list.html:187
+
+msgid "global_copy"
+msgstr "Duplicate"
+
+#: jdash/templates/study/details.html:419 jdash/templates/survey/survey_list.html:198
+
+msgid "global_delete"
+msgstr "Delete"
+
+#: jdash/templates/index.html:96 jdash/templates/study/sop_list_study.html:73 jdash/templates/survey/create_survey.html:159 jdash/templates/survey/survey_list.html:33
+
+msgid "global_desc"
+msgstr "Description"
+
+#: jdash/templates/index.html:178 jdash/templates/survey/survey_list.html:172 jdash/templates/survey/survey_list.html:181
+
+msgid "global_edit"
+msgstr "Edit"
+
+#: jdash/templates/study/sop_list_study.html:37 jdash/templates/survey/survey_list.html:192
+
+msgid "global_history"
+msgstr "History"
+
+#: jdash/templates/index.html:179 jdash/templates/study/details.html:248
+
+msgid "global_qc"
+msgstr "QC"
+
+#: jdash/templates/survey/create_survey.html:112 jdash/templates/survey/create_survey.html:155 jdash/templates/survey/survey_list.html:28 jdash/templates/survey/survey_list.html:155
+
+msgid "global_title"
+msgstr "Title"
+
+#: jdash/templates/index.html:176
+
+msgid "global_view"
+msgstr "View"
+
+#: jdash/templates/nav.html:16
+
+msgid "header_filler"
+msgstr "by"
+
+#: jdash/templates/nav.html:18
+
+msgid "header_group"
+msgstr "Biomarker Development Group, INM-7"
+
+#: jdash/templates/index.html:32
+
+msgid "index_add"
+msgstr "Add Study"
+
+#: jdash/templates/index.html:66
+
+msgid "index_overview1"
+msgstr "subjects in study"
+
+#: jdash/templates/index.html:70
+
+msgid "index_overview2"
+msgstr "subjects completed study"
+
+#: jdash/templates/index.html:74
+
+msgid "index_overview3"
+msgstr "subjects left study"
+
+#: jdash/templates/index.html:77
+
+msgid "index_overview4"
+msgstr "subjects removed"
+
+#: jdash/templates/index.html:94
+
+msgid "index_overview5"
+msgstr "Name"
+
+#: jdash/templates/index.html:95
+
+msgid "index_overview6"
+msgstr "Enrolled subjects"
+
+#: jdash/templates/index.html:98
+
+msgid "index_overview8"
+msgstr "Created Date"
+
+#: jdash/templates/index.html:99 jdash/templates/study/details.html:280
+
+msgid "index_overview9"
+msgstr "Sensors"
+
+#: jdash/templates/index.html:122
+
+msgid "index_overview_empty"
+msgstr "No enrolled subjects"
+
+#: jdash/templates/survey/survey_list.html:19
+
+msgid "index_survey_modal"
+msgstr "Create a New Survey"
+
+#: jdash/templates/survey/create_survey.html:162 jdash/templates/survey/survey_list.html:37
+
+msgid "index_survey_modal_scroll"
+msgstr "Scroll Type"
+
+msgid "index_survey_modal_split"
+msgstr "Split by category"
+
+msgid "index_survey_modal_topN"
+msgstr "TopN"
+
+#: jdash/templates/survey/survey_list.html:94
+
+msgid "index_survey_new"
+msgstr "New Survey"
+
+#: jdash/templates/analytics/view_analytics.html:11 jdash/templates/index.html:18 jdash/templates/study/create_study.html:51 jdash/templates/study/details.html:231 jdash/templates/study/edit_study.html:51 jdash/templates/study/sop_list_study.html:19 jdash/templates/study/study_audit_list.html:18 jdash/templates/survey/create_question.html:43 jdash/templates/survey/create_survey.html:204 jdash/templates/survey/edit_question.html:66 jdash/templates/survey/survey_audit_list.html:18 jdash/templates/survey/survey_list.html:74
+
+msgid "index_tab1"
+msgstr "Studies"
+
+#: jdash/templates/analytics/view_analytics.html:14 jdash/templates/index.html:21 jdash/templates/study/create_study.html:54 jdash/templates/study/details.html:234 jdash/templates/study/edit_study.html:55 jdash/templates/study/sop_list_study.html:22 jdash/templates/study/study_audit_list.html:21 jdash/templates/survey/create_question.html:47 jdash/templates/survey/create_survey.html:208 jdash/templates/survey/edit_question.html:70 jdash/templates/survey/survey_audit_list.html:21 jdash/templates/survey/survey_list.html:77
+
+msgid "index_tab2"
+msgstr "Surveys"
+
+#: jdash/templates/analytics/view_analytics.html:17 jdash/templates/index.html:24 jdash/templates/study/create_study.html:57 jdash/templates/study/details.html:237 jdash/templates/study/edit_study.html:59 jdash/templates/study/sop_list_study.html:25 jdash/templates/study/study_audit_list.html:24 jdash/templates/survey/create_question.html:51 jdash/templates/survey/create_survey.html:212 jdash/templates/survey/edit_question.html:74 jdash/templates/survey/survey_audit_list.html:24 jdash/templates/survey/survey_list.html:80
+
+msgid "index_tab3"
+msgstr "Analytics"
+
+#: jdash/templates/index.html:51
+
+msgid "index_view1"
+msgstr "Grid"
+
+#: jdash/templates/index.html:54
+
+msgid "index_view2"
+msgstr "List"
+
+#: jdash/templates/survey/create_question.html:287 jdash/templates/survey/edit_question.html:308
+
+msgid "instruction_subtext"
+msgstr "Further instructions"
+
+#: jdash/templates/nav.html:32
+
+msgid "Logout"
+msgstr "Logout"
+
+#: jdash/templates/footer.html:125
+
+msgid "Mail us"
+msgstr "Mail us"
+
+#: jdash/templates/study/study_audit_list.html:107 jdash/templates/survey/survey_audit_list.html:105
+
+msgid "No audit history available."
+msgstr "No audit history available."
+
+#: jdash/templates/study/study_audit_list.html:98 jdash/templates/survey/survey_audit_list.html:96
+
+msgid "No field diff"
+msgstr "No field diff"
+
+#: jdash/templates/study/study_audit_list.html:64 jdash/templates/survey/survey_audit_list.html:60
+
+msgid "Object"
+msgstr "Object"
+
+#: jdash/templates/nav.html:45
+
+msgid "Please interact with the page to stay logged in."
+msgstr "Please interact with the page to stay logged in."
+
+#: jdash/templates/survey/edit_question.html:133
+
+msgid "question_activate_on_condition"
+msgstr "Activate question"
+
+#: jdash/templates/survey/create_question.html:205 jdash/templates/survey/edit_question.html:145
+
+msgid "question_activation_condition"
+msgstr "Activation condition"
+
+#: jdash/templates/survey/create_question.html:177 jdash/templates/survey/edit_question.html:206
+
+msgid "question_activation_times"
+msgstr "Activation time(s)"
+
+#: jdash/templates/survey/edit_question.html:169
+
+msgid "question_category"
+msgstr "Category"
+
+#: jdash/templates/survey/edit_question.html:225
+
+msgid "question_deactivate_after_days"
+msgstr "Deactivate after X days"
+
+#: jdash/templates/survey/edit_question.html:220
+
+msgid "question_deactivate_on_answer"
+msgstr "Deactivate on answer"
+
+#: jdash/templates/survey/create_question.html:198 jdash/templates/survey/edit_question.html:138
+
+msgid "question_deactivate_on_condition"
+msgstr "Deactivate question"
+
+#: jdash/templates/survey/create_question.html:211 jdash/templates/survey/edit_question.html:151
+
+msgid "question_deactivation_condition"
+msgstr "Deactivation condition"
+
+#: jdash/templates/survey/create_question.html:185 jdash/templates/survey/edit_question.html:213
+
+msgid "question_deactivation_times"
+msgstr "Deactivation time(s)"
+
+#: jdash/templates/survey/create_question.html:110 jdash/templates/survey/edit_question.html:121
+
+msgid "question_description"
+msgstr "Description"
+
+#: jdash/templates/survey/edit_question.html:175
+
+msgid "question_first_day"
+msgstr "Day to first ask"
+
+#: jdash/templates/survey/edit_question.html:182
+
+msgid "question_image_url"
+msgstr "Image URL"
+
+#: jdash/templates/survey/edit_question.html:187
+
+msgid "question_ink_url"
+msgstr "Link URL"
+
+msgid "question_is_active"
+msgstr "Is active question"
+
+#: jdash/templates/survey/edit_question.html:161
+
+msgid "question_is_default_advanced_values"
+msgstr "Use setting from previous question"
+
+#: jdash/templates/survey/create_question.html:90 jdash/templates/survey/edit_question.html:110
+
+msgid "question_order"
+msgstr "Question Order"
+
+#: jdash/templates/survey/edit_question.html:199
+
+msgid "question_reminder_delay"
+msgstr "Reminder delay (minutes)"
+
+#: jdash/templates/survey/edit_question.html:194
+
+msgid "question_repetition_interval"
+msgstr "Repetition interval (days)"
+
+#: jdash/templates/survey/create_question.html:105 jdash/templates/survey/edit_question.html:116
+
+msgid "question_title"
+msgstr "Title"
+
+#: jdash/templates/survey/edit_question.html:126
+
+msgid "question_type"
+msgstr "Type"
+
+#: jdash/templates/nav.html:41
+
+msgid "Session expiring soon"
+msgstr "Session expiring soon"
+
+#: jdash/templates/study/create_study.html:147 jdash/templates/study/details.html:291 jdash/templates/study/edit_study.html:148
+
+msgid "study_active_sensors"
+msgstr "Active sensors"
+
+#: jdash/templates/study/create_study.html:199 jdash/templates/study/edit_study.html:206
+
+msgid "study_add_task"
+msgstr "Add task"
+
+#: jdash/templates/study/create_study.html:260 jdash/templates/study/edit_study.html:267
+
+msgid "study_add_wearable_device"
+msgstr "Add wearable device"
+
+msgid "study_control"
+msgstr "Please hold the Ctrl or Cmd key for multi-selection"
+
+#: jdash/templates/study/create_study.html:343
+
+msgid "study_create_button"
+msgstr "Create study"
+
+#: jdash/templates/study/create_study.html:111 jdash/templates/study/details.html:275 jdash/templates/study/edit_study.html:112
+
+msgid "study_days"
+msgstr "Days"
+
+#: jdash/templates/study/create_study.html:132 jdash/templates/study/edit_study.html:133
+
+msgid "study_description"
+msgstr "Study description"
+
+#: jdash/templates/study/details.html:380
+
+msgid "study_details_all_ids"
+msgstr "All IDs"
+
+#: jdash/templates/study/details.html:470
+
+msgid "study_details_app"
+msgstr "App"
+
+#: jdash/templates/study/details.html:102 jdash/templates/study/details.html:145 jdash/templates/study/details.html:170 jdash/templates/study/details.html:176 jdash/templates/study/details.html:188 jdash/templates/study/details.html:207 jdash/templates/study/details.html:213
+
+msgid "study_details_close"
+msgstr "Close"
+
+#: jdash/templates/study/details.html:206 jdash/templates/study/details.html:392 jdash/templates/study/details.html:395
+
+msgid "study_details_close_study"
+msgstr "Close Study"
+
+#: jdash/templates/study/details.html:177 jdash/templates/study/details.html:196 jdash/templates/study/details.html:214
+
+msgid "study_details_confirm"
+msgstr "Confirm"
+
+#: jdash/templates/study/details.html:210
+
+msgid "study_details_confirm_close_study"
+msgstr "Confirm to close study"
+
+#: jdash/templates/study/details.html:173
+
+msgid "study_details_confirm_remove_subject"
+msgstr "Confirm to remove subject"
+
+#: jdash/templates/study/details.html:348
+
+msgid "study_details_create"
+msgstr "Create"
+
+#: jdash/templates/study/details.html:489
+
+msgid "study_details_date_left_study"
+msgstr "Date Left Study"
+
+#: jdash/templates/study/details.html:488
+
+msgid "study_details_date_registered"
+msgstr "Date Registered"
+
+#: jdash/templates/study/details.html:159
+
+msgid "study_details_delete_data_confirm"
+msgstr "I understand the consequence, delete data"
+
+#: jdash/templates/study/details.html:144
+
+msgid "study_details_delete_subject_data"
+msgstr "Delete Subject Data"
+
+#: jdash/templates/study/details.html:487
+
+msgid "study_details_device_id"
+msgstr "Device ID"
+
+#: jdash/templates/study/details.html:135
+
+msgid "study_details_download"
+msgstr "Download"
+
+#: jdash/templates/study/details.html:416
+
+msgid "study_details_download_data"
+msgstr "Download data"
+
+msgid "study_details_download_failed"
+msgstr "Download failed. Please try again."
+
+#: jdash/templates/study/details.html:101
+
+msgid "study_details_download_study_data"
+msgstr "Download Study Data"
+
+#: jdash/templates/study/details.html:414
+
+msgid "study_details_download_unused_user_sheets"
+msgstr "Download unused user sheets"
+
+#: jdash/templates/study/details.html:432
+
+msgid "study_details_duration_reached_left"
+msgstr "Study duration reached, left"
+
+#: jdash/templates/study/details.html:431
+
+msgid "study_details_duration_reached_not_left"
+msgstr "Study duration reached, not left"
+
+#: jdash/templates/study/details.html:125
+
+msgid "study_details_email_address"
+msgstr "Email address"
+
+#: jdash/templates/study/details.html:130
+
+msgid "study_details_email_help"
+msgstr "Enter email to which download link will be sent. This email will be used for further communications"
+
+#: jdash/templates/study/details.html:187
+
+msgid "study_details_email_notification"
+msgstr "Email Notification"
+
+#: jdash/templates/study/details.html:191
+
+msgid "study_details_email_notification_body"
+msgstr "Email will be sent to you with the link to download the dataset on your registered email address."
+
+#: jdash/templates/study/details.html:127
+
+msgid "study_details_enter_email"
+msgstr "Enter email"
+
+#: jdash/templates/study/details.html:224
+
+msgid "study_details_generating_zip"
+msgstr "Generating ZIP..."
+
+#: jdash/templates/study/details.html:268
+
+msgid "study_details_information"
+msgstr "Information"
+
+#: jdash/templates/study/details.html:491
+
+msgid "study_details_last_time_received_ema"
+msgstr "Last EMA Received"
+
+#: jdash/templates/study/details.html:430
+
+msgid "study_details_left_study_too_early"
+msgstr "Left study too early"
+
+#: jdash/templates/study/details.html:382
+
+msgid "study_details_missing_ids"
+msgstr "Missing IDs"
+
+#: jdash/templates/study/details.html:479 jdash/templates/study/details.html:482
+
+msgid "study_details_more_details"
+msgstr "More Details"
+
+#: jdash/templates/study/details.html:433
+
+msgid "study_details_multiple_qr_codes"
+msgstr "Multiple QR Codes of one user active"
+
+#: jdash/templates/study/details.html:490
+
+msgid "study_details_n_batches_ema"
+msgstr "EMA Batches"
+
+#: jdash/templates/study/details.html:429
+
+msgid "study_details_no_data_2_days"
+msgstr "No data sent for 2 days"
+
+#: jdash/templates/study/details.html:333
+
+msgid "study_details_number_of_enrolled_subjects"
+msgstr "Number of enrolled subjects"
+
+#: jdash/templates/study/details.html:110
+
+msgid "study_details_processed_data"
+msgstr "Processed Data"
+
+#: jdash/templates/study/details.html:116
+
+msgid "study_details_raw_data"
+msgstr "Raw Data"
+
+#: jdash/templates/study/details.html:411
+
+msgid "study_details_refresh"
+msgstr "Refresh"
+
+#: jdash/templates/study/details.html:367 jdash/templates/study/details.html:368
+
+msgid "study_details_remove"
+msgstr "Remove"
+
+#: jdash/templates/study/details.html:169 jdash/templates/study/details.html:358
+
+msgid "study_details_remove_subject"
+msgstr "Remove Subject"
+
+msgid "study_details_select_subject_to_delete"
+msgstr "Please select subject id to delete"
+
+#: jdash/templates/study/details.html:376 jdash/templates/study/details.html:386
+
+msgid "study_details_send_notification"
+msgstr "Send notification"
+
+#: jdash/templates/study/details.html:473
+
+msgid "study_details_sensor_information"
+msgstr "Sensor Information"
+
+#: jdash/templates/study/details.html:492
+
+msgid "study_details_sensor_list"
+msgstr "Sensor List"
+
+#: jdash/templates/study/details.html:493
+
+msgid "study_details_sensor_list_limited"
+msgstr "Active Sensor List"
+
+#: jdash/templates/study/details.html:475
+
+msgid "study_details_status"
+msgstr "Status"
+
+#: jdash/templates/study/details.html:440
+
+msgid "study_details_status_1"
+msgstr "1 - User left study with this QR Code"
+
+#: jdash/templates/study/details.html:441
+
+msgid "study_details_status_2"
+msgstr "2 - User reached study duration and left automatically"
+
+#: jdash/templates/study/details.html:442
+
+msgid "study_details_status_3"
+msgstr "3 - User removed by dashboard"
+
+#: jdash/templates/study/details.html:439
+
+msgid "study_details_status_empty"
+msgstr "Empty - Everything is fine"
+
+#: jdash/templates/study/details.html:469
+
+msgid "study_details_subject_id"
+msgstr "Subject ID"
+
+#: jdash/templates/study/details.html:155
+
+msgid "study_details_subject_ids_to_delete"
+msgstr "Subject IDs to delete"
+
+#: jdash/templates/study/details.html:321
+
+msgid "study_details_subjects_information"
+msgstr "Subjects information"
+
+#: jdash/templates/study/details.html:308 jdash/templates/study/details.html:311
+
+msgid "study_details_survey_info"
+msgstr "Survey Info"
+
+#: jdash/templates/study/details.html:225
+
+msgid "study_details_take_a_moment"
+msgstr "This can take a moment."
+
+msgid "study_details_to_confirm_suffix"
+msgstr "to confirm"
+
+#: jdash/templates/study/details.html:325
+
+msgid "study_details_total_number_of_subjects"
+msgstr "Total Number of Subjects"
+
+msgid "study_details_type_to_confirm"
+msgstr "Please type"
+
+#: jdash/templates/study/create_study.html:178 jdash/templates/study/create_study.html:186 jdash/templates/study/edit_study.html:185 jdash/templates/study/edit_study.html:193
+
+msgid "study_drag_drop_file"
+msgstr "Drag and drop file here or select file"
+
+#: jdash/templates/study/create_study.html:110 jdash/templates/study/details.html:272 jdash/templates/study/details.html:472 jdash/templates/study/edit_study.html:111
+
+msgid "study_duration"
+msgstr "Study duration"
+
+msgid "study_edit"
+msgstr "Edit study"
+
+#: jdash/templates/study/create_study.html:140 jdash/templates/study/create_study.html:148 jdash/templates/study/edit_study.html:141 jdash/templates/study/edit_study.html:149
+
+msgid "study_multiselect_note"
+msgstr "Use Ctrl/Cmd for multi-select"
+
+#: jdash/templates/study/create_study.html:100 jdash/templates/study/edit_study.html:101
+
+msgid "study_name"
+msgstr "Study name"
+
+#: jdash/templates/study/create_study.html:101 jdash/templates/study/edit_study.html:102
+
+msgid "study_note"
+msgstr "Please do not use spaces or special characters"
+
+#: jdash/templates/study/create_study.html:118 jdash/templates/study/edit_study.html:119
+
+msgid "study_number_of_subjects"
+msgstr "Number of participants"
+
+#: jdash/templates/study/create_study.html:139 jdash/templates/study/edit_study.html:140
+
+msgid "study_passive_sensors"
+msgstr "Passive sensors"
+
+#: jdash/templates/study/create_study.html:125
+
+msgid "study_recording_frequency"
+msgstr "Recording frequency"
+
+#: jdash/templates/study/create_study.html:218 jdash/templates/study/create_study.html:226 jdash/templates/study/edit_study.html:225 jdash/templates/study/edit_study.html:233
+
+msgid "study_seconds"
+msgstr "Seconds"
+
+#: jdash/templates/study/create_study.html:157 jdash/templates/study/details.html:303 jdash/templates/study/edit_study.html:158
+
+msgid "study_sel_ema"
+msgstr "Ecological Momentary Assessment (EMA)"
+
+#: jdash/templates/study/create_study.html:160 jdash/templates/study/edit_study.html:161
+
+msgid "study_sel_ema_note"
+msgstr "This study uses the EMA application, and the assessment and resources should be uploaded during the creation of the study."
+
+#: jdash/templates/study/create_study.html:88 jdash/templates/study/edit_study.html:89
+
+msgid "study_sel_test"
+msgstr "Test study"
+
+#: jdash/templates/study/create_study.html:296 jdash/templates/study/edit_study.html:303
+
+msgid "study_select_sensors_note"
+msgstr "Select sensors and then click Add"
+
+#: jdash/templates/study/edit_study.html:309
+
+msgid "study_sensor_add"
+msgstr "Add"
+
+#: jdash/templates/study/sop_list_study.html:70
+
+msgid "study_sop_admin"
+msgstr "Admin"
+
+#: jdash/templates/study/sop_list_study.html:75
+
+msgid "study_sop_expected_outcome"
+msgstr "Expected Outcome"
+
+#: jdash/templates/study/sop_list_study.html:72
+
+msgid "study_sop_id"
+msgstr "Id"
+
+#: jdash/templates/study/sop_list_study.html:71
+
+msgid "study_sop_owner"
+msgstr "Owner"
+
+#: jdash/templates/study/sop_list_study.html:41 jdash/templates/study/sop_list_study.html:43
+
+msgid "study_sop_select_all"
+msgstr "Select All"
+
+#: jdash/templates/study/sop_list_study.html:74
+
+msgid "study_sop_steps"
+msgstr "Steps"
+
+#: jdash/templates/study/sop_list_study.html:50
+
+msgid "study_sop_update"
+msgstr "Update"
+
+#: jdash/templates/study/create_study.html:171 jdash/templates/study/edit_study.html:173 jdash/templates/study/edit_study.html:177
+
+msgid "study_survey_title"
+msgstr "Survey title"
+
+#: jdash/templates/study/create_study.html:240 jdash/templates/study/edit_study.html:247
+
+msgid "study_task_description"
+msgstr "Task description"
+
+#: jdash/templates/study/create_study.html:217 jdash/templates/study/edit_study.html:224
+
+msgid "study_task_duration"
+msgstr "Task duration"
+
+#: jdash/templates/study/create_study.html:210 jdash/templates/study/edit_study.html:217
+
+msgid "study_task_name"
+msgstr "Task name"
+
+#: jdash/templates/study/create_study.html:225 jdash/templates/study/edit_study.html:232
+
+msgid "study_task_preparation"
+msgstr "Task preparation"
+
+#: jdash/templates/study/create_study.html:247 jdash/templates/study/edit_study.html:254
+
+msgid "study_task_preparation_description"
+msgstr "Task preparation description"
+
+#: jdash/templates/study/create_study.html:197 jdash/templates/study/edit_study.html:204
+
+msgid "study_tasks_label"
+msgstr "Tasks"
+
+msgid "task_show"
+msgstr "Show tasks"
+
+#: jdash/templates/study/create_study.html:90 jdash/templates/study/edit_study.html:91
+
+msgid "study_test_study_tooltip"
+msgstr "Please select if the study is used for test"
+
+#: jdash/templates/study/edit_study.html:361
+
+msgid "study_update_button"
+msgstr "Update study"
+
+msgid "study_upload_ema_file"
+msgstr "Drag and drop file here or select file"
+
+#: jdash/templates/study/create_study.html:177 jdash/templates/study/edit_study.html:184
+
+msgid "study_upload_ema_json"
+msgstr "Upload EMA JSON file"
+
+#: jdash/templates/study/create_study.html:185 jdash/templates/study/edit_study.html:192
+
+msgid "study_upload_ema_zip"
+msgstr "Upload EMA ZIP file with images"
+
+#: jdash/templates/study/create_study.html:283 jdash/templates/study/edit_study.html:290
+
+msgid "study_wearable_device_name"
+msgstr "Device name"
+
+#: jdash/templates/study/create_study.html:295 jdash/templates/study/edit_study.html:302
+
+msgid "study_wearable_device_sensors"
+msgstr "Sensors for this device"
+
+#: jdash/templates/study/create_study.html:258 jdash/templates/study/edit_study.html:265
+
+msgid "study_wearable_devices_label"
+msgstr "Wearable devices"
+
+msgid "wearable_show"
+msgstr "Show wearables"
+
+#: jdash/templates/study/create_study.html:311 jdash/templates/study/edit_study.html:318
+
+msgid "study_wearable_sensor"
+msgstr "Sensor"
+
+#: jdash/templates/study/create_study.html:312 jdash/templates/study/edit_study.html:319
+
+msgid "study_wearable_sensor_resolution"
+msgstr "Resolution"
+
+#: jdash/templates/study/create_study.html:313 jdash/templates/study/edit_study.html:320
+
+msgid "study_wearable_sensor_sampling_rate"
+msgstr "Sampling rate"
+
+#: jdash/templates/study/create_study.html:314 jdash/templates/study/edit_study.html:321
+
+msgid "study_wearable_sensor_unit"
+msgstr "Unit"
+
+#: jdash/templates/survey/survey_list.html:141
+
+msgid "survey_list_download_template"
+msgstr "Download Template"
+
+msgid "survey_list_manual_desc"
+msgstr "Select New Survey, then add questions one by one using the question form on the next page."
+
+#: jdash/templates/survey/survey_list.html:132
+
+msgid "survey_list_manual_label"
+msgstr "1. Create manually:"
+
+msgid "survey_list_template_desc"
+msgstr "Download the question template, fill in your survey questions, and upload the completed file using the upload option above."
+
+#: jdash/templates/survey/survey_list.html:135
+
+msgid "survey_list_template_label"
+msgstr "2. Upload from template:"
+
+#: jdash/templates/survey/survey_list.html:129
+
+msgid "survey_list_two_ways_title"
+msgstr "Two Ways to Create a Survey"
+
+#: jdash/templates/survey/survey_list.html:109
+
+msgid "survey_upload_supported_formats"
+msgstr "Supported formats: JSON, CSV, XLS, XLSX, XLSM. Excel uploads use the first sheet."
+
+msgid "text_error_message_invalid_username_pswd"
+msgstr "Invalid username or password."
+
+msgid "text_error_message_to_contact_support"
+msgstr "Oops! Something went wrong. Please try again later or contact support."
+
+msgid "text_help_study_active_sensors"
+msgstr "Sensors used in the study to record actively."
+
+msgid "text_help_study_description"
+msgstr "Explanations of the study."
+
+msgid "text_help_study_duration"
+msgstr "Number of days the study is conducted."
+
+msgid "text_help_study_ema"
+msgstr "Time in minutes when the answer to the question is reminded (480 = 08:00)."
+
+msgid "text_help_study_frequency"
+msgstr "How many days before the question is repeated (0 = anytime, 1 = every day, etc.)."
+
+msgid "text_help_study_is_test"
+msgstr "If selected, the study is used for testing purposes."
+
+msgid "text_help_study_number_of_subjects"
+msgstr "Number of subjects required for the whole study duration."
+
+msgid "text_help_study_passive_sensors"
+msgstr "Sensors used in the study to record passively."
+
+msgid "text_help_study_select_ema"
+msgstr "Selection help for the EMA survey used in the study."
+
+msgid "text_help_study_task_description"
+msgstr "Task description shown to participants."
+
+msgid "text_help_study_task_duration"
+msgstr "Task duration in seconds."
+
+msgid "text_help_study_task_preparation"
+msgstr "Preparation time before the task starts."
+
+msgid "text_help_study_task_title"
+msgstr "Task title shown to participants."
+
+msgid "text_help_study_title"
+msgstr "The study name."
+
+msgid "text_help_study_upload_ema_images"
+msgstr "Upload a ZIP file containing images used by the EMA survey."
+
+msgid "text_help_study_upload_ema_json"
+msgstr "Upload a JSON file containing the EMA survey definition."
+
+msgid "text_help_survey_category_activate_question"
+msgstr "Enter list of questions to activate. Example entries: 1 or 2, 3."
+
+msgid "text_help_survey_category_activation_condition"
+msgstr "Describe under what condition questions need to be activated."
+
+msgid "text_help_survey_category_deactivate_question"
+msgstr "Enter list of questions to deactivate. Example entries: 1 or 2, 3."
+
+msgid "text_help_survey_category_deactivation_condition"
+msgstr "Describe under what condition questions need to be deactivated."
+
+msgid "text_help_survey_category_did_subject_ask"
+msgstr "If selected, the user ID will be collected."
+
+msgid "text_help_survey_category_title"
+msgstr "The category name."
+
+msgid "text_help_survey_category_value"
+msgstr "Numeric value used later to assign the category to a question."
+
+msgid "text_help_survey_description"
+msgstr "A short description of the survey (purpose, context)."
+
+msgid "text_help_survey_question_answer_form"
+msgstr "Define answer options and placeholder texts based on the question type."
+
+msgid "text_help_survey_question_category"
+msgstr "Category value used to group questions."
+
+msgid "text_help_survey_question_clock_time"
+msgstr "Time in minutes when the answer to the question is reminded (480 = 08:00)."
+
+msgid "text_help_survey_question_clock_time_end"
+msgstr "Time when the question becomes inactive. If multiple start times are provided, the number of end times must match."
+
+msgid "text_help_survey_question_clock_time_start"
+msgstr "Time when the question becomes active. Example entries: 480 or 480, 700."
+
+msgid "text_help_survey_question_deactivate_on_answer"
+msgstr "If a certain answer is given, the question is no longer asked."
+
+msgid "text_help_survey_question_deactivate_on_date"
+msgstr "The question has an expiration date."
+
+msgid "text_help_survey_question_description"
+msgstr "Additional explanation shown with the question."
+
+msgid "text_help_survey_question_first_day_to_answer"
+msgstr "Day of the study on which the question should be asked for the first time. Day 0 is the day of enrollment"
+
+msgid "text_help_survey_question_frequency"
+msgstr "How many days before the question is repeated (0 = anytime, 1 = every day, etc.)."
+
+msgid "text_help_survey_question_image_url"
+msgstr "Image source for the question."
+
+msgid "text_help_survey_question_sort_id"
+msgstr "Question number used for arranging the questions."
+
+msgid "text_help_survey_question_title"
+msgstr "The question text."
+
+msgid "text_help_survey_question_type"
+msgstr "Expected answer type, for example selection, time, text, or number."
+
+msgid "text_help_survey_question_url"
+msgstr "Link source for the question."
+
+msgid "text_help_survey_scrolling"
+msgstr "Select the scrolling behavior for the survey."
+
+msgid "text_help_survey_split_by_category"
+msgstr "If selected, questions are split into category blocks."
+
+msgid "text_help_survey_title"
+msgstr "Name of the survey."
+
+msgid "text_help_survey_top_n"
+msgstr "Maximum number of questions to be answered in one session."
+
+msgid "text_info_active_labelling"
+msgstr "There will be a predefined task that the user should perform in the application. The selected sensor will only record during the task."
+
+msgid "text_info_ema"
+msgstr "This study uses the EMA application, and the assessment and resources should be uploaded during study creation."
+
+msgid "text_info_manual_active_labelling"
+msgstr "This mode is similar to No Labeling, except that passively recorded sensors take the name of the task during that specific task."
+
+msgid "text_info_no_labelling"
+msgstr "This is the default for passive monitoring and passively recorded data will not be labeled. The task button will be deactivated in the app."
+
+msgid "text_info_partial_active_labelling"
+msgstr "This mode combines passive and active labeling: passive sensors record without user interaction, while active sensors are only activated during the labeling task."
+
+msgid "text_info_passive_monitoring"
+msgstr "In this mode, selected sensors continue to record data in the background without further user interaction. The selected frequency only applies to accelerometer and gyroscope sensors."
+
+msgid "text_message_type_not_found"
+msgstr "Message type not found."
+
+msgid "text_success_contacting_message"
+msgstr "Thank you for reaching out to collaborate with us. We will review your message and get back to you soon."
+
+msgid "text_success_deletion_data_request"
+msgstr "Your request for data deletion has been submitted successfully. Please allow us a short time to process it."
+
+msgid "text_success_new_user"
+msgstr "New users have been successfully created."
+
+msgid "text_success_notification"
+msgstr "Notification has been sent successfully."
+
+msgid "text_success_study_updated"
+msgstr "Study has been successfully updated."
+
+#: jdash/templates/study/study_audit_list.html:62 jdash/templates/survey/survey_audit_list.html:58
+
+msgid "Timestamp"
+msgstr "Timestamp"
+
+#: jdash/templates/nav.html:44
+
+msgid "Your session will expire in less than a minute due to inactivity."
+msgstr "Your session will expire in less than a minute due to inactivity."
+

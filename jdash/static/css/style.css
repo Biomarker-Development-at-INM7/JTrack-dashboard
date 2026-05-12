@@ -1,4 +1,4 @@
-
+/* General Styles */
 .container{
   padding: 10px 30px 10px 30px;
 }
@@ -155,12 +155,16 @@
   .wrimagecard {
     margin-top: 0;
     margin-bottom: 1.5rem;
-    text-align: center;
+    text-align: left;
     position: relative;
-    background: #fff;
-    box-shadow: 0 15px 20px 0px rgba(46, 61, 73, 0.15);
+    background: #fff; 
     border-radius: 4px;
+    border-width: 1px;  
+    border-style: solid;
+    border-color: #e0e0e0;
     transition: all 0.3s ease;
+    padding-right: 0px;
+    padding-left: 0px;
   }
   
   .wrimagecard .far {
@@ -175,13 +179,10 @@
   
   .wrimagecard-topimage_header {
     background-color: rgba(3, 36, 77, 0.1);
-    padding: 20px;
+    padding: 0px 20px 0px 20px;
   }
   
-  a.wrimagecard:hover,
-  .wrimagecard-topimage:hover {
-    box-shadow: 2px 4px 8px 0px rgba(46, 61, 73, 0.2);
-  }
+ 
   
   .wrimagecard-topimage a {
     height: 100%;
@@ -204,6 +205,10 @@
   
   .h-140 {
     height: 140px !important;
+  }
+
+  .member-badge {
+    font-size: 0.95rem;
   }
   
   #navBtns {
@@ -306,6 +311,7 @@
   }
 
 #title-div {
+    padding-left: 32px;
     float: left;
 }
 #title {
@@ -319,12 +325,13 @@
   color: #005B82;
 }
 #footer-div{
-  box-shadow: -2px -5px 5px rgb(0 0 0 / 20%);
+    /* box-shadow: -2px -5px 5px rgb(0 0 0 / 20%); */
     background-color: #005B82;
     color: #f1f1f1;
-  /*  padding: 16px;*/
+    /* padding: 16px; */
     bottom: 0;
     position: relative;
+    margin-top: auto;
 }
 
 .form-group.required .control-label:after {
@@ -573,6 +580,19 @@ div#notes {
   max-width: 100%;
 }
 
+.sortid-badge {                                                                                                  
+  display: inline-block;                                                         
+  width: 50px;                                                                   
+  height: 50px;                                                                  
+  background-color: #023d6b;                                                     
+  color: white;                                                                  
+  font-weight: bold;                                                             
+  font-size: 1.5rem;                                                             
+  border-radius: 50%;                                                            
+  text-align: center;                                                            
+  line-height: 50px;                                                             
+  margin-top: 5px;                                                               
+ }
 
 /* Layout the footer row */
 .bootstrap-table .fixed-table-pagination {
@@ -604,3 +624,7 @@ div#notes {
   flex-wrap: wrap;
 }
 
+/* At 2048px and up, make each column 25% (i.e., 4 per row) */
+@media (min-width: 2048px) {
+  .col-2048-3 { flex: 0 0 auto; width: 25%; }
+}

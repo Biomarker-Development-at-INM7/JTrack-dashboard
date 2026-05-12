@@ -113,3 +113,12 @@ form {
     font-size: 1.25rem; /* Adjust font size */
 }
 
+.form-group.required .control-label:after {
+  content:"*";
+  color:red;
+}
+
+.large-switch .form-check-input {
+  transform: scale(1.2);
+  margin-right: 10px;
+}

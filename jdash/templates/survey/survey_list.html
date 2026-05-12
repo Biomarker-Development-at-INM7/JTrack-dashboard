@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load custom_tags %}
 {% load static %}
+{% load i18n %}
 {% block content %}
 
 <script src="{% static 'js/jquery.min.js' %}"></script>
@@ -15,7 +16,7 @@
 	<div class="modal-dialog">
 	  <div class="modal-content">
 		<div class="modal-header">
-		  <h5 class="modal-title" id="exampleModalLabel">Create a New Survey</h5>
+		  <h5 class="modal-title" id="exampleModalLabel">{% trans "index_survey_modal" %}</h5>
 		  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
 		</div>
 		<form action="{%url 'create_survey' survey_id=0 %}" method="POST" >
@@ -24,19 +25,21 @@
 				
 				<div class="form-group required mb-4">
 					
-						{{survey_form.title}}	 <label >Title </label>  
+						{{survey_form.title}}	 <label >{% trans "global_title" %}</label>
                         <span><small><i>{{survey_help_text.title}}</i></small></span>
 				</div>	
 				<div class="form-group required mb-4">	
 						{{survey_form.description}}
-						<label >Description </label>  
+						<label >{% trans "global_desc" %}</label>
 						<span><small><i>{{survey_help_text.description}}</i></small></span>
 				</div>
 				<div class="form-check form-check-inline mb-4"   >
-					<label class="form-check-label">Scroll Type</label>  
-					<span><small><i>({{survey_help_text.scrolling}})</i></small></span>  	
+					<label class="form-check-label">{% trans "index_survey_modal_scroll" %}</label>
+					<span><small><i>({{survey_help_text.scrolling}})</i></small></span>
 					{{ survey_form.scrolling}} 
 				</div>
+					<input type="hidden" name="topN" value="-1">
+				
 			</div>
 			<div class="modal-footer">
 				<input name="create_survey" type="submit"  value="Create" role="button" class="btn btn-primary"  >
@@ -68,35 +71,48 @@
 <div class="row mb-4">
 	<ul class="nav nav-tabs">
 	<li class="nav-item">
-	  <a class="nav-link " href="{%url 'home' %}">Studies</a>
+	  <a class="nav-link " href="{%url 'home' %}">{% trans "index_tab1" %}</a>
 	</li>
 	<li class="nav-item">
-	  <a class="nav-link active" aria-current="page" href="{%url 'survey' %}">Survey</a>
+	  <a class="nav-link active" aria-current="page" href="{%url 'survey' %}">{% trans "index_tab2" %}</a>
 	</li>
 	<li class="nav-item">
-	  <a class="nav-link" href="{%url 'analytics' study_name='all' %}">Analytics</a>
+	  <a class="nav-link" href="{%url 'analytics' study_name='all' %}">{% trans "index_tab3" %}</a>
 	</li>
   </ul>
 </div> 
 	  
-	<div class="row mb-2" >
+	<div class="row mb-3 align-items-start">
+		{% if not request.user|has_group:"Viewer"  %}
 		<div id="toolbar" class="col-md-6 col-lg-6">
-			{% if not request.user|has_group:"Viewer"  %}
-					
-            <input name="create_json" type="submit"
-			role="button" value="New Survey" class="btn btn-outline-primary btn-block mb-8"
-			data-bs-toggle="modal" data-bs-target="#surveyModal" />
-			
+			<div class="d-flex flex-wrap align-items-center gap-2">
+				<button type="button"
+					class="btn btn-outline-primary"
+					data-bs-toggle="modal"
+					data-bs-target="#surveyModal">
+					{% trans "index_survey_new" %}
+				</button>
+				
+			</div>
 		</div>
-        <div class="col-md-2 col-lg-2"></div>
-        <div class="col-md-4 col-lg-4">
-			<form action="{% url 'create_survey'  survey_id=0 %}" method="post" enctype="multipart/form-data">
-				{% csrf_token %}
-				<div class=" input-group mb-2">
-					{{json_form.json_file}} <button type="submit" value="Upload" name="upload_survey"  ><i class="fa fa-upload fa-lg" aria-hidden="true"></i></button>
+		<div id="survey_table_toolbar" class="col-md-2 col-lg-2 ">
+			<a class="btn btn-outline-secondary btn-sm " href="{% static 'survey_question_template.txt' %}" download>
+					<i class="fa fa-download fa-lg" aria-hidden="true"></i> {% trans "survey_list_download_template" %}
+				</a>
+		</div> 
+		<div class="col-md-6 col-lg-4 d-flex justify-content-md-end">
+			<div class="d-flex flex-column align-items-end gap-2">
+				<form action="{% url 'create_survey'  survey_id=0 %}" method="post" enctype="multipart/form-data">
+					{% csrf_token %}
+					<div class="input-group mb-2">
+						{{json_form.json_file}}
+						<button type="submit" value="Upload" name="upload_survey" class="btn btn-outline-primary px-3">
+							<i class="fa fa-upload me-2" aria-hidden="true"></i>Upload
+						</button>
+					</div>
+					<small class="form-text text-muted">{% trans "survey_upload_supported_formats" %}</small>
+				</form>
 				</div>
-
-			</form>
 		</div>
         {% endif %}
 	</div>
@@ -112,6 +128,17 @@
             {% endif %}
            
 		</div>
+		<div class="alert alert-light border mb-3" role="alert">
+			<div class="fw-semibold mb-2">{% trans "survey_list_two_ways_title" %}</div>
+			<div class="small">
+				<div class="mb-2">
+					<strong>{% trans "survey_list_manual_label" %}</strong> {% trans "survey_list_manual_desc" %}
+				</div>
+				<div class="text-muted">
+					<strong>{% trans "survey_list_template_label" %}</strong> {% trans "survey_list_template_desc" %}
+				</div>
+			</div>
+		</div>
 		<table id ="survey_table" class="table-responsive"
 			data-search="true"
 			data-pagination="true"
@@ -121,11 +148,12 @@
 			data-page-list="[10, 30, 50, 100, all]">
 			<thead>
 				<tr>
-				<th data-field="survey_id" >Id</th>
-				<th data-field="survey_title" >Title</th>
+				<th data-field="survey_id">Id</th>
+				<th data-field="survey_title">{% trans "global_title" %}</th>
+				<th data-field="category_names">Categories</th>
 				<th data-field="study_name" >Study associated</th>
 				<th data-field="created_date" data-sortable="true">Created date</th>
-				<th data-events="survey_operateEvents">Actions</th>
+				<th data-events="survey_operateEvents">{% trans "global_act" %}</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -133,20 +161,45 @@
 				<tr>
 				<td id="survey_id">{{survey.id}}</td>
 				<td id='survey_title'>{{survey.title}}</td>
+				<td id='category_names'>{{survey.category_names}}</td>
 				<td id='study_name'>{{survey.study_name}}</td>
 				<td id='created_date'>{{survey.createdDate}}</td>
 					{% if survey.id == '999' %}
 					<td>
-						<a class="view"  href="{%url 'edit_survey' study_name=survey.study_name %}" 
-                                         title="Edit"   ><i class="fa fa-edit fa-lg"></i></a>
+					  <a class="view"
+						 href="{% url 'edit_survey' study_name=survey.study_name %}"
+						 title="{% trans 'global_edit' %}">
+						<i class="fa fa-edit fa-lg"></i>
+					  </a>
 					</td>
 					{% else %}
 						
 					<td>
-						<a class="edit"  href="{%url 'create_survey' survey_id=survey.id %}" title="Edit"   ><i class="fa fa-edit fa-lg"></i></a>
-                        <a class="copy"  href="{%url 'duplicate_survey' survey_id=survey.id %}" title="Duplicate"   ><i class="fa fa-copy  fa-lg"></i></a>
-						<a class="delete" href="#" title="Delete"
-                            data-id="{{survey}}" data-bs-toggle="modal" data-bs-target="#deleteModal"  ><i class="fa fa-trash fa-lg"></i></a>
+					  <a class="edit"
+						 href="{% url 'create_survey' survey_id=survey.id %}"
+						 title="{% trans 'global_edit' %}">
+						<i class="fa fa-edit fa-lg"></i>
+					  </a>
+
+					  <a class="copy"
+						 href="{% url 'duplicate_survey' survey_id=survey.id %}"
+						 title="{% trans 'global_copy' %}">
+						<i class="fa fa-copy fa-lg"></i>
+					  </a>
+					  <a class="log"
+						 href="{% url 'survey_audit' survey_id=survey.id %}"
+						 title="{% trans 'global_history' %}">
+						<i class="fa fa-history fa-lg"></i>
+					  </a>
+
+					  <a class="delete"
+						 href="#"
+						 title="{% trans 'global_delete' %}"
+						 data-id="{{ survey }}"
+						 data-bs-toggle="modal"
+						 data-bs-target="#deleteModal">
+						<i class="fa fa-trash fa-lg"></i>
+					  </a>
 					</td>
 					{% endif %}
 

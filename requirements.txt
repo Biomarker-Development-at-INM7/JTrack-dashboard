@@ -8,11 +8,10 @@ pillow
 codetiming
 requests
 numpy
-PIL
 qrcode
 fpdf
 pdfkit
 google
 goole-auth
-mysqlcient=2.1.0
+mysqlcient==2.1.0
 
