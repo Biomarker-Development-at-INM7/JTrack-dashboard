@@ -233,6 +233,23 @@ def change_permissions(path):
     except Exception:
         pass
 
+import pwd,grp
+def change_ownership(path):
+    """
+    Set filesystem ownership for study folders.
+    """
+    try:
+        uid = pwd.getpwnam("www-data").pw_uid
+        gid = grp.getgrnam("jtrack").gr_gid
+
+        os.chown(path, uid, gid)
+
+        for root, dirs, files in os.walk(path):
+            for name in dirs:
+                os.chown(os.path.join(root, name), uid, gid)
+    except Exception:
+        pass
+
 def update_number_of_subjects(study_name, total_count):
     """
     Method for update_number_of_subjects
@@ -348,7 +365,6 @@ def to_list(val):
     - Tuples/sets become lists.
     - None -> [] ; other scalars -> [val]
     """
-    print(f"to_list input: {val} ({type(val)})")
     if val in [None,""]:
         return []
     if isinstance(val, list):

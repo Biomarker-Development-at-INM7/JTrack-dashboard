@@ -42,6 +42,7 @@ from jdash.utils.fileutils import (
     get_all_json_data,
     parse_get_dashboard_csv,
     create_backup_json_file,
+    change_ownership,
 )
 from jdash.services.datahelper import validate_empty
 from jdash.services.subject import Subject
@@ -235,7 +236,7 @@ class Study:
             exist_ok=True
         )
         change_permissions(self.bids_path)
-
+        change_ownership(self.bids_path);
         os.makedirs(self.dash_root, exist_ok=True)
         change_permissions(self.dash_root)
 
