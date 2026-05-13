@@ -1,3 +1,4 @@
+console.log("Loaded survey.js version 2025-08-15");
 
 var question_types = {
   'Instruction for questions' : '0',
@@ -18,14 +19,14 @@ var question_types = {
 //////////////////
 $(function() {
     initTable()
-    
+
 })
 function initTable() {
     $('#survey_quest_table').bootstrapTable({
       detailViewAlign : 'right',
       paginationParts: ['pageInfoshort', 'pageSize', 'pageList']
     })
-   
+
     $('#quest_table').bootstrapTable({
       detailViewAlign : 'right',
       exportTypes: ['json', 'csv'],
@@ -34,11 +35,11 @@ function initTable() {
       exportOptions: {
         fileName: function () {
            return 'survey'
-        } 
+        }
      },
       paginationParts: ['pageInfoshort', 'pageSize', 'pageList']
     })
-    
+
     $('#survey_table').bootstrapTable({
       detailViewAlign : 'right',
       paginationParts: ['pageInfoshort', 'pageSize', 'pageList']
@@ -90,7 +91,7 @@ window.operateEvents = {
         $('#minText').val('');
         $('#maxText').val('' );
       }
-      
+
     },
     'click .delete': function (e, value, row, index) {
       $("#survey_quest_table").bootstrapTable('remove', {
@@ -130,85 +131,141 @@ window.operateEvents = {
 window.survey_operateEvents = {
     'click .delete': function (e, value, row, index) {
       $("#survey_table").bootstrapTable('remove', {
-        field: 'id',
-        values: [row.id]
+        field: 'survey_id',
+        values: [row.survey_id]
       })
               // Retrieve the survey ID from the data-id attribute
-              var surveyId = row["survey_id"];
+              var surveyId = row.survey_id;
               // Update a hidden input field in the form with the survey ID
               var input = document.createElement('input');
               input.type = 'hidden';
               input.name = 'survey_id';
               input.value = surveyId;
               document.getElementById('deleteSurveyForm').appendChild(input);
-          
+
     }
   }
 
 function remove_survey(){
     const myModal = document.getElementById('deleteModal')
     const deleteSurveyForm = document.getElementById("deleteSurveyForm");
-    deleteSurveyForm.submit(); 
+    deleteSurveyForm.submit();
 }
 
 
 
 function show_answer_form(){
-    var selectedValue = document.getElementById('questionType').value;
-    const totalChoiceForms = document.getElementById("id_form-TOTAL_FORMS")
-      if (selectedValue == '1' || selectedValue == '2'){
-        document.getElementById('answerForm_header').style.display = 'block';
-        document.getElementById('add-choice').style.display = 'block';
-        for (var i = 0; i < totalChoiceForms.value; i++) {
-          document.getElementById('choice-form-'+ i ).style.display = 'block';
-        } 
-        document.getElementById('slidingAnswer-0').style.display = 'none';
-        document.getElementById('slidingAnswer-1').style.display = 'none';
-        document.getElementById('subTextDiv').style.display = 'none';
-      }else if (selectedValue == 3){
-        document.getElementById('answerForm_header').style.display = 'block';
-        document.getElementById('slidingAnswer-0').style.display = 'block';
-        document.getElementById('slidingAnswer-1').style.display = 'block';
-        for (var i = 0; i < totalChoiceForms.value; i++) {
-          document.getElementById('choice-form-'+ i ).style.display = 'none';
+    const questionType = document.getElementById('questionType');
+    if (!questionType) {
+      return;
+    }
+
+    const selectedValue = questionType.value;
+    const isChoice = selectedValue === '1' || selectedValue === '2';
+    const isSliding = selectedValue === '3';
+    const answerForms = Array.from(document.querySelectorAll('.choice-formset'));
+    const slidingRows = Array.from(document.querySelectorAll('[id^="slidingAnswer-"]'));
+    const subTextRows = Array.from(document.querySelectorAll('[id="subTextDiv"]'));
+
+    if (!isChoice && answerForms.length > 1) {
+      for (let index = answerForms.length - 1; index >= 1; index--) {
+        answerForms[index].remove();
+        if (slidingRows[index]) {
+          slidingRows[index].remove();
         }
-        document.getElementById('subTextDiv').style.display = 'none';
-      }else if (selectedValue == 4 || selectedValue == 5 || selectedValue == 6 
-          || selectedValue == 7 || selectedValue == 8 || selectedValue == 9){
-        document.getElementById('answerForm_header').style.display = 'block';
-        document.getElementById('subTextDiv').style.display = 'block';
-        document.getElementById('add-choice').style.display = 'none';
-        for (var i = 0; i < totalChoiceForms.value; i++) {
-          document.getElementById('choice-form-'+ i ).style.display = 'none';
+        if (subTextRows[index]) {
+          subTextRows[index].remove();
         }
-        
-        document.getElementById('slidingAnswer-0').style.display = 'none';
-        document.getElementById('slidingAnswer-1').style.display = 'none';
-      }else{
-        document.getElementById('answerForm_header').style.display = 'none';
-        document.getElementById('add-choice').style.display = 'none';
-        for (var i = 0; i < totalChoiceForms.value; i++) {
-          document.getElementById('choice-form-'+ i ).style.display = 'none';
+
+        const answerIdInputs = document.querySelectorAll('input[name="answer_id"]');
+        if (answerIdInputs[index]) {
+          answerIdInputs[index].remove();
         }
-        document.getElementById('slidingAnswer-0').style.display = 'none';
-        document.getElementById('slidingAnswer-1').style.display = 'none';
-        document.getElementById('subTextDiv').style.display = 'none';
       }
+
+      const totalFormsInput = document.getElementById('id_form-TOTAL_FORMS');
+      if (totalFormsInput) {
+        totalFormsInput.value = '1';
+      }
+      renumberChoices();
+    }
+
+    const addChoiceButton = document.getElementById('add-choice');
+    if (addChoiceButton) {
+      addChoiceButton.style.display = isChoice ? 'block' : 'none';
+    }
+
+    document.querySelectorAll('.choice-formset').forEach((element) => {
+      element.style.display = isChoice ? 'flex' : 'none';
+    });
+
+    document.querySelectorAll('[id^="slidingAnswer-"]').forEach((element) => {
+      element.style.display = isSliding ? 'flex' : 'none';
+    });
+
+    document.querySelectorAll('#subTextDiv').forEach((element) => {
+      element.style.display = (!isChoice && !isSliding) ? 'block' : 'none';
+    });
+  }
+function initializeDefaultValueToggle() {
+  const toggle = document.getElementById('flexSwitchCheckDefault');
+  const advancedSection = document.getElementById('advanced-values-section');
+
+  if (!toggle) return;
+
+  function updateVisibility() {
+    if (toggle.checked && advancedSection) {
+      advancedSection.style.display = 'none';
+    } else if (advancedSection) {
+      advancedSection.style.display = '';
+    }
   }
 
+  if (window.current_sort_id === 1) {
+    toggle.checked = true;
+    toggle.disabled = true;
+  }
+
+  updateVisibility();
+  toggle.addEventListener('change', () => {
+    updateVisibility();
+    set_default_values(toggle);
+  });
+
+  if (toggle.checked) {
+    set_default_values(toggle);
+  }
+}
 function set_default_values(default_switch){
- if (default_switch.checked){
-    $('#category').val(1)
-    $('#nextDayToAnswer').val(1)
-    $('#frequency').val(0)
-    $('#clockTime').val(480)
-    $('#deactivateOnDate').val(0)
-  }else{
-    $('#category').val('')
-    $('#nextDayToAnswer').val('')
-    $('#frequency').val('')
-    $('#clockTime').val('')
-    $('#deactivateOnDate').val('')
+  const isFirstQuestion = current_sort_id === 1;
+
+  if (default_switch.checked) {
+    if (isFirstQuestion) {
+      // Apply static defaults for question 1
+      $('#category').val(1);
+      $('#nextDayToAnswer').val(1);
+      $('#frequency').val(0);
+      $('#clockTime').val(480);
+      $('#deactivateOnDate').val(0);
+    } else {
+      // Apply values from previous question
+      if (typeof previous_question_object !== 'undefined') {
+        $('#category').val(previous_question_object.category || '');
+        $('#nextDayToAnswer').val(previous_question_object.nextDayToAnswer || '');
+        $('#frequency').val(previous_question_object.frequency || '');
+        $('#clockTime').val(previous_question_object.clockTime || '');
+        $('#deactivateOnDate').val(previous_question_object.deactivateOnDate || '');
+      } else {
+        console.warn("Previous question values are not available.");
+      }
+    }
+  } else {
+    // Clear values
+    $('#category').val('');
+    $('#nextDayToAnswer').val('');
+    $('#frequency').val('');
+    $('#clockTime').val('');
+    $('#deactivateOnDate').val('');
   }
 }
 
@@ -242,6 +299,8 @@ function makeAllEmptyValues(){
     $('#maxValue').val(0.1);
     $('#minText').val('');
     $('#maxText').val('' );
+    document.getElementsByName('add_question')[0].disabled = false;
+    document.getElementsByName('update_question')[0].disabled = true;
 }
 
 
@@ -249,16 +308,8 @@ function makeAllEmptyValues(){
 
 ///////// Questions /////
 
-function loadAnswerForm(){
-  var selectedValue = document.getElementById('questionType').value;
-    if (selectedValue == '1' || selectedValue == '2'){
-      document.getElementById('add-choice').style.display = 'block';
-    }
-
-}
-
 function editQuestion(){
-  const questionForm = document.getElementById("editQuestionForm");
+  const questionForm = document.getElementById("questionForm");
   var input = document.createElement('input');
   input.type = 'hidden';
   input.name = 'update_question';
@@ -266,12 +317,11 @@ function editQuestion(){
   questionForm.submit();
 }
 
-
-function display_info(){
-    // stop any native submit/validation
-    if (validateNecessaryFields() && validateClockTimes()) {
-      $('#updateModal').modal('show');
-    }
+function display_info(event){
+    event.preventDefault();
+  if (validateNecessaryFields() && validateClockTimes()) {
+    $('#updateModal').modal('show');
+  }
 
 }
 
@@ -279,9 +329,15 @@ function validateNecessaryFields() {
   const qTitleEl = document.getElementById('questionTitle');
   const qsubTextEl = document.getElementById('subText');
   const qTypeEl = document.getElementById('questionType');
+  const frequencyEl = document.getElementById('frequency');
+  const deactivateOnDateEl = document.getElementById('deactivateOnDate');
+  const nextDayToAnswerEl = document.getElementById('nextDayToAnswer');
   qTitleEl.setCustomValidity('');
   qsubTextEl.setCustomValidity('');
   qTypeEl.setCustomValidity('');
+  if (frequencyEl) frequencyEl.setCustomValidity('');
+  if (deactivateOnDateEl) deactivateOnDateEl.setCustomValidity('');
+  if (nextDayToAnswerEl) nextDayToAnswerEl.setCustomValidity('');
 
    // 1) Require at least one of title or subtext
    if (qTitleEl.value.trim() === '' && qsubTextEl.value.trim() === '') {
@@ -296,6 +352,18 @@ function validateNecessaryFields() {
     else if (qTypeEl.value === '') {
     qTypeEl.setCustomValidity('Please select a question type.');
     qTypeEl.reportValidity();
+    return false;
+  } else if (frequencyEl && String(frequencyEl.value).trim() === '') {
+    frequencyEl.setCustomValidity('Please enter a repetition interval or default values check the default switch');
+    frequencyEl.reportValidity();
+    return false;
+  } else if (deactivateOnDateEl && String(deactivateOnDateEl.value).trim() === '') {
+    deactivateOnDateEl.setCustomValidity('Please enter deactivate after days or default values check the default switch');
+    deactivateOnDateEl.reportValidity();
+    return false;
+  } else if (nextDayToAnswerEl && String(nextDayToAnswerEl.value).trim() === '') {
+    nextDayToAnswerEl.setCustomValidity('Please enter the first day to answer or default values check the default switch');
+    nextDayToAnswerEl.reportValidity();
     return false;
   }else{
 
@@ -364,8 +432,9 @@ function validateClockTimes() {
   return true;
 }
 
+
 function addQuestion(){
-  
+
   quest_table = $('#quest_table')
   const questionForm = document.getElementById("questionForm");
   var x = $('#quest_table').bootstrapTable('getData').length;
@@ -378,165 +447,435 @@ function addQuestion(){
   row.append(column)
   }
   quest_table.append(row)
-  questionForm.submit(); 
+  var input = document.createElement('input');
+  input.type = 'hidden';
+  input.name = 'add_question';
+  questionForm.appendChild(input);
+  $('#sort_id').val(x + 1 );
+  questionForm.submit();
 
 }
 
 
 function delete_quest(){
   const deleteQuestionForm = document.getElementById("deleteQuestionForm");
-  deleteQuestionForm.submit(); 
+  deleteQuestionForm.submit();
 }
 
 function remove_question(){
   const removeQuestionForm = document.getElementById("removeQuestionForm");
-  removeQuestionForm.submit(); 
+  removeQuestionForm.submit();
 }
 
 ///////// Answers /////
 
-function addAnswer(){
+function addAnswer() {
   const answerForm = document.getElementById("answerForm");
-  questionForm.append(document.getElementsByName('add_answer'))
-  answerForm.submit(); 
+  const addInput = document.getElementsByName('add_answer')[0];
+
+  if (addInput && answerForm) {
+    // Add the input to the form (if it’s not already in it)
+    if (!answerForm.contains(addInput)) {
+      answerForm.appendChild(addInput);
+    }
+    answerForm.submit();
+  }
+}
+
+function renumberChoices() {
+  const forms = document.querySelectorAll('.choice-formset');
+  forms.forEach((formEl, index) => {
+    // Update row ID
+    formEl.id = `choice-form-${index}`;
+
+    // Update form field names/ids inside this row
+    formEl.querySelectorAll('input, textarea, select, label').forEach(el => {
+      if (el.name) {
+        el.name = el.name.replace(/form-\d+-/, `form-${index}-`);
+      }
+      if (el.id) {
+        el.id = el.id.replace(/form-\d+-/, `form-${index}-`);
+      }
+      if (el.htmlFor) {
+        el.htmlFor = el.htmlFor.replace(/form-\d+-/, `form-${index}-`);
+      }
+    });
+
+    // Update remove button ID
+    const removeBtn = formEl.querySelector('[id^="id_"][id$="_remove_btn"]');
+    if (removeBtn) {
+      removeBtn.id = `id_${index}_remove_btn`;
+    }
+
+    // Update visible order label (if used)
+    const orderLabel = formEl.querySelector('.form-control-plaintext');
+    if (orderLabel) {
+      orderLabel.textContent = index + 1;
+    }
+
+    // Update hidden sort ID
+    const sortInput = formEl.querySelector(`input[name$="-answerSortId"]`);
+    if (sortInput) {
+      sortInput.value = index + 1;
+    }
+  });
 }
 
 
 ///////// Categories /////
 
+function renumber_category_forms() {
+  const forms = document.querySelectorAll(".category-formset.mb-4");
+  const totalForms = document.getElementById("id_form-TOTAL_FORMS");
 
-function add_category_form(){
-  
-  
-  const main = document.getElementById("category_details_form")
-  const totalCategoryForms = document.getElementById("id_form-TOTAL_FORMS")
- 
-  const currentCategoryForms = document.getElementsByClassName("category-formset mb-4")
-  const currentFormCount = currentCategoryForms.length //+ 1
+  forms.forEach((formEl, index) => {
+    formEl.id = `category-form-${index}`;
 
-  //add new category form
+    formEl.querySelectorAll("input, textarea, select, label, span, a").forEach((el) => {
+      if (el.name) {
+        el.name = el.name.replace(/form-\d+-/g, `form-${index}-`);
+      }
+      if (el.id) {
+        el.id = el.id.replace(/form-\d+-/g, `form-${index}-`);
+      }
+      if (el.htmlFor) {
+        el.htmlFor = el.htmlFor.replace(/form-\d+-/g, `form-${index}-`);
+      }
+    });
 
-  const categoryFormEl = document.getElementById('category-form-0').cloneNode(true)
-  
-  categoryFormEl.setAttribute('class','category-formset mb-4')
-  categoryFormEl.setAttribute('id',`category-form-${currentFormCount}`)
-  const regex = new RegExp('form-0-','g')
-  categoryFormEl.innerHTML  = categoryFormEl.innerHTML.replace(regex,"form-"+currentFormCount+"-")
-  categoryFormEl.innerHTML  = categoryFormEl.innerHTML.replace('id_0_remove_btn',"id_"+currentFormCount+"_remove_btn")
-  totalCategoryForms.setAttribute('value', currentFormCount + 1)
-  
-  main.appendChild(categoryFormEl)
-  const initialCategoryForms = document.getElementById("id_form-INITIAL_FORMS")
-  if (initialCategoryForms.value != 0 ){
-    document.getElementById("id_form-"+currentFormCount+"-categoryTitle").value = ""
-    
-  }
-  if (currentFormCount> 0){
-    document.getElementById("id_"+currentFormCount+"_remove_btn").disabled = false
-  }
-}
+    const titleField = formEl.querySelector(`[name="form-${index}-categoryTitle"]`);
+    if (titleField) {
+      titleField.id = `id_form-${index}-categoryTitle`;
+    }
 
-function remove_category_form(id){
-  array = id.split("_")
-  if(array[1] != 0){
-  const main = document.getElementById("category_details_form")
-  const categoryFormEl = document.getElementById("category-form-"+array[1])
-  main.removeChild(categoryFormEl)
-  }
-}
+    const valueField = formEl.querySelector(`[name="form-${index}-categoryValue"]`);
+    if (valueField) {
+      valueField.id = `id_form-${index}-categoryValue`;
+      valueField.value = index + 1;
+      valueField.type = "hidden";
+    }
 
-function add_choices_form(){
-  const main = document.getElementById("choice_details_form")
-  const totalChoiceForms = document.getElementById("id_form-TOTAL_FORMS")
-  const currentChoiceForms = document.getElementsByClassName("choice-formset mb-4")
-  const currentFormCount = currentChoiceForms.length // +1
-  
+    const displayValue = formEl.querySelector('[id^="display-value-"]');
+    if (displayValue) {
+      displayValue.id = `display-value-${index}`;
+    }
 
-  //add new choice form
+    const removeBtn = formEl.querySelector('[id^="id_"][id$="_remove_btn"]');
+    if (removeBtn) {
+      removeBtn.id = `id_${index}_remove_btn`;
+    }
+  });
 
-  const choiceFormEl = document.getElementById('choice-form-0').cloneNode(true)
-  
-  choiceFormEl.setAttribute('class','row choice-formset mb-4')
-  choiceFormEl.setAttribute('id',`choice-form-${currentFormCount}`)
-  const regex = new RegExp('form-0-','g')
-  choiceFormEl.innerHTML  = choiceFormEl.innerHTML.replace(regex,"form-"+currentFormCount+"-")
-  choiceFormEl.innerHTML  = choiceFormEl.innerHTML.replace('id_0_remove_btn',"id_"+currentFormCount+"_remove_btn")
-  totalChoiceForms.setAttribute('value', currentFormCount + 1)
-  
-  main.appendChild(choiceFormEl)
-  const initialChoiceForms = document.getElementById("id_form-INITIAL_FORMS")
-    document.getElementById("id_form-"+currentFormCount+"-answerSortId").value = ""
-    document.getElementById("id_form-"+currentFormCount+"-text").value = ""
-  if (currentFormCount> 0){
-    document.getElementById("id_"+currentFormCount+"_remove_btn").disabled = false
+  if (totalForms) {
+    totalForms.value = forms.length;
   }
 }
 
-function remove_choice_form(id){
+function update_remove_buttons() {
+  const forms = document.querySelectorAll(".category-formset.mb-4");
+  forms.forEach((formEl, index) => {
+    const removeBtn = formEl.querySelector('[id^="id_"][id$="_remove_btn"]');
+    if (removeBtn) {
+      removeBtn.disabled = forms.length <= 1;
+      removeBtn.id = `id_${index}_remove_btn`;
+    }
+  });
+}
 
-  const idToRemove = document.getElementById("answer_id").value
-  // Select all input elements with name "answer_id" and extract their values.
-  const answerIdElements = document.querySelectorAll('input[name="answer_id"]');
-  const answerIds = Array.from(answerIdElements, el => el.value);
-  // Filter the array to remove the specified ID.
-  var filteredAnswerIds = answerIds.filter(id => id !== idToRemove);
 
-  filteredAnswerIds = document.querySelectorAll('input[name="answer_id"]');
+function add_category_form() {
+  const main = document.getElementById("category_details_form");
+  const totalCategoryForms = document.getElementById("id_form-TOTAL_FORMS");
 
-  array = id.split("_")
-  if(array[1] != 0){
-  const main = document.getElementById("choice_details_form")
-  const choiceFormEl = document.getElementById("choice-form-"+array[1])
-  
-  main.removeChild(choiceFormEl)
+  const currentCategoryForms = document.getElementsByClassName("category-formset mb-4");
+  const currentFormCount = currentCategoryForms.length;
+
+  const categoryFormEl = document.getElementById('category-form-0').cloneNode(true);
+
+  // Update formset metadata
+  categoryFormEl.setAttribute('class', 'category-formset mb-4');
+  categoryFormEl.setAttribute('id', `category-form-${currentFormCount}`);
+  const regex = new RegExp('form-0-', 'g');
+  categoryFormEl.innerHTML = categoryFormEl.innerHTML.replace(regex, `form-${currentFormCount}-`);
+  categoryFormEl.innerHTML = categoryFormEl.innerHTML.replace('id_0_remove_btn', `id_${currentFormCount}_remove_btn`);
+
+  totalCategoryForms.setAttribute('value', currentFormCount + 1);
+  main.appendChild(categoryFormEl);
+
+  // Clean up cloned input values
+  document.getElementById(`id_form-${currentFormCount}-categoryTitle`).value = "";
+
+  // ✅ HIDE and set `categoryValue` automatically
+  const valueField = document.getElementById(`id_form-${currentFormCount}-categoryValue`);
+  valueField.value = currentFormCount + 1;
+  valueField.type = "hidden"; // Hide it from the user
+
+  // ✅ Remove duplicated 'didSubjectAsk' (leave only the original one at top)
+  const didSubjectAskField = document.getElementById(`id_form-${currentFormCount}-didSubjectAsk`);
+  if (didSubjectAskField) {
+    didSubjectAskField.closest('.form-check').remove(); // or .parentElement.remove() if needed
   }
+
+  // Enable the remove button
+  const removeBtn = document.getElementById(`id_${currentFormCount}_remove_btn`);
+  if (removeBtn) {
+    removeBtn.disabled = false;
+  }
+
+  renumber_category_forms();
+  update_remove_buttons();
+}
+
+function remove_category_form(id) {
+  const index = id.split("_")[1];
+  const allForms = document.getElementsByClassName("category-formset mb-4");
+
+  if (allForms.length <= 1) {
+    // Only one form left — don't remove it, just clear its fields
+    const titleField = document.getElementById(`id_form-${index}-categoryTitle`);
+    const valueField = document.getElementById(`id_form-${index}-categoryValue`);
+    const checkbox = document.getElementById(`id_form-${index}-didSubjectAsk`);
+
+    if (titleField) titleField.value = "";
+    if (valueField) valueField.value = "1";
+    if (checkbox) checkbox.checked = false;
+
+    alert("At least one category is required.");
+    return;
+  }
+
+  // Otherwise, safe to remove
+  const main = document.getElementById("category_details_form");
+  const categoryFormEl = document.getElementById("category-form-" + index);
+  if (categoryFormEl) {
+    main.removeChild(categoryFormEl);
+
+    renumber_category_forms();
+    update_remove_buttons();
+  }
+}
+
+function add_choices_form() {
+  // Get the container that holds all choice forms
+  const container = document.getElementById("sortable-answer-list");
+  const totalFormsInput = document.getElementById("id_form-TOTAL_FORMS");
+
+  // Count current choice forms to determine the next index
+  const currentFormCount = document.getElementsByClassName("choice-formset").length;
+
+  // Use the first available form as a template
+  const template = document.querySelector('.choice-formset');
+  if (!template) {
+    console.error("No template form found");
+    return;
+  }
+
+  // Clone the template node deeply
+  const newForm = template.cloneNode(true);
+  newForm.setAttribute('id', `choice-form-${currentFormCount}`);
+
+  // Replace all form index references (e.g., form-0- → form-3-)
+  const regex = new RegExp(`form-(\\d+)-`, 'g');
+  newForm.innerHTML = newForm.innerHTML.replace(regex, `form-${currentFormCount}-`);
+
+  // Update the remove button ID as well
+  newForm.innerHTML = newForm.innerHTML.replace(/id_\d+_remove_btn/, `id_${currentFormCount}_remove_btn`);
+
+  // Append the new form to the container
+  container.appendChild(newForm);
+
+  // Update Django's management TOTAL_FORMS count
+  totalFormsInput.value = currentFormCount + 1;
+
+  // Reset specific fields inside the new form
+  setTimeout(() => {
+    const sortInput = newForm.querySelector(`[name="form-${currentFormCount}-answerSortId"]`);
+    const textInput = newForm.querySelector(`[name="form-${currentFormCount}-text"]`);
+    if (sortInput) sortInput.value = currentFormCount + 1;
+    if (textInput) textInput.value = "";
+  }, 0);
+
+  // Enable the remove button on the new form
+  setTimeout(() => {
+    const removeBtn = newForm.querySelector(`#id_${currentFormCount}_remove_btn`);
+    if (removeBtn) removeBtn.disabled = false;
+  }, 0);
+
+  // Re-index all choice forms (sort IDs, visible numbers, etc.)
+  renumberChoices();
+}
+
+function remove_choice_form(btnId) {
+  // Extract form index from button ID (e.g., "id_2_remove_btn" → 2)
+  const idx = parseInt(btnId.split('_')[1], 10);
+  const row = document.getElementById(`choice-form-${idx}`);
+  if (!row) return;
+
+  // Remove the form row
+  row.remove();
+
+  // Remove the associated hidden input (answer_id)
+  const allAnswerInputs = document.querySelectorAll('input[name="answer_id"]');
+  if (allAnswerInputs.length > idx) {
+    allAnswerInputs[idx].remove();
+  }
+
+  // Update TOTAL_FORMS
+  const totalFormsInput = document.getElementById("id_form-TOTAL_FORMS");
+  const newCount = document.querySelectorAll('.choice-formset').length;
+  totalFormsInput.value = newCount;
+
+  // Reindex all forms so Django can parse them
+  renumberChoices();
 }
 
 function toggleActivateConditionsField(){
-  const aqEl = document.getElementById('activate_question')
-  const conaEl = document.getElementById('activate_condition_div')
-    const conditionInput = conaEl.querySelector('input');
-  const val = aqEl.value.trim();
-  aqEl.setCustomValidity('');
-  // Test for an integer (one or more digits only)
-  const pattern = /^\d+(?:,\d+)*$/.test(val);
-  if (val !== '' && !pattern){
-    aqEl.setCustomValidity('Please enter a comma-separated list of question IDs.');
-    aqEl.reportValidity();
-  }
-    if (val === '') {
-    conaEl.value = '';
-        if (conditionInput) {
-      conditionInput.value = '';                        // Clear value
-      conditionInput.removeAttribute('value');          // Prevent "cached" value on reload
-      conditionInput.setAttribute('autocomplete', 'off'); // Prevent browser autocomplete
+  const activate_questions_list = document.getElementById('activate_question')
+  const activate_conditions = document.getElementById('activate_condition_div')
+  try {
+    // Parse the value in the textarea as JSON (an array)
+    const questionArray = JSON.parse(activate_questions_list.value);
+
+    // Check if it's a non-empty array
+    if (Array.isArray(questionArray) && questionArray.length > 0) {
+        activate_conditions.style.display = 'block'
+      }else{
+        activate_conditions.style.display = 'none'
+      }
+    } catch (e) {
+      // If JSON parsing fails (invalid JSON), hide the div
+      activate_conditions.style.display = 'none';
     }
-  }
-  // Show if integer, hide otherwise
-  conaEl.style.display = val ? '' : 'none';
+
 }
 
 function toggleDeactivateConditionsField(){
-  const dqEl = document.getElementById('deactivate_question')
-  const condEl = document.getElementById('deactivate_condition_div')
-    const conditionInput = condEl.querySelector('input');
-  const val = dqEl.value.trim();
-  dqEl.setCustomValidity('');
-  // Test for an integer (one or more digits only)
-  const pattern = /^\d+(?:,\d+)*$/.test(val);
-  if (val !== '' && !pattern){
-    dqEl.setCustomValidity('Please enter a comma-separated list of question IDs.');
-    dqEl.reportValidity();
-  }
-  if (val === '') {
-    conaEl.value = '';
-    if (conditionInput) {
-      conditionInput.value = '';                        // Clear value
-      conditionInput.removeAttribute('value');          // Prevent "cached" value on reload
-      conditionInput.setAttribute('autocomplete', 'off'); // Prevent browser autocomplete
-    }
-  }
-  // Show if integer, hide otherwise
-  condEl.style.display = val ? '' : 'none';
+  const deactivate_questions_list = document.getElementById('deactivate_question')
+  const deactivate_conditions = document.getElementById('deactivate_condition_div')
 
+  try {
+    // Parse the value in the textarea as JSON (an array)
+    const questionArray = JSON.parse(deactivate_questions_list.value);
+
+    // Check if it's a non-empty array
+    if (Array.isArray(questionArray) && questionArray.length > 0) {
+      deactivate_conditions.style.display = 'block'
+      }else{
+        deactivate_conditions.style.display = 'none'
+      }
+    } catch (e) {
+      // If JSON parsing fails (invalid JSON), hide the div
+      deactivate_conditions.style.display = 'none';
+    }
+
+}
+
+function ensureChoiceFormCount(minCount) {
+  let currentCount = document.querySelectorAll('.choice-formset').length;
+  while (currentCount < minCount) {
+    add_choices_form();
+    currentCount = document.querySelectorAll('.choice-formset').length;
+  }
+}
+
+function setChoiceTexts(values) {
+  ensureChoiceFormCount(values.length);
+  values.forEach((value, index) => {
+    const input = document.querySelector(`[name="form-${index}-text"]`);
+    if (input) {
+      input.value = value;
+    }
+  });
+}
+
+function setSlidingDefaults(values) {
+  const defaults = {
+    value: 1,
+    defaultValue: 3,
+    stepSize: 1,
+    minValue: 1,
+    maxValue: 5,
+    minText: 'Low',
+    maxText: 'High',
+  };
+  const finalValues = { ...defaults, ...values };
+  Object.entries(finalValues).forEach(([field, value]) => {
+    const input = document.querySelector(`[name="form-0-${field}"]`);
+    if (input) {
+      input.value = value;
+    }
+  });
+}
+
+function applyQuestionTemplate(templateName) {
+  const templates = {
+    weekly_duration: {
+      questionType: '9',
+      frequency: 7,
+      nextDayToAnswer: 1,
+      deactivateOnDate: 0,
+      choices: [],
+    },
+    daily_single_choice: {
+      questionType: '1',
+      frequency: 1,
+      nextDayToAnswer: 1,
+      deactivateOnDate: 0,
+      choices: ['Yes', 'No'],
+    },
+    monthly_multiple_choice: {
+      questionType: '2',
+      frequency: 30,
+      nextDayToAnswer: 1,
+      deactivateOnDate: 0,
+      choices: ['Option 1', 'Option 2', 'Option 3'],
+    },
+    weekly_sliding_choice: {
+      questionType: '3',
+      frequency: 7,
+      nextDayToAnswer: 1,
+      deactivateOnDate: 0,
+      sliding: {
+        value: 1,
+        defaultValue: 3,
+        stepSize: 1,
+        minValue: 1,
+        maxValue: 5,
+        minText: 'Very low',
+        maxText: 'Very high',
+      },
+      choices: [],
+    },
+    weekly_free_text: {
+      questionType: '4',
+      frequency: 7,
+      nextDayToAnswer: 1,
+      deactivateOnDate: 0,
+      choices: [],
+    }
+  };
+
+  const template = templates[templateName];
+  if (!template) {
+    return;
+  }
+
+  const defaultToggle = document.getElementById('flexSwitchCheckDefault');
+  if (defaultToggle) {
+    defaultToggle.checked = false;
+  }
+
+  $('#questionType').val(template.questionType);
+  $('#frequency').val(template.frequency);
+  $('#nextDayToAnswer').val(template.nextDayToAnswer);
+  $('#deactivateOnDate').val(template.deactivateOnDate);
+
+  show_answer_form();
+
+  if (template.questionType === '1' || template.questionType === '2') {
+    setChoiceTexts(template.choices);
+  }
+  if (template.questionType === '3' && template.sliding) {
+    setSlidingDefaults(template.sliding);
+  }
 }

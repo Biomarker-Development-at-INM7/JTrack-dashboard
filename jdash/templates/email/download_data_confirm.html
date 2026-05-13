@@ -2,28 +2,78 @@
 {% load static %}
 {% block content %}
 <script>
-  document.getElementById('code_form').addEventListener('submit', function(event) {
-    event.preventDefault(); // Prevent the default form submission
-    document.getElementById('success').style.display = 'block'; // Show the div
-    document.getElementById('code').style.display = 'none';
-});
-  
+  document.addEventListener('DOMContentLoaded', function () {
+    const codeForm = document.getElementById('code_form');
+    const loadingCard = document.getElementById('loading');
+    const successCard = document.getElementById('success');
+    const codeBlock = document.getElementById('code');
+    const submitButton = document.getElementById('verify_button');
+    let downloadPoll = null;
+
+    function hasDownloadCookie() {
+      return document.cookie.split('; ').some(function (row) {
+        return row === 'file_download_started=1';
+      });
+    }
+
+    codeForm?.addEventListener('submit', function() {
+      document.cookie = 'file_download_started=; Max-Age=0; path=/; SameSite=Lax';
+      if (loadingCard) {
+        loadingCard.style.display = 'block';
+      }
+      if (successCard) {
+        successCard.style.display = 'none';
+      }
+      if (codeBlock) {
+        codeBlock.style.display = 'none';
+      }
+      if (submitButton) {
+        submitButton.disabled = true;
+      }
+
+      downloadPoll = window.setInterval(function() {
+        if (!hasDownloadCookie()) {
+          return;
+        }
+
+        window.clearInterval(downloadPoll);
+        document.cookie = 'file_download_started=; Max-Age=0; path=/; SameSite=Lax';
+
+        if (loadingCard) {
+          loadingCard.style.display = 'none';
+        }
+        if (successCard) {
+          successCard.style.display = 'block';
+        }
+        if (submitButton) {
+          submitButton.disabled = false;
+        }
+      }, 500);
+    });
+  });
 </script>
 <div class="row justify-content-center mt-5">
     <div class="col-xl-10 col-lg-6 col-md-6">
-    <div id = "success" class="card " style="display: none;">
-        <div class="card-header text-white " style="background-color: #6ad37b;">
-            
-            <h2 class="h4 text-center">
-                <i class="fas fa-check-circle fa-2x "></i>
+    <div id="success" class="card" style="display: none;">
+        <div class="card-header text-white" style="background-color: #198754;">
+            <h2 class="h4 text-center mb-0">
+                <i class="fas fa-check-circle"></i> Download started
             </h2>
         </div>
-        <div class="card-body">
-            <h2 class="h4 text-center">
-               Success!!
-            </h2>
-            <p class="card-text text-center">
-              {{text_message}}
+        <div class="card-body text-center">
+            <p class="card-text mb-0">
+              The file transfer has started. Keep this page open until your browser finishes downloading.
+            </p>
+        </div>
+    </div>
+    <div id="loading" class="card" style="display: none;">
+        <div class="card-header text-white" style="background-color: #0d6efd;">
+            <h2 class="h4 text-center mb-0">Preparing download</h2>
+        </div>
+        <div class="card-body text-center">
+            <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+            <p class="card-text mt-3 mb-0">
+              Your download is being prepared. This may take a moment for large files.
             </p>
         </div>
     </div>
@@ -49,12 +99,12 @@
               {% endif %}
               <div class="jumbotron text-center">
                 <h2>Enter the verification code</h2>
-                <form id = "code_form" method="get" action="{%url 'download_dataset' arg=arg%}" >
+                <form id="code_form" method="get" action="{%url 'download_dataset' arg=arg%}" >
                   {% csrf_token %}
                   <div class="col-md-9 col-sm-12">
                     <div class="form-group form-group-lg">
                       <input type="text" class="form-control col-md-6 col-sm-6 col-sm-offset-2" name="verifyCode" required>
-                      <input name="confirm_download_data" role="button" onclick="show_message()" btn btn-primary btn-lg col-md-2 col-sm-2" type="submit" value="Verify">
+                      <input id="verify_button" name="confirm_download_data" role="button" class="btn btn-primary btn-lg col-md-2 col-sm-2" type="submit" value="Verify">
                     </div>
                   </div>
                 </form>
@@ -63,5 +113,6 @@
           </div>
         </div>
       </div>    
+      <iframe name="download_frame" style="display: none;"></iframe>
   </div> 
 {% endblock %}

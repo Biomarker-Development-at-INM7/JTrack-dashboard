@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% load custom_tags %}
+{% load static %}
+{% block content %}
+
+
+  <h1>Oops—something went wrong.</h1>
+  <p>Our server hit a snag. We’ve been notified and are looking into it.</p>
+  <p><a href="{% url 'home' %}">Return home</a> or try again later.</p>
+
+  {% endblock %}

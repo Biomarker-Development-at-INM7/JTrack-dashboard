@@ -11,7 +11,14 @@ sys.path.append('./')
 from django.contrib import admin
 from django.db.models import Q
 
-from .models import Study, Subject, Survey, Answer, Category, Question
+from .models import (Study, Subject, Survey, 
+                     Answer, Category, Question,
+                     DeviceCatalog,SensorCatalog,
+                     Task,DeviceSensor,
+                     StudyDeviceSensor,
+                     # ResolutionCatalog,
+                     SamplingRateCatalog,
+                     UnitCatalog)
 
 
 # ---------- Shared behavior ----------
@@ -61,9 +68,29 @@ class SurveyAdmin(JDashBaseAdmin):
     search_fields = ("id", "title")
     search_help_text = "Search by numeric ID or title (case-insensitive)."
 
+class TaskInline(admin.TabularInline):   # or admin.StackedInline
+    model = Task
+    extra = 1
+    fields = ("sortId", "task_name")
+    show_change_link = True
+    
+class StudDeviceSensorInline(admin.TabularInline):   # or admin.StackedInline
+    model = StudyDeviceSensor
+    extra = 1
+    fields = (
+        "device_sensor",
+        # Resolution support is currently disabled in the study UI/model.
+        # "resolution",
+        "sampling_rate",
+        "unit",
+        "is_enabled",
+    )
+    show_change_link = True
 
+        
 @admin.register(Study)
 class StudyAdmin(JDashBaseAdmin):
+    inlines = [TaskInline, StudDeviceSensorInline]
     list_display = ("id", "title","owner","closed")
     list_display_links = ("id", "title")
     search_fields = ("id", "title")
@@ -85,5 +112,46 @@ class AnswerAdmin(JDashBaseAdmin):
     list_editable = ("answerSortId",)
     search_fields = ("id", "text","question__id")
     search_help_text = "Search by numeric ID or text (case-insensitive)."
+    
+@admin.register(DeviceSensor)
+class DeviceSensor(JDashBaseAdmin):
+    list_display = ("id", "device", "sensor")
+    list_display_links = ("id",)
+    search_fields = ("id", "name", "label")
+    search_help_text = "Search by numeric ID, device name, or sensor label (case-insensitive)."
+    
+@admin.register(DeviceCatalog)
+class DeviceAdmin(JDashBaseAdmin):
+    list_display = ("id", "name", "model")
+    list_display_links = ("id", "name")
+    search_fields = ("id", "name",  "model")
+    search_help_text = "Search by numeric ID, name, or model (case-insensitive)."
+    
+@admin.register(SensorCatalog)
+class SensorAdmin(JDashBaseAdmin):
+    list_display = ( "code", "label")
+    list_display_links = ("label","code")
+    search_fields = ("label", "code")
+    search_help_text = "Search by label (case-insensitive)."
+    
+# Resolution support is currently disabled in the study UI/model.
+# @admin.register(ResolutionCatalog)
+# class ResolutionCatalogAdmin(JDashBaseAdmin):
+#     list_display = ("id", "value")
+#     list_display_links = ("id", "value")
+#     search_fields = ("id", "value")
+#     search_help_text = "Search by numeric ID or value (case-insensitive)." 
+    
+@admin.register(SamplingRateCatalog)
+class SamplingRateCatalogAdmin(JDashBaseAdmin):
+    list_display = ("id", "value", "sensor")
+    list_display_links = ("id", "value")
+    search_fields = ("id", "value", "sensor__label", "sensor__code")
+    search_help_text = "Search by numeric ID , value or sensor (case-insensitive)."
 
-
+@admin.register(UnitCatalog)
+class UnitCatalogAdmin(JDashBaseAdmin):
+    list_display = ("id", "value", "sensor")
+    list_display_links = ("id", "value")
+    search_fields = ("id", "value", "sensor__label", "sensor__code")
+    search_help_text = "Search by numeric ID, value, or sensor (case-insensitive)."

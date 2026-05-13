@@ -1,25 +1,26 @@
 {% extends 'base.html' %}
 {% load custom_tags %}
 {% load static %}
+{% load i18n %}
 {% block content %}
 {% load plotly_dash %}
 
-<div class="row mb-4">
+<div class="row mb-4 mx-0">
   <ul class="nav nav-tabs">
     <li class="nav-item">
-      <a class="nav-link " aria-current="page" href="{%url 'home' %}">Studies</a>
+      <a class="nav-link " aria-current="page" href="{%url 'home' %}">{% trans "index_tab1" %}</a>
     </li>
     <li class="nav-item">
-      <a class="nav-link" href="{%url 'survey' %}">Survey</a>
+      <a class="nav-link" href="{%url 'survey' %}">{% trans "index_tab2" %}</a>
     </li>
     <li class="nav-item">
-      <a class="nav-link active" href="{%url 'analytics' study_name='all' %}">Analytics</a>
+      <a class="nav-link active" href="{%url 'analytics' study_name='all' %}">{% trans "index_tab3" %}</a>
     </li>
     </ul>
 </div>
 
 
-    <div class="row">
+    <div class="row mx-0">
       
         
         <div class="col-xs-12 col-sm-9" style="display: flex; justify-content: flex-end">
@@ -34,7 +35,8 @@
             
             
         </div>
-        <div id="session-id" style="display: none;" data-username="{{ initial_args }}" data-session-key="{{ session_id }}">
+        <div id="session-id" style="display: none;" data-username="{{ initial_args }}" 
+        data-session-key="{{ session_id }}">
           
         </div>
         

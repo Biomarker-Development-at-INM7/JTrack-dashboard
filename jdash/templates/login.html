@@ -1,39 +1,70 @@
 {% extends 'login_base.html' %}
 {% load static %}
+
 {% block content %}
-<div class="row justify-content-center mt-5">
-    <div class="col-xl-4 col-lg-6 col-md-6">
-      <div class="card shadow">
-        
-        <div class="card-body">
-          {% if messages %}
-            <ul class="messages">
-                {% for message in messages %}
-                <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
-                {% endfor %}
-            </ul>
-            {% endif %}
-            {% if error_message %}
-            <p class="bg-danger p-d ml-b">{{ error_message }}</p>
-            {% endif %}
-          <form action="{% url 'login' %}" method="post">
-            {% csrf_token %}
-            <div class="mb-4">
-              <label for="username" class="form-label">Username</label>
-              <input type="text" class="form-control" name="username" id="username" />
+    
+    <div class="row justify-content-center mt-5">
+        <div class="col-xl-4 col-lg-6 col-md-6">
+            <div class="card shadow">
+                <div class="card-body">
+                    {% if messages %}
+                        <ul class="messages">
+                            {% for message in messages %}
+                            <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+
+                    <form action="{% url 'login' %}" method="post">
+                        {% csrf_token %}
+                        <div class="mb-4">
+                            <label for="username" class="form-label">Username</label>
+                            <input type="text" class="form-control" name="username" id="username" />
+                        </div>
+                        <div class="mb-4">
+                            <label for="password" class="form-label">Password</label>
+                            <div style="position: relative;">
+                                <input type="password" class="form-control" name="password" id="password" />
+                                <button
+                                    type="button"
+                                    class="btn"
+                                    id="togglePassword"
+                                    aria-label="Show password"
+                                    aria-pressed="false"
+                                    style="position: absolute; top: 50%; right: 0.5rem; transform: translateY(-50%); border: 0; box-shadow: none; background: transparent; padding: 0.25rem 0.5rem;"
+                                >
+                                    <i class="fa fa-eye" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="d-grid">
+                            <input name="login" type="submit" value="Login" class="btn btn-success" />
+                        </div>
+                    </form>
+                </div>
             </div>
-            <div class="mb-4">
-              <label for="password" class="form-label">Password</label>
-              <input type="password" class="form-control" name="password"  id="password" />
-            </div>
-            
-            <div class="d-grid">
-                <input name="login" type="submit" value="Login" class="btn btn-success" /> &nbsp;
-            </div>
-          </form>
         </div>
-      </div>
     </div>
-  </div>
-  
+    <script>
+        (function () {
+            const passwordInput = document.getElementById("password");
+            const toggleButton = document.getElementById("togglePassword");
+
+            if (!passwordInput || !toggleButton) {
+                return;
+            }
+
+            toggleButton.addEventListener("click", function () {
+                const showPassword = passwordInput.type === "password";
+                const icon = toggleButton.querySelector("i");
+                passwordInput.type = showPassword ? "text" : "password";
+                toggleButton.setAttribute("aria-label", showPassword ? "Hide password" : "Show password");
+                toggleButton.setAttribute("aria-pressed", showPassword ? "true" : "false");
+                if (icon) {
+                    icon.className = showPassword ? "fa fa-eye-slash" : "fa fa-eye";
+                }
+            });
+        })();
+    </script>
 {% endblock %}
