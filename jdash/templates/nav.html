@@ -68,7 +68,7 @@
       </button>
   </form>
   -->
-    <form action="{% url 'set_language' %}" method="post" style="display:inline;">
+  <form action="{% url 'set_language' %}" method="post" style="display:inline;">
     {% csrf_token %}
     <input type="hidden" name="language" value="en">
     <input type="hidden" name="next" class="language-next" data-language="en" value="{{ request.get_full_path }}">
@@ -92,10 +92,10 @@
     const url = new URL(window.location.href);
     let path = url.pathname;
 
-    if (/^\/(en|de)(\/|$)/.test(path)) {
+    if (/^\/dev\/(en|de)(\/|$)/.test(path)) {
+      return path.replace(/^\/dev\/(en|de)(?=\/|$)/, `/dev/${targetLang}`) + url.search + url.hash;
+    } else if (/^\/(en|de)(\/|$)/.test(path)) {
       path = path.replace(/^\/(en|de)(?=\/|$)/, "");
-    } else if (/^\/dev\/(en|de)(\/|$)/.test(path)) {
-      path = path.replace(/^\/dev\/(en|de)(?=\/|$)/, "/dev");
     } else if (/^\/(en|de)\/dev(\/|$)/.test(path)) {
       path = path.replace(/^\/(en|de)\/dev(?=\/|$)/, "/dev");
     }
@@ -115,52 +115,136 @@
   });
 
   const timeoutSeconds = 20 * 60;
-  let countdown = timeoutSeconds;
-  const modalThreshold = 60;
-  const checkInterval = 30;
-
+  const timeoutMs = timeoutSeconds * 1000;
+  const modalThresholdSeconds = 60;
+  const modalThresholdMs = modalThresholdSeconds * 1000;
+  const checkIntervalMs = 30 * 1000;
+  const logoutUrl = "{% url 'logout' %}";
+  const sessionCheckUrl = "{% url 'session_check' %}";
   const timerDisplay = document.getElementById("logout-timer");
+  const sessionModalElement = document.getElementById("sessionModal");
+  const activityStorageKey = "jdashLastActivityAt";
+  let logoutTriggered = false;
+  let fallbackLastActivityAt = Date.now();
+
+  function getSessionModal() {
+    if (!sessionModalElement || !window.bootstrap || !window.bootstrap.Modal) {
+      return null;
+    }
+    return window.bootstrap.Modal.getOrCreateInstance(sessionModalElement);
+  }
+
+  function readLastActivityAt() {
+    try {
+      const rawValue = window.sessionStorage.getItem(activityStorageKey);
+      const parsedValue = Number(rawValue);
+      if (Number.isFinite(parsedValue) && parsedValue > 0) {
+        fallbackLastActivityAt = parsedValue;
+        return parsedValue;
+      }
+    } catch (error) {
+      // Fall back to in-memory tracking when storage is unavailable.
+    }
+    return fallbackLastActivityAt;
+  }
+
+  function writeLastActivityAt(timestamp) {
+    fallbackLastActivityAt = timestamp;
+    try {
+      window.sessionStorage.setItem(activityStorageKey, String(timestamp));
+    } catch (error) {
+      // Ignore storage failures and keep using the in-memory fallback.
+    }
+  }
+
+  function clearLastActivityAt() {
+    try {
+      window.sessionStorage.removeItem(activityStorageKey);
+    } catch (error) {
+      // Ignore storage failures.
+    }
+  }
+
+  function ensureLastActivityAt() {
+    const timestamp = readLastActivityAt();
+    if (!timestamp) {
+      const now = Date.now();
+      writeLastActivityAt(now);
+      return now;
+    }
+    return timestamp;
+  }
+
+  function logoutNow() {
+    if (logoutTriggered) {
+      return;
+    }
+    logoutTriggered = true;
+    clearLastActivityAt();
+    window.location.assign(logoutUrl);
+  }
 
   function updateTimer() {
-    const minutes = Math.floor(countdown / 60);
-    const seconds = countdown % 60;
+    const elapsedMs = Date.now() - ensureLastActivityAt();
+    const remainingMs = Math.max(0, timeoutMs - elapsedMs);
+    const remainingSeconds = Math.ceil(remainingMs / 1000);
+    const minutes = Math.floor(remainingSeconds / 60);
+    const seconds = remainingSeconds % 60;
+
     if (timerDisplay) {
-      timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, "0")}`;
     }
 
-    if (countdown === modalThreshold) {
-      const modal = new bootstrap.Modal(document.getElementById("sessionModal"));
-      modal.show();
+    const sessionModal = getSessionModal();
+    if (sessionModal) {
+      if (remainingMs > 0 && remainingMs <= modalThresholdMs) {
+        sessionModal.show();
+      } else {
+        sessionModal.hide();
+      }
     }
 
-    if (countdown <= 0) {
-      window.location.href = "{% url 'logout' %}";
+    if (remainingMs <= 0) {
+      logoutNow();
     }
-
-    countdown--;
   }
 
-  function resetTimer() {
-    countdown = timeoutSeconds;
+  function markActivity() {
+    writeLastActivityAt(Date.now());
+    const sessionModal = getSessionModal();
+    if (sessionModal) {
+      sessionModal.hide();
+    }
+    updateTimer();
   }
 
-  ['keypress', 'click', 'scroll'].forEach(evt => {
-    document.addEventListener(evt, resetTimer);
+  ensureLastActivityAt();
+
+  ["keydown", "click", "scroll", "touchstart"].forEach((eventName) => {
+    document.addEventListener(eventName, markActivity, { passive: true });
+  });
+
+  window.addEventListener("focus", updateTimer);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      updateTimer();
+    }
   });
 
   setInterval(() => {
-    fetch("{% url 'session_check' %}", {
+    fetch(sessionCheckUrl, {
       method: "GET",
       credentials: "same-origin"
-    }).then(res => {
+    }).then((res) => {
       if (res.status === 401 || res.redirected) {
-        window.location.href = "{% url 'logout' %}";
+        logoutNow();
       }
     }).catch(() => {
-      window.location.href = "{% url 'logout' %}";
+      logoutNow();
     });
-  }, checkInterval * 1000);
+  }, checkIntervalMs);
 
+  updateTimer();
   setInterval(updateTimer, 1000);
 </script>
 {% endif %}
