@@ -12,6 +12,99 @@
 <script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
 <script src="{% static 'js/main.js' %}"></script>
 <script src="{% static 'js/popper.js' %}"></script>
+<style>
+    .qc-table-wrap {
+        overflow-x: auto;
+    }
+
+    .qc-steps-cell,
+    .qc-notes-cell {
+        min-width: 240px;
+    }
+
+    .qc-notes-input {
+        min-height: 88px;
+        resize: vertical;
+    }
+
+    .qc-note-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .qc-note-item {
+        padding: 0.5rem 0.65rem;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        background: #fff;
+    }
+
+    .qc-note-item p {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    .qc-note-meta {
+        display: block;
+        margin-top: 0.35rem;
+        color: #6c757d;
+        font-size: 0.85rem;
+        line-height: 1.35;
+    }
+
+    .qc-note-empty {
+        margin: 0;
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+
+    .qc-note-trigger {
+        margin-bottom: 0.75rem;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: #6c757d;
+        line-height: 1;
+    }
+
+    .qc-note-trigger:hover,
+    .qc-note-trigger:focus {
+        color: #0d6efd;
+    }
+
+    .qc-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        background: rgba(33, 37, 41, 0.45);
+        z-index: 1050;
+    }
+
+    .qc-modal-backdrop.is-open {
+        display: flex;
+    }
+
+    .qc-modal-card {
+        width: min(680px, 100%);
+        max-height: min(80vh, 720px);
+        overflow: auto;
+        padding: 1rem;
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.2);
+    }
+
+    .qc-modal-list {
+        max-height: 300px;
+        overflow: auto;
+        margin-bottom: 1rem;
+    }
+</style>
 
 <div class="row mb-4">
 	<ul class="nav nav-tabs">
@@ -59,7 +152,8 @@
         </ul>
         {% endif %}
     </div> 
-    <table id ="qc_table" class="table-responsive"
+    <div class="qc-table-wrap">
+    <table id ="qc_table" class="table table-striped align-middle"
     data-toolbar="#toolbar"
         data-search="true"
         data-pagination="true"
@@ -69,10 +163,10 @@
             <tr>
                 <th data-field="tested_by_admin">{% trans "study_sop_admin" %}</th>
                 <th data-field="tested_by_owner" >{% trans "study_sop_owner" %}</th>
-                <th data-field="testcase_db_id" >{% trans "study_sop_id" %}</th>
                 <th>{% trans "global_desc" %}</th>
                 <th>{% trans "study_sop_steps" %}</th>
                 <th>{% trans "study_sop_expected_outcome" %}</th>
+                <th>Comments</th>
             </tr>
         </thead>
         <tbody>
@@ -90,14 +184,64 @@
                                                  owner-checkbox"
                        id="owner_checkbox{{ forloop.counter }}" {% if test.tested_by_owner %}checked{% endif %}
                     </td>
-                <td id="testcase_db_id">{{test.id}}</td>
-                <td id='description'>{{test.description}}</td>
-                <td id='steps'>{{test.steps}}</td>
-                <td>{{test.expected_outcome}}</td>
+                <input type="hidden" class="testcase-db-id" value="{{ test.id }}">
+                <td>{{test.description}}</td>
+                <td class="qc-steps-cell">{{test.steps}}</td>
+                <td>
+                    <div>{{test.expected_outcome}}</div>
+                </td>
+                <td class="qc-notes-cell">
+                    <textarea class="qc-notes-data d-none">{{ test.notes_json }}</textarea>
+                    <button type="button" class="qc-note-trigger" onclick="openQcNotesModal(this)" title="Comments" aria-label="Comments">
+                        <i class="fa fa-comment" aria-hidden="true"></i>
+                    </button>
+                    <div class="qc-note-list">
+                        {% if test.notes_preview %}
+                            {% for note in test.notes_preview %}
+                            <div class="qc-note-item">
+                                <p>{{ note.text }}</p>
+                                {% if note.user or note.timestamp %}
+                                <small class="qc-note-meta">
+                                    {% if note.user %}{{ note.user }}{% endif %}
+                                    {% if note.timestamp %}
+                                        {% if note.user %} · {% endif %}
+                                        {{ note.timestamp }}
+                                    {% endif %}
+                                </small>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                            {% if test.notes_list|length > 3 %}
+                            <p class="qc-note-empty">Showing last 3 comments.</p>
+                            {% endif %}
+                        {% else %}
+                            <p class="qc-note-empty">No comments yet.</p>
+                        {% endif %}
+                    </div>
+                </td>
             </tr>
             {% endfor  %}
         </tbody>
     </table>
+    </div>
+</div>
+
+<div id="qcNotesModal" class="qc-modal-backdrop" data-current-user="{{ qc_username }}" data-notify-url="{% url 'qc_comment_notify' study_name=study.title %}">
+    <div class="qc-modal-card" role="dialog" aria-modal="true" aria-labelledby="qcNotesModalTitle">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 id="qcNotesModalTitle" class="mb-0">Comments</h5>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="closeQcNotesModal()">Close</button>
+        </div>
+        <div class="qc-modal-list qc-note-list"></div>
+        <div class="mb-3">
+            <label for="qcNoteInput" class="form-label">Add comment</label>
+            <input id="qcNoteInput" type="text" class="form-control" maxlength="1000" placeholder="Enter comment">
+        </div>
+        <div class="d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-primary" onclick="appendQcNote()">Add</button>
+        </div>
+    </div>
 </div>
 	
 {% endblock %}
+

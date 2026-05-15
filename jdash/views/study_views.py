@@ -8,7 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.forms.formsets import formset_factory
 from django.shortcuts import render, redirect
-
+from django.http import JsonResponse
 from jdash.services.subject import Subject
 
 from jdash.audit.services import StudyAuditService
@@ -22,7 +22,7 @@ from jdash.services.controller import (
     remove_subjects_from_study,
     update_study_meta_data,
 )
-from jdash.services.notification import send_email, send_push_notification
+from jdash.services.notification import send_email, send_push_notification,send_qc_comment_email
 from jdash.services.study import Study
 from jdash.forms import (
     CreateStudyForm,
@@ -48,9 +48,9 @@ from jdash.services.datahelper import (
     normalize_survey_data,
 )
 from jdash.utils.fileutils import get_json_data
-from jdash.repositories.study_repository import update_test_case_flags
+from jdash.repositories.study_repository import update_test_case_flags,append_qc_note
 from jdash.repositories.survey_repository import retrieve_all_survey_for_user
-from jdash.models import FileDownloadToken, Study as studymodel, StudyDeviceSensor
+from jdash.models import FileDownloadToken, Study as studymodel,StudyDeviceSensor,QualityControlTests
 from jdash.config.textmessages import TextMessages as textmessages
 
 from django.http import HttpResponse
@@ -406,7 +406,7 @@ def edit_study(request, study_name):
             for i, sf in enumerate(sensor_formsets):
                 logger.warning("Sensor formset %s errors: %s", i, sf.errors)
 
-    if "survey" in json_meta:
+    if json_meta.get("survey"):
         survey = normalize_survey_data(json_meta)
 
         if not survey.get("id"):
@@ -475,11 +475,80 @@ def qc_study(request, study_name):
         HttpResponse: Rendered QC/SOP page.
     """
     if constants.button_name_update_test_flags in request.POST:
-        test_flags_list = request.POST[constants.field_name_test_case_flags]
-        user_details = request.session.get(constants.session_key_user_details, {})
-        update_test_case_flags(json.loads(test_flags_list), user_details[constants.field_name_username])
+        test_flags_list = request.POST.get(constants.field_name_test_case_flags, "").strip()
+        if test_flags_list:
+            try:
+                testcase_updates = json.loads(test_flags_list)
+            except json.JSONDecodeError:
+                logger.warning(
+                    "qc_study received invalid test_case_flags for study=%s user=%s payload=%r",
+                    study_name,
+                    request.user.username,
+                    test_flags_list[:200],
+                )
+                messages.error(request, "Unable to save QC updates. Please try again.")
+            else:
+                user_details = request.session.get(constants.session_key_user_details, {})
+                username = user_details.get(constants.field_name_username, request.user.username)
+                update_test_case_flags(testcase_updates, username)
+        else:
+            logger.warning(
+                "qc_study received empty test_case_flags for study=%s user=%s",
+                study_name,
+                request.user.username,
+            )
     context = create_display_sop_list_of_study(study_name)
+    context["qc_username"] = request.user.username
     return render(request, constants.sop_list_of_study_page, context)
+
+@login_required
+def notify_qc_comment(request, study_name):
+    """Send an email notification when a QC comment is added from the modal."""
+    if request.method != constants.post_method:
+        return JsonResponse({"ok": False, "error": "Method not allowed"}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({"ok": False, "error": "Invalid payload"}, status=400)
+
+    testcase_db_id = payload.get("id")
+    comment_text = str(payload.get("comment", "")).strip()
+    timestamp = str(payload.get("timestamp", "")).strip()
+    username = request.user.username
+
+    if not testcase_db_id or not comment_text:
+        return JsonResponse({"ok": False, "error": "Missing comment data"}, status=400)
+
+    test_case = QualityControlTests.objects.filter(
+        id=testcase_db_id,
+        study__title=study_name,
+    ).values("testcase_id", "description").first()
+
+    if not test_case:
+        return JsonResponse({"ok": False, "error": "Test case not found"}, status=404)
+
+    append_qc_note(
+        testcase_db_id,
+        {
+            "text": comment_text,
+            "user": username,
+            "timestamp": timestamp,
+        },
+        username,
+    )
+
+    sent = send_qc_comment_email(
+        study_name=study_name,
+        testcase_id=test_case["testcase_id"],
+        description=test_case["description"],
+        comment_text=comment_text,
+        username=username,
+        timestamp=timestamp,
+    )
+    status_code = 200 if sent else 500
+    return JsonResponse({"ok": sent, "saved": True}, status=status_code)
+
 
 
 @login_required

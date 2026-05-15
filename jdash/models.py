@@ -388,3 +388,22 @@ class QualityControlTests(models.Model):
 
     def __str__(self):
         return f"TestCaseID: {self.testcase_id}"
+
+class QualityControlComment(models.Model):
+    """Comment history entries for a quality-control test case."""
+
+    test_case = models.ForeignKey(
+        "jdash.QualityControlTests",
+        on_delete=models.CASCADE,
+        related_name="comments",
+    )
+    text = models.TextField()
+    username = models.CharField(max_length=255, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    display_timestamp = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        ordering = ["created_at", "id"]
+
+    def __str__(self):
+        return f"QCComment({self.test_case_id}, {self.username})"
