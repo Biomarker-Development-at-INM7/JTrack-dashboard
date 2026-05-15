@@ -42,6 +42,7 @@ from jdash.utils.fileutils import (
     get_all_json_data,
     parse_get_dashboard_csv,
     create_backup_json_file,
+    change_ownership,
 )
 from jdash.services.datahelper import validate_empty
 from jdash.services.subject import Subject
@@ -235,7 +236,7 @@ class Study:
             exist_ok=True
         )
         change_permissions(self.bids_path)
-
+        change_ownership(self.bids_path);
         os.makedirs(self.dash_root, exist_ok=True)
         change_permissions(self.dash_root)
 
@@ -426,6 +427,12 @@ class Study:
 
         if 'device_sensor_rows' in values_obj:
             study_json['device_sensor_rows'] = values_obj['device_sensor_rows']
+        
+        # Keep the study JSON schema stable even when EMA is disabled or omitted
+        # from the submitted update payload. Some deployed save guards require the
+        # survey key to exist on every overwrite.
+        if constants.field_name_survey not in study_json or study_json[constants.field_name_survey] is None:
+            study_json[constants.field_name_survey] = {}
 
         study_json["version"] = study_json["version"] + 1
         save_study_json(self.study_name, study_json)
@@ -616,12 +623,14 @@ def get_all_study_details(user):
             study["viewers"] = viewers
             number_of_subjects = json_data.get(constants.key_name_number_of_subjects, 0) or 0
             if number_of_subjects:
-                study[constants.key_name_stats] = calculate_stats_of_number_of_subjects(
+                study_stats = calculate_stats_of_number_of_subjects(
                     study[constants.key_name_study_title],
                     number_of_subjects,
                 )
             else:
-                study[constants.key_name_stats] = {}
+                study_stats = {}
+            study[constants.key_name_stats] = study_stats
+            stats_json[study[constants.key_name_study_title]] = study_stats
             if constants.key_name_sensor_list in json_data:
                 raw_sensor_list = json_data.get(constants.key_name_sensor_list)
                 if raw_sensor_list is None:
