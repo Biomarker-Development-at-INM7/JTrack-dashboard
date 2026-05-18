@@ -315,6 +315,20 @@ def create_display_sop_list_of_study(study_name):
             context[constants.key_name_test_list] = json.loads(
                 retrieve_test_cases_for_study(study[constants.key_name_id])
             )
+        for test_case in context[constants.key_name_test_list]:
+            comments = test_case.get("comments", [])
+            notes_list = [
+                {
+                    "text": str(comment.get("text", "")).strip(),
+                    "user": str(comment.get("user", "")).strip(),
+                    "timestamp": str(comment.get("timestamp", "")).strip(),
+                }
+                for comment in comments
+                if str(comment.get("text", "")).strip()
+            ]
+            test_case["notes_list"] = notes_list
+            test_case["notes_preview"] = notes_list[-3:]
+            test_case["notes_json"] = json.dumps(notes_list)
         context[constants.key_name_study] = study
     except Exception as exc:
         logger.exception("create_display_sop_list_of_study failed for study=%s", study_name)
@@ -322,7 +336,6 @@ def create_display_sop_list_of_study(study_name):
         context[constants.key_name_test_list] = []
         context[constants.key_name_error_message] = controller_error_message(exc)
     return context
-
 
 def close_study(study_name, user):
     """

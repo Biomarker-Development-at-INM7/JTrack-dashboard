@@ -25,6 +25,7 @@ urlpatterns = [
     path('add/', views.add_study , name=constants.url_name_for_add_study),
     path('edit/<str:study_name>', views.edit_study , name=constants.url_name_for_edit_study),
     path('qc/<str:study_name>', views.qc_study , name=constants.url_name_for_qc_study),
+    path('qc/<str:study_name>/comment-notify/', views.notify_qc_comment, name='qc_comment_notify'),
     path('audit/<str:study_name>', views.study_audit , name=constants.url_name_for_study_audit),
     path('details/<str:study_name>', views.study_details , name=constants.url_name_for_details),
     #path('details/<str:study_name>/<str:id_type>', views.study_details , name=constants.url_name_for_details),

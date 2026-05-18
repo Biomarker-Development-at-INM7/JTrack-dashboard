@@ -324,9 +324,13 @@ class CreateStudyForm(StrictValidationMixin, forms.Form):
             self.fields['number_of_subjects'].initial = json_data["number_of_subjects"]
             self.fields['study_description'].initial = json_data["description"]
 
+            survey_data = json_data.get("survey")
+            ema_enabled = json_data.get("ema_checkbox")
+            if ema_enabled is None:
+                ema_enabled = bool(survey_data)
+            self.fields['ema_checkbox'].initial = bool(ema_enabled)
 
-            if "survey" in json_data:
-                self.fields['ema_checkbox'].initial = True
+            if survey_data and self.fields['ema_checkbox'].initial:
                 if "id" in json_data["survey"]:
                     self.fields['survey'].initial = initial_survey_id
                 else:

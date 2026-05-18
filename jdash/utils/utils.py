@@ -11,6 +11,116 @@ from jdash.services.subject import Subject
 current_date = timezone.now().strftime('%Y-%m-%d')
 logger = logging.getLogger("django")
 
+def _get_qc_survey_question_identifier(question, fallback_index):
+    """Return a stable identifier for EMA QC cases."""
+    for key in ("db_id", "question_db_id"):
+        value = question.get(key)
+        if value not in (None, ""):
+            return value
+
+    for key in ("id", "sortId"):
+        value = question.get(key)
+        if value not in (None, ""):
+            return value
+
+    return fallback_index
+
+
+def build_quality_control_test_cases(study_data):
+    """Build normalized QC test-case payloads for a study."""
+    cases = []
+
+    def _add_case(testcase_id, test_type, description, steps, expected_outcome, semantic_key=None, **extra):
+        case = {
+            "testcase_id": testcase_id,
+            "test_type": test_type,
+            "description": description,
+            "steps": steps,
+            "expected_outcome": expected_outcome,
+            "semantic_key": semantic_key or testcase_id,
+        }
+        case.update(extra)
+        cases.append(case)
+
+    _add_case(
+        "SUB-01",
+        "Subject",
+        "Verify participant enrollment process",
+        "1. Scan QR code from downloaded Activation pdf.\n 2. Verify subject can access the JTrack successfully. ",
+        " Participant information should be correctly saved during enrollment.",
+    )
+    _add_case(
+        "DATA-01",
+        "Data",
+        "Validate real-time monitoring of data",
+        "1. Access study view page. 2. Verify live batch data updates for sensors and EMA(if necessary).",
+        "Data should update in real-time on the dashboard.",
+    )
+    _add_case(
+        "DATA-02",
+        "Data",
+        "Verify data export functionality",
+        "1. Export study data. 2. Check for link to download and verification code email received",
+        "Exported data should match sensors and other necessary identifiers",
+    )
+
+    survey = study_data.get("survey")
+    if isinstance(survey, dict) and "questions" in survey:
+        for index, question in enumerate(survey.get("questions", [])):
+            question_identifier = _get_qc_survey_question_identifier(question, index)
+            _add_case(
+                f"EMA-{question_identifier}",
+                "EMA",
+                question.get("title", ""),
+                "",
+                "Check the data stored variable",
+                semantic_key=f"EMA|{question_identifier}",
+                legacy_semantic_key=f"EMA|{index}",
+            )
+
+    for index, sensor in enumerate(study_data.get("sensor_list", [])):
+        for platform_code, platform_label in (("AND", "Android"), ("IOS", "iOS")):
+            _add_case(
+                f"PSEN-{platform_code}-{index}",
+                "Sensor",
+                f"Verify passive sensor data is logged correctly for {sensor} on {platform_label}",
+                f"1. Simulate {sensor} for a subject on {platform_label}. 2. Check if {sensor} json is generated.",
+                f"{sensor} data from {platform_label} should appear in json accurately with timestamps.",
+                semantic_key=f"PSEN|{platform_label}|{sensor}",
+            )
+
+    for index, sensor in enumerate(study_data.get("sensor_list_limited", [])):
+        _add_case(
+            f"ASEN-{index}",
+            "Sensor",
+            "Verify that sensor data is logged correctly",
+            f"1. Simulate {sensor} for a subject. 2. Check if {sensor} json is generated. ",
+            f"{sensor} data should appear in json accurately with timestamps. ",
+            semantic_key=f"ASEN|{sensor}",
+        )
+
+    for device_index, wearable in enumerate(study_data.get("wearables", [])):
+        device_name = (
+            wearable.get("sensorname")
+            or wearable.get("manufacturer")
+            or wearable.get("model")
+            or "wearable device"
+        )
+
+        for sensor_index, sensor in enumerate(wearable.get("sensors", [])):
+            sensor_label = sensor.get("wearable_sensor", "wearable sensor")
+            for platform_code, platform_label in (("AND", "Android"), ("IOS", "iOS")):
+                _add_case(
+                    f"WDEV-{platform_code}-{device_index}-{sensor_index}",
+                    "Sensor",
+                    f"Verify {device_name} wearable data is logged correctly for {sensor_label} on {platform_label}",
+                    f"1. Simulate {device_name} {sensor_label} collection on {platform_label}. 2. Check if {sensor_label} json is generated.",
+                    f"{device_name} {sensor_label} data from {platform_label} should appear in json accurately with timestamps.",
+                    semantic_key=f"WDEV|{platform_label}|{device_name}|{sensor_label}",
+                )
+
+    return cases
+
 def study_name_user_id(value):
     bufferdString = ""
     strArray = value.split(constants.underscore_seperator)
@@ -336,7 +446,7 @@ def question_serializer(queryset):
 
         if question_data['clockTime_start'] not in (None, ""," ", []):           
             clock_start_raw = question_data['clockTime_start']                   
-            logger.info("question_serializer:start_str %s %s",clock_start_raw,type(clock_start_raw))
+            #logger.info("question_serializer:start_str %s %s",clock_start_raw,type(clock_start_raw))
             # If it's a list (expected case), join it                            
             if isinstance(clock_start_raw, list):                                
                 if len(clock_start_raw) > 1:                                     
@@ -355,7 +465,7 @@ def question_serializer(queryset):
                         clocktime_end_str = str(question_data['clockTime_end'][0])    
         else:                                                                    
              clocktime_str = 1                                                    
-        logger.info("question_serializer:clockTimes %s %s",clocktime_str,clocktime_start_str) 
+        logger.debug("question_serializer:clockTimes %s %s",clocktime_str,clocktime_start_str) 
 
         if question_data['activation_condition'] == "None" or question_data['activation_condition'] is None:
             question_data['activation_condition'] = ""
@@ -423,7 +533,7 @@ def create_sql_statements_for_quality_control_tests(study_data, output_sql_file,
     """
     Function to create SQL statements for quality control tests
     """
-    logger.info("Creating SQL statements for quality control tests %s", study_data)
+    logger.debug("Creating SQL statements for quality control tests %s", study_data)
     tested_by_admin = False
     tested_by_owner = False
     
@@ -442,86 +552,17 @@ def create_sql_statements_for_quality_control_tests(study_data, output_sql_file,
         );
         """
         sql_file.write(sql.strip() + "\n")
-
     with open(output_sql_file, 'w', encoding="utf-8") as sql_file:
-        _write_case(
-            sql_file,
-            "DATA-01",
-            "Data",
-            "Validate real-time monitoring of data",
-            "1. Access study view page. 2. Verify live batch data updates for sensors and EMA(if necessary).",
-            "Data should update in real-time on the dashboard.",
-        )
-        _write_case(
-            sql_file,
-            "DATA-02",
-            "Data",
-            "Verify data export functionality",
-            "1. Export study data. 2. Check for link to download and verification code email received",
-            "Exported data should match sensors and other necessary identifiers",
-        )
-        _write_case(
-            sql_file,
-            "SUB-01",
-            "Subject",
-            "Verify participant enrollment process",
-            "1. Scan QR code from downloaded Activation pdf.\n 2. Verify subject can access the JTrack successfully. ",
-            " Participant information should be correctly saved during enrollment.",
-        )
-
-        survey = study_data.get("survey")
-        if isinstance(survey, dict) and "questions" in survey:
-            for index, question in enumerate(survey.get("questions", [])):
-                _write_case(
-                    sql_file,
-                    f"EMA-{index}",
-                    "EMA",
-                    question.get("title", ""),
-                    "",
-                    "Check the data stored variable",
-                )
-
-        for index, sensor in enumerate(study_data.get("sensor_list", [])):
-            for platform_code, platform_label in (("AND", "Android"), ("IOS", "iOS")):
-                _write_case(
-                    sql_file,
-                    f"PSEN-{platform_code}-{index}",
-                    "Sensor",
-                    f"Verify passive sensor data is logged correctly for {sensor} on {platform_label}",
-                    f"1. Simulate {sensor} for a subject on {platform_label}. 2. Check if {sensor} json is generated.",
-                    f"{sensor} data from {platform_label} should appear in json accurately with timestamps.",
-                )
-
-        for index, sensor in enumerate(study_data.get("sensor_list_limited", [])):
+        for case in build_quality_control_test_cases(study_data):
             _write_case(
                 sql_file,
-                f"ASEN-{index}",
-                "Sensor",
-                "Verify that sensor data is logged correctly",
-                f"1. Simulate {sensor} for a subject. 2. Check if {sensor} json is generated. ",
-                f"{sensor} data should appear in json accurately with timestamps. ",
+                case["testcase_id"],
+                case["test_type"],
+                case["description"],
+                case["steps"],
+                case["expected_outcome"],
             )
 
-        for device_index, wearable in enumerate(study_data.get("wearables", [])):
-            device_name = (
-                wearable.get("sensorname")
-                or wearable.get("manufacturer")
-                or wearable.get("model")
-                or "wearable device"
-            )
-
-            for sensor_index, sensor in enumerate(wearable.get("sensors", [])):
-                sensor_label = sensor.get("wearable_sensor", "wearable sensor")
-                for platform_code, platform_label in (("AND", "Android"), ("IOS", "iOS")):
-                    _write_case(
-                        sql_file,
-                        f"WDEV-{platform_code}-{device_index}-{sensor_index}",
-                        "Sensor",
-                        f"Verify {device_name} wearable data is logged correctly for {sensor_label} on {platform_label}",
-                        f"1. Simulate {device_name} {sensor_label} collection on {platform_label}. 2. Check if {sensor_label} json is generated.",
-                        f"{device_name} {sensor_label} data from {platform_label} should appear in json accurately with timestamps.",
-                    )
-            
 def normalize_question_data_defaults(question_data):
     """
     Normalizes the default values in the given question data dictionary.

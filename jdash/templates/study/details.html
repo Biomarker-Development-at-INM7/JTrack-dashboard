@@ -137,6 +137,9 @@
                     {% trans "study_details_raw_data" %}
                   </label>
                 </div>
+                <div class="study-info-note mt-3 mb-3" role="alert">
+                  {% trans "study_details_data_available_next_day" %}
+                </div>
                 <input name="study_name" value={{meta_data.name}} type="hidden"/>
                 {% if email != '' %}
                 <input name="user_email" value={{email}} type="hidden"/>
@@ -452,7 +455,9 @@
                   <!--- <input name="generate_files" type="submit" 
                   role="button" value="Generate CSV files" class="btn btn-outline-primary btn-block mb-8"
                   data-toggle="modal" data-target="#confirmationModal" /> !-->
-                    
+                  <div class="study-info-note mb-3" role="alert">
+                      {% trans "study_details_live_monitoring_data_info" %}
+                    </div>
                 </div>
                 <div class="col-xs-12 col-sm-3">
                   <a href="{%url 'details' study_name=meta_data.name %}" data-bs-toggle="tooltip" title="{% trans 'study_details_refresh' %}">

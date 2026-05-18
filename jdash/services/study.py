@@ -12,6 +12,7 @@ import glob
 import json
 import logging
 import os
+import re
 import subprocess
 import threading
 import zipfile
@@ -27,6 +28,7 @@ from jdash.config import constants as constants
 from jdash.config import runtime_config as config
 import jdash.exceptions.studyexceptions as studyexceptions
 from jdash.utils.utils import (
+        build_quality_control_test_cases,
     calculate_stats_of_number_of_subjects,
     create_sql_statements_for_quality_control_tests,
     get_latest_received_study_sensor_details,
@@ -462,17 +464,131 @@ class Study:
         logger.info("Study.update finished for study_name=%s", self.study_name)
         logger.debug("Study.update return_value=%s", study_json)
         return study_json
-    
+
     def _refresh_test_cases(self):
         """
-        Rebuild quality-control test cases after a study update.
+        Sync quality-control test cases after a study update.
 
         Returns:
             None
         """
         study_id = json.loads(retrieve_study_details_by_title(self.study_name))[constants.key_name_id]
-        qctestsModel.objects.filter(study_id=study_id).delete()
-        self._create_test_cases()
+        desired_cases = build_quality_control_test_cases(self.meta)
+        existing_cases = list(qctestsModel.objects.filter(study_id=study_id))
+
+        def _semantic_key_from_existing(test_case):
+            testcase_id = str(test_case.testcase_id or "")
+            if testcase_id.startswith(("DATA-", "SUB-")):
+                return testcase_id
+
+            if testcase_id.startswith("EMA-"):
+                return f"EMA|{testcase_id.removeprefix('EMA-')}"
+
+            if testcase_id.startswith("PSEN-"):
+                match = re.search(
+                    r"for (?P<sensor>.+?) on (?P<platform>Android|iOS)$",
+                    str(test_case.description or ""),
+                )
+                if match:
+                    return f"PSEN|{match.group('platform')}|{match.group('sensor')}"
+
+            if testcase_id.startswith("ASEN-"):
+                match = re.search(
+                    r"1\. Simulate (?P<sensor>.+?) for a subject",
+                    str(test_case.steps or ""),
+                )
+                if match:
+                    return f"ASEN|{match.group('sensor')}"
+
+            if testcase_id.startswith("WDEV-"):
+                match = re.search(
+                    r"Verify (?P<device>.+?) wearable data is logged correctly for (?P<sensor>.+?) on (?P<platform>Android|iOS)$",
+                    str(test_case.description or ""),
+                )
+                if match:
+                    return (
+                        f"WDEV|{match.group('platform')}|"
+                        f"{match.group('device')}|{match.group('sensor')}"
+                    )
+
+            return testcase_id
+
+        existing_by_key = {
+            _semantic_key_from_existing(test_case): test_case
+            for test_case in existing_cases
+        }
+
+        matched_existing_by_key = {}
+        used_existing_ids = set()
+        for case in desired_cases:
+            existing = existing_by_key.get(case["semantic_key"])
+            if existing is not None and existing.id in used_existing_ids:
+                existing = None
+
+            if existing is None and case["semantic_key"].startswith("EMA|"):
+                existing = next(
+                    (
+                        test_case
+                        for test_case in existing_cases
+                        if test_case.id not in used_existing_ids
+                        and str(test_case.testcase_id or "").startswith("EMA-")
+                        and str(test_case.description or "") == case["description"]
+                    ),
+                    None,
+                )
+
+            if existing is None:
+                legacy_key = case.get("legacy_semantic_key")
+                legacy_existing = existing_by_key.get(legacy_key)
+                if legacy_existing is not None and legacy_existing.id not in used_existing_ids:
+                    existing = legacy_existing
+
+            if existing is not None:
+                matched_existing_by_key[case["semantic_key"]] = existing
+                used_existing_ids.add(existing.id)
+
+        stale_cases = [
+            test_case
+            for test_case in existing_cases
+            if test_case.id not in used_existing_ids
+        ]
+        if stale_cases:
+            qctestsModel.objects.filter(id__in=[test_case.id for test_case in stale_cases]).delete()
+
+        rows_to_rekey = []
+        for case in desired_cases:
+            existing = matched_existing_by_key.get(case["semantic_key"])
+            if existing and existing.testcase_id != case["testcase_id"]:
+                existing.testcase_id = f"TMP-{existing.id}"
+                rows_to_rekey.append(existing)
+
+        if rows_to_rekey:
+            qctestsModel.objects.bulk_update(rows_to_rekey, ["testcase_id"])
+
+        for case in desired_cases:
+            existing = matched_existing_by_key.get(case["semantic_key"])
+            if existing:
+                changed_fields = []
+                for field in ("testcase_id", "test_type", "description", "steps", "expected_outcome"):
+                    if getattr(existing, field) != case[field]:
+                        setattr(existing, field, case[field])
+                        changed_fields.append(field)
+                if changed_fields:
+                    existing.save(update_fields=changed_fields)
+                continue
+
+            qctestsModel.objects.create(
+                testcase_id=case["testcase_id"],
+                test_type=case["test_type"],
+                description=case["description"],
+                steps=case["steps"],
+                expected_outcome=case["expected_outcome"],
+                tested_by_admin=False,
+                tested_by_owner=False,
+                admin_username="",
+                owner_username="",
+                study_id=study_id,
+            )
 
     def _trigger_update_json_script(self):
         """

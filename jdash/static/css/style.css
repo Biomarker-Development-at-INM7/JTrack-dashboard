@@ -179,7 +179,7 @@
   
   .wrimagecard-topimage_header {
     background-color: rgba(3, 36, 77, 0.1);
-    padding: 0px 20px 0px 20px;
+    padding: 20px 20px 20px 20px;
   }
   
  
@@ -628,3 +628,11 @@ div#notes {
 @media (min-width: 2048px) {
   .col-2048-3 { flex: 0 0 auto; width: 25%; }
 }
+.study-info-note {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ffe69c;
+  border-radius: 0.375rem;
+  background-color: #fff3cd;
+  color: #664d03;
+}
+

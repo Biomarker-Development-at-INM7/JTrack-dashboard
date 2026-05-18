@@ -7,7 +7,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils.encoding import force_str
-
+from django.utils import timezone
 from auditlog.models import LogEntry
 
 from jdash.config import constants as constants
@@ -15,6 +15,7 @@ from jdash.models import (
     DeviceSensor,
     FileDownloadToken as downloadFile,
     QualityControlTests as qctestsModel,
+    QualityControlComment,
     # ResolutionCatalog,
     SamplingRateCatalog,
     Study as studymodel,
@@ -279,9 +280,27 @@ def add_verification_code(code, token):
 
 def retrieve_test_cases_for_study(study_db_id):
     """Return all quality-control test cases for a study."""
-    results = qctestsModel.objects.filter(study_id=study_db_id).values()
-    return json.dumps(list(results), default=str)
-
+    results = []
+    queryset = qctestsModel.objects.filter(study_id=study_db_id).prefetch_related("comments")
+    for test_case in queryset:
+        item = {
+            "id": test_case.id,
+            "testcase_id": test_case.testcase_id,
+            "test_type": test_case.test_type,
+            "description": test_case.description,
+            "steps": test_case.steps,
+            "expected_outcome": test_case.expected_outcome,
+            "tested_by_admin": test_case.tested_by_admin,
+            "tested_by_owner": test_case.tested_by_owner,
+            "admin_updated_at": test_case.admin_updated_at,
+            "owner_updated_at": test_case.owner_updated_at,
+            "admin_username": test_case.admin_username,
+            "owner_username": test_case.owner_username,
+            "study_id": test_case.study_id,
+            "comments": [_serialize_qc_comment(comment) for comment in test_case.comments.all()],
+        }
+        results.append(item)
+    return json.dumps(results, default=str)
 
 def update_test_case_flags(testcase_updates, username):
     """Update admin/owner completion flags for quality-control test cases."""
@@ -294,15 +313,16 @@ def update_test_case_flags(testcase_updates, username):
         try:
             logger.info("An test %s %s", test_case, type(test_case))
             db_test_case = qctestsModel.objects.get(id=test_case["id"])
-            db_test_case.tested_by_admin = test_case.get(
-                "tested_by_admin",
-                db_test_case.tested_by_admin,
-            )
-            db_test_case.tested_by_owner = test_case.get(
-                "tested_by_owner",
-                db_test_case.tested_by_owner,
-            )
-            db_test_case.admin_username = username
+            new_admin_flag = test_case.get("tested_by_admin", db_test_case.tested_by_admin)
+            new_owner_flag = test_case.get("tested_by_owner", db_test_case.tested_by_owner)
+
+            if new_admin_flag != db_test_case.tested_by_admin:
+                db_test_case.admin_username = username
+            if new_owner_flag != db_test_case.tested_by_owner:
+                db_test_case.owner_username = username
+
+            db_test_case.tested_by_admin = new_admin_flag
+            db_test_case.tested_by_owner = new_owner_flag
             db_test_case.save()
             success_count += 1
         except Exception as exc:
@@ -318,6 +338,27 @@ def update_test_case_flags(testcase_updates, username):
         "failure_count": failure_count,
         "errors": errors,
     }
+
+def _serialize_qc_comment(comment):
+    return {
+        "id": comment.id,
+        "text": comment.text,
+        "user": comment.username,
+        "timestamp": comment.display_timestamp,
+        "created_at": comment.created_at.isoformat() if comment.created_at else "",
+    }
+
+
+
+def append_qc_note(test_case_id, note_entry, username):
+    """Append a single QC note entry and persist it immediately."""
+    db_test_case = qctestsModel.objects.get(id=test_case_id)
+    return QualityControlComment.objects.create(
+        test_case=db_test_case,
+        text=str(note_entry.get("text", "")).strip(),
+        username=str(note_entry.get("user", "")).strip(),
+        display_timestamp=str(note_entry.get("timestamp", "")).strip(),
+    )
 
 
 def retrieve_study_details_by_title(study_name):
