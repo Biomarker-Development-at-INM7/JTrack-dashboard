@@ -13,6 +13,7 @@ from jdash.views.study_views import (
     download_dataset_from_link,
     edit_study,
     qc_study,
+    notify_qc_comment,
     study_audit,
     study_details,
 )

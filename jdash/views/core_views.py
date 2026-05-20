@@ -47,6 +47,15 @@ def session_check(request):
     Returns:
         JsonResponse: JSON payload with an ``active`` flag.
     """
+    if not request.user.is_authenticated:
+        return JsonResponse({"active": False}, status=401)
+
+    if request.GET.get("refresh") == "1":
+        session_age = getattr(settings, "SESSION_COOKIE_AGE", None)
+        if session_age:
+            request.session.set_expiry(session_age)
+        request.session.modified = True
+
     return JsonResponse({"active": True})
 
 

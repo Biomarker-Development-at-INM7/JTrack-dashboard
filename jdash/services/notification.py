@@ -178,3 +178,34 @@ def send_email(fullname,receiver_email,arg,link):
         logger.info(f"An error occurred: {e}")
         return False
 
+def send_qc_comment_email(study_name, testcase_id, description, comment_text, username, timestamp):
+    """Send an email when a QC comment is added from the QC modal."""
+    subject = f"QC Comment Added: {study_name}"
+    body = (
+        "<p>A new QC comment was added.</p>"
+        f"<p><strong>Study:</strong> {study_name}</p>"
+        f"<p><strong>Test case:</strong> {testcase_id}</p>"
+        f"<p><strong>Description:</strong> {description}</p>"
+        f"<p><strong>User:</strong> {username}</p>"
+        f"<p><strong>Timestamp:</strong> {timestamp}</p>"
+        f"<p><strong>Comment:</strong><br>{comment_text}</p>"
+    )
+
+    message = MIMEMultipart()
+    message.attach(MIMEText(body, "html"))
+    message["Subject"] = subject
+    message["To"] = settings.SUPPORT_EMAIL_G
+    message["From"] = settings.SUPPORT_EMAIL
+
+    try:
+        session = smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT)
+        session.starttls(context=ssl.create_default_context())
+        session.login(settings.SUPPORT_EMAIL, settings.SUPPORT_PWD)
+        session.sendmail(settings.SUPPORT_EMAIL, settings.SUPPORT_EMAIL_G, message.as_string())
+        session.quit()
+        logger.info("QC comment email sent for study=%s testcase=%s", study_name, testcase_id)
+        return True
+    except Exception as exc:
+        logger.info("QC comment email failed for study=%s testcase=%s error=%s", study_name, testcase_id, exc)
+        return False
+

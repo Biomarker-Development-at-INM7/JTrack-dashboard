@@ -45,73 +45,69 @@
 
 <footer id="footer-div" class="footer-section">
     <div class="container-fluid">
-        <div class="footer-cta">
-            <div class="row">
+        <div class="footer-shell">
+            <div class="footer-top row g-4 align-items-stretch">
                 <div class="col-lg-6">
-                    <div class="row">
-                        <a class="footer_link"
+                    <div class="footer-lead">
+                        <a class="footer_link footer-brand-link"
                            href="https://www.fz-juelich.de/en/inm/inm-7/research-groups/biomarker-development"
                            rel="noreferrer" target="_blank">
-                            <h1>{% trans "footer_groupname" %}</h1>
+                            <h2 class="footer-brand-title">{% trans "footer_groupname" %}</h2>
                         </a>
-                    </div>
-                    <div>
-                        {% trans "footer_groupdesc" %}
+                        <p class="footer-brand-copy">{% trans "footer_groupdesc" %}</p>
                     </div>
                 </div>
 
-                <div class="col-lg-3 mb-30">
-                    <div class="row">
-                        <div class="col-4">
-                            <img class="image--cover" src="{% static 'icons/jtrack-ema.jpeg' %}" />
-                        </div>
-                        <div class="col-6 mt-4">
-                            <div class="row">
-                                <a href="https://apps.apple.com/de/app/jtrack-ema/id1605100657" target="_blank">
-                                    <img src="http://upload.wikimedia.org/wikipedia/commons/0/0f/Available_on_the_App_Store_%28black%29_SVG.svg" />
-                                </a>
+                <div class="col-lg-6">
+                    <div class="footer-app-grid">
+                        <div class="footer-app-card">
+                            <img class="footer-app-thumb" src="{% static 'icons/jtrack-ema.jpeg' %}" alt="JTrack EMA" />
+                            <div class="footer-app-body">
+                                <div class="footer-app-title">JTrack EMA</div>
+                                <div class="footer-app-links">
+                                    <a href="https://apps.apple.com/de/app/jtrack-ema/id1605100657" target="_blank" rel="noreferrer">
+                                        <img src="http://upload.wikimedia.org/wikipedia/commons/0/0f/Available_on_the_App_Store_%28black%29_SVG.svg" alt="Download JTrack EMA on the App Store" />
+                                    </a>
+                                    <a href="https://play.google.com/store/apps/details?id=inm7.JTrack.JTrack_EMA_Plus" target="_blank" rel="noreferrer">
+                                        <img src="https://gallery.mailchimp.com/b88b3ba75f26335343bfecdc0/images/5e301e76-08a9-459e-ad1a-b9eab2f28c0c.png" alt="Get JTrack EMA on Google Play" />
+                                    </a>
+                                </div>
                             </div>
-                            <div class="row">
-                                <a href="https://play.google.com/store/apps/details?id=inm7.JTrack.JTrack_EMA_Plus" target="_blank">
-                                    <img src="https://gallery.mailchimp.com/b88b3ba75f26335343bfecdc0/images/5e301e76-08a9-459e-ad1a-b9eab2f28c0c.png" />
-                                </a>
-                            </div>
                         </div>
-                    </div>
-                </div>
 
-                <div class="col-lg-3 mb-30">
-                    <div class="row">
-                        <div class="col-4">
-                            <img class="image--cover" src="{% static 'icons/jtrack-social.jpeg' %}" />
-                        </div>
-                        <div class="col-6 mt-4">
-                            <div class="row">
-                                <a href="https://apps.apple.com/de/app/jtrack-social/id1645319896" target="_blank">
-                                    <img src="http://upload.wikimedia.org/wikipedia/commons/0/0f/Available_on_the_App_Store_%28black%29_SVG.svg" />
-                                </a>
-                            </div>
-                            <div class="row">
-                                <a href="https://play.google.com/store/apps/details?id=inm7.JTrack.JTrack_Social" target="_blank">
-                                    <img src="https://gallery.mailchimp.com/b88b3ba75f26335343bfecdc0/images/5e301e76-08a9-459e-ad1a-b9eab2f28c0c.png" />
-                                </a>
+                        <div class="footer-app-card">
+                            <img class="footer-app-thumb" src="{% static 'icons/jtrack-social.jpeg' %}" alt="JTrack Social" />
+                            <div class="footer-app-body">
+                                <div class="footer-app-title">JTrack Social</div>
+                                <div class="footer-app-links">
+                                    <a href="https://apps.apple.com/de/app/jtrack-social/id1645319896" target="_blank" rel="noreferrer">
+                                        <img src="http://upload.wikimedia.org/wikipedia/commons/0/0f/Available_on_the_App_Store_%28black%29_SVG.svg" alt="Download JTrack Social on the App Store" />
+                                    </a>
+                                    <a href="https://play.google.com/store/apps/details?id=inm7.JTrack.JTrack_Social" target="_blank" rel="noreferrer">
+                                        <img src="https://gallery.mailchimp.com/b88b3ba75f26335343bfecdc0/images/5e301e76-08a9-459e-ad1a-b9eab2f28c0c.png" alt="Get JTrack Social on Google Play" />
+                                    </a>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="footer-content pt-4">
-                <div class="row">
-                    <div class="col-lg-6 col-sm-6 mb-50">
+            <div class="footer-divider"></div>
+
+            <div class="footer-content">
+                <div class="row g-4">
+                    <div class="col-lg-6">
                         <div class="footer-widget">
                             <div class="footer-widget-heading">
                                 <h3>{% trans "footer_contacthead" %}</h3>
                             </div>
-                            <div class="footer-text">
-                                {% trans "footer_contactdesc" %}
-                                <a type="button" href="{% url 'contact_email' %}" class="btn btn-outline-light">{% trans "footer_contactbtn" %}</a>
-                                <p>
+                            <div class="footer-text footer-support-copy">
+                                <div class="footer-support-inline">
+                                    <span>{% trans "footer_contactdesc" %}</span>
+                                    <a type="button" href="{% url 'contact_email' %}" class="btn btn-outline-light btn-sm">{% trans "footer_contactbtn" %}</a>
+                                </div>
+                                <p class="footer-support-delete">
                                     {% trans "footer_contactdel" %}
                                     <a href="{% url 'delete_subject_data' %}">{% trans "footer_contactdelbtn" %}</a>
                                 </p>
@@ -119,44 +115,46 @@
                         </div>
                     </div>
 
-                    <div class="col-lg-3 col-sm-3 mb-30">
+                    <div class="col-lg-3">
                         <div class="footer-widget">
                             <div class="footer-widget-heading">
                                 <h3>{% trans "Mail us" %}</h3>
                             </div>
-                            <div class="person">
-                                <a class="footer_link" href="mailto:j.dukart@fz-juelich.de" itemprop="email">
-                                    <i class="fa fa-user"> Dr. Juergen Dukart</i>
+                            <div class="footer-contact-list">
+                                <a class="footer_link footer-contact-item" href="mailto:j.dukart@fz-juelich.de" itemprop="email">
+                                    <i class="fa fa-user"></i>
+                                    <span>Dr. Juergen Dukart</span>
                                 </a>
-                            </div>
-                            <div class="person">
-                                <a class="footer_link" href="mailto:m.turna@fz-juelich.de" itemprop="email">
-                                    <i class="fa fa-user"> Dr. Mehran Turna</i>
+                                <a class="footer_link footer-contact-item" href="mailto:m.turna@fz-juelich.de" itemprop="email">
+                                    <i class="fa fa-user"></i>
+                                    <span>Dr. Mehran Turna</span>
                                 </a>
                             </div>
                         </div>
                     </div>
 
-                    <div class="col-lg-3 col-sm-3 mb-50">
-                         <div class="footer-widget mb-3">
+                    <div class="col-lg-3">
+                        <div class="footer-widget">
                             <div class="footer-widget-heading">
                                 <h3>Docs</h3>
                             </div>
                             <div class="footer-text">
                                 <a class="footer_link"
-                                   href="https://jtrack.readthedocs.io/en/latest/What_is_JTrack.html"
+                                   href="https://jtrack.readthedocs.io/en/latest/JTrack_Dashboard.html"
                                    rel="noreferrer"
                                    target="_blank">
-                                    JTrack Documentation
+                                    JTrack Dashboard Documentation
+                                </a>
+                            </div>
+                            <div class="footer-org-logos">
+                                <a href="https://www.fz-juelich.de/en/inm/inm-7/" target="_blank" rel="noreferrer">
+                                    <img src="{% static 'icons/bb-icon.png' %}" alt="INM-7 Biomarker Development">
+                                </a>
+                                <a href="https://www.fz-juelich.de/" target="_blank" rel="noreferrer">
+                                    <img src="{% static 'icons/fz-icon.png' %}" alt="Forschungszentrum Juelich">
                                 </a>
                             </div>
                         </div>
-                        <a href="https://www.fz-juelich.de/en/inm/inm-7/" target="_blank">
-                            <img src="{% static 'icons/bb-icon.png' %}" height="65">
-                        </a>
-                        <a href="https://www.fz-juelich.de/" target="_blank">
-                            <img src="{% static 'icons/fz-icon.png' %}" height="65">
-                        </a>
                     </div>
                 </div>
 
@@ -167,3 +165,4 @@
         </div>
     </div>
 </footer>
+

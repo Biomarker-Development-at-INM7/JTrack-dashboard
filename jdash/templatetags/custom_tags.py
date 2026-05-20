@@ -1,3 +1,7 @@
+import os
+import re
+import json
+from pathlib import Path
 from django import template
 from django.contrib.auth.models import Group
 from jdash.services.subject import Subject
@@ -5,6 +9,46 @@ from jdash.config import constants
 from jdash.models import SensorCatalog
 
 register = template.Library()
+
+def _iter_partner_logo_paths():
+    """
+    Yield relative static paths for partner logos from known static roots.
+
+    Returns:
+        list[str]: Sorted unique static-relative paths under icons/partners.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    candidate_dirs = [
+        repo_root / "jdash" / "static" / "icons" / "partners",
+        repo_root / "static" / "icons" / "partners",
+    ]
+    allowed_suffixes = {".png", ".jpg", ".jpeg", ".svg", ".webp"}
+    results = []
+
+    for candidate_dir in candidate_dirs:
+        if not candidate_dir.exists():
+            continue
+        for file_path in sorted(candidate_dir.iterdir()):
+            if file_path.is_file() and file_path.suffix.lower() in allowed_suffixes:
+                static_relative = file_path.relative_to(candidate_dir.parent.parent).as_posix()
+                results.append(static_relative)
+
+    # preserve order while removing duplicates
+    return list(dict.fromkeys(results))
+
+
+@register.simple_tag
+def get_partner_logo_paths():
+    """
+    Return static-relative logo paths from the partners icon folder.
+
+    Returns:
+        list[str]: Paths that can be passed to the ``static`` template tag.
+    """
+    return _iter_partner_logo_paths()
+
+def _normalize_sensor_token(value):
+    return re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
 
 
 def _get_wearable_sensor_code_map(wearables):
@@ -31,9 +75,81 @@ def _get_wearable_sensor_code_map(wearables):
     if not labels:
         return {}
 
-    return dict(
-        SensorCatalog.objects.filter(label__in=labels).values_list("label", "code")
-    )
+    normalized_catalog = {
+        _normalize_sensor_token(label): code
+        for label, code in SensorCatalog.objects.all().values_list("label", "code")
+    }
+    return {
+        label: normalized_catalog.get(_normalize_sensor_token(label), label)
+        for label in labels
+    }
+
+
+def _normalize_dashboard_prefix(value):
+    prefix = re.sub(r"[^A-Za-z0-9]+", "_", str(value or "").strip())
+    return re.sub(r"_+", "_", prefix).strip("_").lower()
+
+
+def _format_sensor_display_name(value):
+    value = str(value or "").strip()
+    if not value:
+        return ""
+    return value.lower()
+
+def _get_wearable_dashboard_sensor_meta_map(study):
+    """
+    Build wearable metadata keyed by backend-provided dashboard sensor names.
+
+    Args:
+        study (dict): Study metadata dictionary containing ``wearables`` and
+            ``dashboard_sensor_list``.
+
+    Returns:
+        dict: Mapping of normalized dashboard sensor name to display/button info.
+    """
+    wearables = (study or {}).get("wearables", []) or []
+    dashboard_sensor_list = (study or {}).get("dashboard_sensor_list", []) or []
+    sensor_code_map = _get_wearable_sensor_code_map(wearables)
+    meta_map = {}
+    available_dashboard_sensors = {
+        str(sensor).strip().lower(): str(sensor).strip()
+        for sensor in dashboard_sensor_list
+    }
+
+    for wearable in wearables or []:
+        if not isinstance(wearable, dict):
+            continue
+        wearable_name = str(wearable.get("sensorname", "") or "").strip()
+        wearable_prefix = _normalize_dashboard_prefix(wearable_name)
+        wearable_prefix = f"{wearable_prefix}_" if wearable_prefix else ""
+        for sensor in wearable.get("sensors", []) or []:
+            if not isinstance(sensor, dict):
+                continue
+            label = str(sensor.get("wearable_sensor", "") or "").strip()
+            if not label:
+                continue
+            normalized_label = _normalize_sensor_token(label)
+            dashboard_sensor_name = None
+            for normalized_sensor_name, original_sensor_name in available_dashboard_sensors.items():
+                if wearable_prefix and not normalized_sensor_name.startswith(wearable_prefix):
+                    continue
+                remainder = normalized_sensor_name[len(wearable_prefix):] if wearable_prefix else normalized_sensor_name
+                if _normalize_sensor_token(remainder) == normalized_label:
+                    dashboard_sensor_name = original_sensor_name
+                    break
+            if not dashboard_sensor_name:
+                continue
+            sensor_code = sensor_code_map.get(label, label)
+            button_label = f"{wearable_name}-{sensor_code}" if wearable_name else sensor_code
+            formatted_label = _format_sensor_display_name(label)
+            formatted_wearable_name = _format_sensor_display_name(wearable_name)
+            display_label = f"{formatted_wearable_name} {formatted_label}".strip() if wearable_name else formatted_label
+            meta_map[str(dashboard_sensor_name).strip().lower()] = {
+                "button_label": button_label,
+                "display_label": display_label,
+            }
+
+    return meta_map
 
 @register.filter(name='get_n_batches')  
 def get_n_batches(value, arg):
@@ -103,22 +219,65 @@ def get_activity_status_tag(value, studyobj):
 @register.filter(name='get_status_tag') 
 def get_status_tag(value):
     """
-    Return an HTML strong span element with a tooltip describing subject's status code.
+    Return an HTML strong span element describing subject's status code.
 
     Args:
         value (int): Status code of the subject.
 
     Returns:
-        str: HTML string representing the status with tooltip.
+        str: HTML string representing the status.
     """
     status_map = {
-        0: ("Instudy", "Everything is fine", "text-warning"),
-        1: ("Left study", "Subject left study with this QR Code", "text-primary"),
-        2: ("Completed", "Subject reached study duration and left automatically", "text-success"),
-        3: ("Removed", "Subject removed by dashboard", "text-danger"),
+        0: ("Instudy", "text-primary"),
+        1: ("Left study", "text-secondary"),
+        2: ("Completed", "text-success"),
+        3: ("Removed", "text-danger"),
     }
-    label, tooltip, css_class = status_map.get(value, ("Unknown", "Unknown status", "text-secondary"))
-    return f'<strong><span class="{css_class}" data-toggle="tooltip" data-placement="top" title="{tooltip}">{label}</span></strong>'
+    label, css_class = status_map.get(value, ("Unknown", "text-secondary"))
+    return f'<strong><span class="{css_class}">{label}</span></strong>'
+
+
+@register.filter(name="get_subject_status_tag")
+def get_subject_status_tag(subject_row, studyobj):
+    """
+    Return a subject status tag that can account for row-level timing details.
+
+    Args:
+        subject_row (dict): Dashboard-derived subject row.
+        studyobj (dict): Study metadata dictionary.
+
+    Returns:
+        str: HTML string representing the status with tooltip.
+    """
+    if not isinstance(subject_row, dict):
+        return get_status_tag(subject_row)
+
+    status_code = subject_row.get("status_code")
+    date_left_study = str(subject_row.get("date_left_study", "") or "").strip().lower()
+    time_in_study = str(subject_row.get("time_in_study", "") or "").strip()
+    study_duration = str((studyobj or {}).get("duration", "") or "").strip()
+
+    def _parse_day_count(value):
+        match = re.search(r"-?\d+", value)
+        return int(match.group(0)) if match else None
+
+    time_in_study_days = _parse_day_count(time_in_study)
+    study_duration_days = _parse_day_count(study_duration)
+
+    if (
+        status_code == 0
+        and date_left_study == "none"
+        and time_in_study_days is not None
+        and study_duration_days is not None
+        and time_in_study_days > study_duration_days
+    ):
+        return (
+            '<strong><span class="text-warning" data-bs-toggle="tooltip" '
+            'data-bs-placement="top" title="Subject is still in study, but the configured duration is exceeded.">'
+            'Instudy <small>(duration exceeded)</small></span></strong>'
+        )
+
+    return get_status_tag(status_code)
 
 
 def get_sensor_tag(value, studyobj):
@@ -135,26 +294,126 @@ def get_sensor_tag(value, studyobj):
     result = []
     subject_instance = Subject(value, None)
     sensor_dict = subject_instance.get_sensor_activity_code(value, studyobj)
-
+    wearable_meta_map = _get_wearable_dashboard_sensor_meta_map(studyobj or {})
     if sensor_dict:
         for sensor, info in sensor_dict.items():
             status_code = info.get("status_code", -1)
+            if status_code == 4:
+                continue
             btn_class = {
-                1: "btn-primary",
-                2: "btn-warning",
-                3: "btn-success",
-            }.get(status_code, "btn-danger")
+                0: "btn-danger",
+                1: "btn-warning",
+                2: "btn-success",
+                3: "btn-secondary",
+                4: "btn-light",
+            }.get(status_code, "btn-outline-secondary")
 
             desc = info.get("status_desc", "")
-            sensor_code = info.get("sensor_code", sensor)
+            wearable_meta = wearable_meta_map.get(str(sensor).strip().lower(), {})
+            sensor_code = wearable_meta.get("button_label") or info.get("sensor_code", sensor)
             button_html = (
                 f'<button style="margin-left:2px" class="btn {btn_class}" '
-                f'data-toggle="tooltip" data-placement="top" title="{desc}">{sensor_code}</button>'
+                f'data-sensor-name="{sensor}" data-bs-toggle="tooltip" '
+                f'data-bs-placement="top" title="{desc}">{sensor_code}</button>'
             )
             result.append(button_html)
 
     return "".join(result)
 
+@register.filter(name="get_sensor_activity_json")
+def get_sensor_activity_json(value, studyobj):
+    """
+    Serialize the backend sensor activity map for a subject row so the
+    details-panel UI can reuse the same status semantics as the sensor tags.
+
+    Args:
+        value (dict): Subject data dictionary.
+        studyobj (dict): Study object/dictionary used to determine sensor status.
+
+    Returns:
+        str: JSON string for the per-sensor activity/status map.
+    """
+    subject_instance = Subject(value, None)
+    sensor_dict = subject_instance.get_sensor_activity_code(value, studyobj)
+    return json.dumps(sensor_dict)
+
+
+@register.filter(name="get_dashboard_sensor_filter_values")
+def get_dashboard_sensor_filter_values(study):
+    """
+    Build a JSON object of sensor filter labels -> values.
+
+    Args:
+        study (dict): Study metadata.
+
+    Returns:
+        dict: Mapping whose labels are user-friendly and whose values match the
+        compact codes shown in the table.
+    """
+    values = {}
+
+    def _add(label, value):
+        label = str(label or "").strip()
+        value = str(value or "").strip()
+        if label and value and value not in values:
+            values[value] = label
+
+    wearables = study.get("wearables", []) or []
+    wearable_sensor_meta_map = _get_wearable_dashboard_sensor_meta_map(study)
+    wearable_dashboard_sensors = set(wearable_sensor_meta_map.keys())
+    base_dashboard_sensors = {
+        str(sensor).strip().lower()
+        for sensor in (study.get("sensor_list", []) or [])
+    }
+    base_dashboard_sensors.update(
+        str(sensor).strip().lower()
+        for sensor in (study.get("sensor_list_limited", []) or [])
+    )
+
+    for sensor in study.get("dashboard_sensor_list", []) or []:
+        normalized_sensor = str(sensor).strip().lower()
+        if (
+            normalized_sensor in wearable_dashboard_sensors
+            and normalized_sensor not in base_dashboard_sensors
+        ):
+            continue
+        sensor_code = constants.sensor_list.get(sensor, sensor)
+        sensor_label = _format_sensor_display_name(sensor)
+        if sensor_label != sensor_code:
+            _add(f"{sensor_label} ({sensor_code})", sensor_code)
+        else:
+            _add(sensor_code, sensor_code)
+
+    for wearable in wearables:
+        if not isinstance(wearable, dict):
+            continue
+        wearable_name = str(wearable.get("sensorname", "") or "").strip()
+        wearable_prefix = _normalize_dashboard_prefix(wearable_name)
+        for sensor in wearable.get("sensors", []) or []:
+            if not isinstance(sensor, dict):
+                continue
+            label = str(sensor.get("wearable_sensor", "") or "").strip()
+            if not label:
+                continue
+            normalized_label = _normalize_sensor_token(label)
+            meta = {}
+            for dashboard_sensor_name, dashboard_sensor_meta in wearable_sensor_meta_map.items():
+                if wearable_prefix and not dashboard_sensor_name.startswith(f"{wearable_prefix}_"):
+                    continue
+                remainder = dashboard_sensor_name[len(wearable_prefix) + 1:] if wearable_prefix else dashboard_sensor_name
+                if _normalize_sensor_token(remainder) == normalized_label:
+                    meta = dashboard_sensor_meta
+                    break
+            sensor_code = meta.get("button_label", label)
+
+            formatted_label = _format_sensor_display_name(label)
+            formatted_wearable_name = _format_sensor_display_name(wearable_name)
+            if wearable_name:
+                _add(f"{formatted_wearable_name} {formatted_label} ({sensor_code})", sensor_code)
+            else:
+                _add(f"{formatted_label} ({sensor_code})", sensor_code)
+
+    return values
 
 @register.filter(name="get_sensor_codes")
 def get_sensor_codes(sensor_list, current_sensor_list):
@@ -523,13 +782,31 @@ def get_wearable_sensor_lines(wearables):
                 continue
             sampling_rate = sensor.get("sampling_rate", "-")
             unit = sensor.get("unit", "-")
-            line = label
+            line = _format_sensor_display_name(label)
             if device_name:
                 line = f"{line} ({device_name})"
             line = f"{line} - {sampling_rate}"
             result.append(f"<p>{line}</p>")
 
     return "".join(result)
+
+@register.filter(name="get_wearable_sensor_display_map")
+def get_wearable_sensor_display_map(study):
+    """
+    Build a case-insensitive display-name map for wearable sensors from the
+    backend-provided dashboard sensor keys.
+
+    Args:
+        study (dict): Study metadata dictionary containing ``wearables`` and
+            ``dashboard_sensor_list``.
+
+    Returns:
+        dict: Mapping from lower-cased wearable sensor label to display text.
+    """
+    display_map = {}
+    for dashboard_sensor_name, meta in _get_wearable_dashboard_sensor_meta_map(study).items():
+        display_map[dashboard_sensor_name] = meta["display_label"]
+    return display_map
 
 @register.filter(name="get_study_sensor_summary")
 def get_study_sensor_summary(study, current_sensor_list):

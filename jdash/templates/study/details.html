@@ -10,6 +10,13 @@
 <script src="{% static 'js/bootstrap-table.min.js' %}"></script>
 <script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
 <script src="{% static 'js/main.js' %}"></script>
+{{ meta_data|get_dashboard_sensor_filter_values|json_script:"sensor-filter-defaults" }}
+{{ meta_data|get_wearable_sensor_display_map|json_script:"wearable-sensor-display-map" }}
+<script>
+  var sensorFilterDefaults = JSON.parse(document.getElementById('sensor-filter-defaults').textContent);
+  var wearableSensorDisplayMap = JSON.parse(document.getElementById('wearable-sensor-display-map').textContent);
+  var studyDurationDays = Number('{{ meta_data.duration|default_if_none:0 }}');
+</script>
 <script>
   (function () {
     const btn = document.getElementById('user_unused_sheet');
@@ -136,6 +143,9 @@
                   <label class="form-check-label" for="flexCheckChecked">
                     {% trans "study_details_raw_data" %}
                   </label>
+                </div>
+                <div class="study-info-note mt-3 mb-3" role="alert">
+                  {% trans "study_details_data_available_next_day" %}
                 </div>
                 <input name="study_name" value={{meta_data.name}} type="hidden"/>
                 {% if email != '' %}
@@ -452,7 +462,9 @@
                   <!--- <input name="generate_files" type="submit" 
                   role="button" value="Generate CSV files" class="btn btn-outline-primary btn-block mb-8"
                   data-toggle="modal" data-target="#confirmationModal" /> !-->
-                    
+                  <div class="study-info-note mb-3" role="alert">
+                      {% trans "study_details_live_monitoring_data_info" %}
+                    </div>
                 </div>
                 <div class="col-xs-12 col-sm-3">
                   <a href="{%url 'details' study_name=meta_data.name %}" data-bs-toggle="tooltip" title="{% trans 'study_details_refresh' %}">
@@ -512,44 +524,40 @@
                     data-response-handler="responseHandler">
                         <thead class="table-dark">
                           <tr >
-                                              
-                            <th data-field="subject_id" data-filter-control="input" rowspan="2">{% trans "study_details_subject_id" %}</th>                             
+
+                            <th data-field="subject_id" data-filter-control="input" rowspan="2">{% trans "study_details_subject_id" %}</th>
                             <th data-field="appName" data-filter-control="select" rowspan="2">{% trans "study_details_app" %}</th>
-                                                                         
+
                             <th data-field="duration" data-filter-control="input" rowspan="2">{% trans "study_duration" %}</th>
-                            <th data-field="sensor_info" data-filter-control="select" data-filter-data="var:{{meta_data.sensor_list}}" data-filter-strict-search="false" rowspan="2">{% trans "study_details_sensor_information" %}</th> 
-                             
+                            <th data-field="sensor_info" data-filter-control="select" data-filter-data="var:sensorFilterDefaults" data-filter-strict-search="false" data-filter-custom-search="sensorInfoFilterSearch" rowspan="2">{% trans "study_details_sensor_information" %}</th>
+
                             <th data-field="status" data-filter-control="select" data-filter-data="var:filterDefaults" data-filter-strict-search="false" rowspan="2">{% trans "study_details_status" %}</th>
-                            
+
                             {% if meta_data.sensor_size > 0  %}
-                            
-                            <th colspan = '{{ meta_data.sensor_size |add:7  }}' data-visible="false">{% trans "study_details_more_details" %}</th>
+
+                            <th colspan = '{{ meta_data.sensor_size |add:9  }}' data-visible="false">{% trans "study_details_more_details" %}</th>
                             {% else%}
-                            
-                            <th colspan = '7' data-visible="false">{% trans "study_details_more_details" %}</th>
+
+                            <th colspan = '9' data-visible="false">{% trans "study_details_more_details" %}</th>
                             {% endif %}
-                              
+
                           </tr>
                           <tr >
                             <th data-field="device_id"  data-visible="false">{% trans "study_details_device_id" %}</th>
-                            <th data-field="date_registered"  data-visible="false">{% trans "study_details_date_registered" %}</th> 
+                            <th data-field="date_registered"  data-visible="false">{% trans "study_details_date_registered" %}</th>
                             <th data-field="date_left_study" data-visible="false">{% trans "study_details_date_left_study" %}</th>
                             <th data-field="n_batches_ema" data-visible="false">{% trans "study_details_n_batches_ema" %}</th>
                             <th data-field="last_time_received_ema" data-visible="false">{% trans "study_details_last_time_received_ema" %}</th>
+                            <th data-field="sensor_activity_map" data-visible="false">sensor_activity_map</th>
                             <th data-field="sensor_list"  data-visible="false">{% trans "study_details_sensor_list" %}</th>
                             <th data-field="sensor_list_limited"  data-visible="false">{% trans "study_details_sensor_list_limited" %}</th>
-                            {% for sensor in meta_data.sensor_list_limited %}
+                            <th data-field="dashboard_sensor_list"  data-visible="false">dashboard_sensor_list</th>
+                            {% for sensor in meta_data.dashboard_sensor_list %}
                             <th data-field='n_batches_{{sensor}}' data-visible="false">n_batches_{{sensor}}</th>
                             <th data-field='last_time_received_{{sensor}}' data-visible="false">last_time_received_{{sensor}}</th>
-                            
-                            {% endfor %} 
-                            {% for sensor in meta_data.sensor_list %}
-                            <th data-field='n_batches_{{sensor}}' data-visible="false">n_batches_{{sensor}}</th>
-                            <th data-field='last_time_received_{{sensor}}' data-visible="false">last_time_received_{{sensor}}</th>
-                            
-                            {% endfor %} 
+                            {% endfor %}
                           </tr>
-                        </thead>                       
+                        </thead>
                           <!-- looping through the json array -->
                           <tbody>
                           {% for k,v in d.items %}
@@ -557,37 +565,34 @@
                             <td colspan="5">
                             <input class="form-check-input" type="checkbox" value="{{k}}" name="check-subject-id" >
                             <a name='user_sheet' download href="{%url 'download' arg=k  %}" >{{k}}</a></td>
-                            
+
                           </tr>
-                          
+
                             {% for i in v %}
-                              <tr colspan="5" > 
-                                                            
+                              <tr colspan="5" >
+
                                 <td data-field="subject_id" data-filter-control="input" >{{i.subject_name}} </td>
                                 <td data-field="appName" >{{i.app}}</td>
                                 <td data-field="duration" data-filter-control="input">{{i.time_in_study}}</td>
                                 <td data-field="sensor_info" id="sensors_info" >{{ i | get_sensor_tag:meta_data|safe }}</td>
-                                <td data-field="status" data-filter-control="select" >{{ i.status_code | get_status_tag|safe}} </td>
+                                <td data-field="status" data-filter-control="select" >{{ i | get_subject_status_tag:meta_data|safe}} </td>
                                 <td data-field="device_id" data-visible="false">{{i.device_id}}</td>
                                 <td data-field="date_registered" data-visible="false"> {{i.date_registered}} </td>
                                 <td data-field="date_left_study" data-visible="false">{{i.date_left_study}}</td>
                                 <td data-field="n_batches_ema" data-visible="false">{{i | get_n_batches:"ema"|safe}}</td>
                                 <td data-field="last_time_received_ema" data-visible="false">{{i | get_last_time_received:"ema"|safe}}</td>
+                                <td data-field="sensor_activity_map" data-visible="false">{{i | get_sensor_activity_json:meta_data}}</td>
                                 <td data-field="sensor_list"  data-visible="false"> {{meta_data.sensor_list}}</td>
                                 <td data-field="sensor_list_limited"  data-visible="false"> {{meta_data.sensor_list_limited}}</td>
-                                {% for sensor in meta_data.sensor_list_limited %}
+                                <td data-field="dashboard_sensor_list"  data-visible="false"> {{meta_data.dashboard_sensor_list}}</td>
+                                {% for sensor in meta_data.dashboard_sensor_list %}
                                 <td data-field='n_batches_{{sensor}}' data-visible="false">{{i | get_n_batches:sensor|safe}}</td>
                                 <td data-field='last_time_received_{{sensor}}' data-visible="false">{{i | get_last_time_received:sensor|safe}}</td>
-                                
-                                {% endfor %} 
-                                {% for sensor in meta_data.sensor_list %}
-                                <td data-field='n_batches_{{sensor}}' data-visible="false">{{i | get_n_batches:sensor|safe}}</td>
-                                <td data-field='last_time_received_{{sensor}}' data-visible="false">{{i | get_last_time_received:sensor|safe}}</td>
-                                {% endfor %}    
-                                       
+                                {% endfor %}
+
                               </tr>
-                             
-                              
+
+
                               {% endfor %}
                             {% endfor %}
                             </tbody>

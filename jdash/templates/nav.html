@@ -127,13 +127,13 @@
   let logoutTriggered = false;
   let fallbackLastActivityAt = Date.now();
 
+
   function getSessionModal() {
     if (!sessionModalElement || !window.bootstrap || !window.bootstrap.Modal) {
       return null;
     }
     return window.bootstrap.Modal.getOrCreateInstance(sessionModalElement);
   }
-
   function readLastActivityAt() {
     try {
       const rawValue = window.sessionStorage.getItem(activityStorageKey);
@@ -253,3 +253,4 @@
 
   
 </nav>
+

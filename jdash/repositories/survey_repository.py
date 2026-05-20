@@ -400,7 +400,7 @@ def retrieve_all_survey_for_user(user, session_key):
         queryset = surveyModel.objects.values()
         survey_list = json.loads(survey_serializer(queryset))
         for obj in survey_list:
-            study_details = studymodel.objects.filter(survey=obj["id"]).values()
+            study_details = studymodel.objects.filter(survey=obj["id"],closed=False).values()
             if study_details:
                 obj["study_name"] = ", ".join([study["title"] for study in study_details])
             category_titles = list(
@@ -422,7 +422,7 @@ def get_list_surveys_for_user(user, ema_studies):
 
     if queryset:
         for survey in json.loads(survey_serializer(queryset)):
-            study_details = studymodel.objects.filter(survey=survey["id"]).values()
+            study_details = studymodel.objects.filter(survey=survey["id"], closed=False).values()
             if study_details:
                 survey["study_name"] = ", ".join([study["title"] for study in study_details])
             category_titles = list(
@@ -436,7 +436,7 @@ def get_list_surveys_for_user(user, ema_studies):
                 surveys.append(survey)
 
     for studyname in ema_studies:
-        data = studymodel.objects.filter(title=studyname).values()
+        data = studymodel.objects.filter(title=studyname, closed=False).values()
         jsondata = json.loads(custom_serializer(data))[0]
         survey_queryset = surveyModel.objects.filter(id=jsondata["survey"]).values()
         if survey_queryset:

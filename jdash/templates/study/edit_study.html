@@ -409,7 +409,7 @@
 									<input
 										type="text"
 										class="form-control"
-										value="{% if f.instance.pk %}{{ f.instance.device_sensor.sensor.label }}{% endif %}"
+                                        value="{% if f.instance.pk %}{{ f.instance.device_sensor.sensor.label|lower }}{% endif %}"
 										readonly
 									>
 								</td>

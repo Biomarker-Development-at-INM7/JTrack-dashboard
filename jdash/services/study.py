@@ -12,6 +12,7 @@ import glob
 import json
 import logging
 import os
+import re
 import subprocess
 import threading
 import zipfile
@@ -27,11 +28,13 @@ from jdash.config import constants as constants
 from jdash.config import runtime_config as config
 import jdash.exceptions.studyexceptions as studyexceptions
 from jdash.utils.utils import (
+        build_quality_control_test_cases,
     calculate_stats_of_number_of_subjects,
     create_sql_statements_for_quality_control_tests,
     get_latest_received_study_sensor_details,
 )
 from jdash.utils.fileutils import (
+        build_wearable_dashboard_sensor_name,
     get_json_data,
     change_permissions,
     save_study_json,
@@ -298,9 +301,12 @@ class Study:
         logger.info("Study.display_context called for study_name=%s", self.study_name)
         ctx = {'meta_data': self.meta}
         self._ensure_legacy_survey_ids(ctx["meta_data"])
+        dashboard_sensors = self._get_dashboard_sensor_names(ctx["meta_data"])
+        ctx["meta_data"]["dashboard_sensor_list"] = dashboard_sensors
+        ctx["meta_data"]["sensor_size"] = len(dashboard_sensors) * 2
         raw = parse_get_dashboard_csv(self.study_name)
         # ensure all sensors appear
-        for sensor in ctx['meta_data'].get(constants.key_name_sensor_list, []):
+        for sensor in dashboard_sensors:
             for row in raw:
                 row.setdefault(f"{sensor} n_batches", 0)
                 row.setdefault(f"{sensor} last_time_received", "none")
@@ -311,6 +317,43 @@ class Study:
         logger.info("Study.display_context finished for study_name=%s", self.study_name)
         logger.debug("Study.display_context return_value=%s", ctx)
         return ctx
+    
+    @staticmethod
+    def _get_dashboard_sensor_names(meta_data):
+        """
+        Build the sensor list used by the live-monitoring table.
+
+        This includes passive sensors, active sensors, and wearable sensors so
+        dashboard rows can surface Garmin/wearable metrics when those columns
+        exist in the CSV.
+        """
+        ordered = []
+
+        def _add(sensor_name):
+            sensor_name = str(sensor_name or "").strip()
+            if sensor_name and sensor_name not in ordered:
+                ordered.append(sensor_name)
+
+        for sensor_name in meta_data.get(constants.key_name_sensor_list, []) or []:
+            _add(sensor_name)
+
+        for sensor_name in meta_data.get("sensor_list_limited", []) or []:
+            _add(sensor_name)
+
+        for wearable in meta_data.get("wearables", []) or []:
+            if not isinstance(wearable, dict):
+                continue
+            wearable_name = wearable.get("sensorname", "")
+            for sensor in wearable.get("sensors", []) or []:
+                if not isinstance(sensor, dict):
+                    continue
+                _add(
+                    build_wearable_dashboard_sensor_name(
+                        wearable_name,
+                        sensor.get("wearable_sensor", ""),
+                    )
+                )
+        return ordered
 
     @staticmethod
     def _ensure_legacy_survey_ids(meta_data: dict):
@@ -462,17 +505,131 @@ class Study:
         logger.info("Study.update finished for study_name=%s", self.study_name)
         logger.debug("Study.update return_value=%s", study_json)
         return study_json
-    
+
     def _refresh_test_cases(self):
         """
-        Rebuild quality-control test cases after a study update.
+        Sync quality-control test cases after a study update.
 
         Returns:
             None
         """
         study_id = json.loads(retrieve_study_details_by_title(self.study_name))[constants.key_name_id]
-        qctestsModel.objects.filter(study_id=study_id).delete()
-        self._create_test_cases()
+        desired_cases = build_quality_control_test_cases(self.meta)
+        existing_cases = list(qctestsModel.objects.filter(study_id=study_id))
+
+        def _semantic_key_from_existing(test_case):
+            testcase_id = str(test_case.testcase_id or "")
+            if testcase_id.startswith(("DATA-", "SUB-")):
+                return testcase_id
+
+            if testcase_id.startswith("EMA-"):
+                return f"EMA|{testcase_id.removeprefix('EMA-')}"
+
+            if testcase_id.startswith("PSEN-"):
+                match = re.search(
+                    r"for (?P<sensor>.+?) on (?P<platform>Android|iOS)$",
+                    str(test_case.description or ""),
+                )
+                if match:
+                    return f"PSEN|{match.group('platform')}|{match.group('sensor')}"
+
+            if testcase_id.startswith("ASEN-"):
+                match = re.search(
+                    r"1\. Simulate (?P<sensor>.+?) for a subject",
+                    str(test_case.steps or ""),
+                )
+                if match:
+                    return f"ASEN|{match.group('sensor')}"
+
+            if testcase_id.startswith("WDEV-"):
+                match = re.search(
+                    r"Verify (?P<device>.+?) wearable data is logged correctly for (?P<sensor>.+?) on (?P<platform>Android|iOS)$",
+                    str(test_case.description or ""),
+                )
+                if match:
+                    return (
+                        f"WDEV|{match.group('platform')}|"
+                        f"{match.group('device')}|{match.group('sensor')}"
+                    )
+
+            return testcase_id
+
+        existing_by_key = {
+            _semantic_key_from_existing(test_case): test_case
+            for test_case in existing_cases
+        }
+
+        matched_existing_by_key = {}
+        used_existing_ids = set()
+        for case in desired_cases:
+            existing = existing_by_key.get(case["semantic_key"])
+            if existing is not None and existing.id in used_existing_ids:
+                existing = None
+
+            if existing is None and case["semantic_key"].startswith("EMA|"):
+                existing = next(
+                    (
+                        test_case
+                        for test_case in existing_cases
+                        if test_case.id not in used_existing_ids
+                        and str(test_case.testcase_id or "").startswith("EMA-")
+                        and str(test_case.description or "") == case["description"]
+                    ),
+                    None,
+                )
+
+            if existing is None:
+                legacy_key = case.get("legacy_semantic_key")
+                legacy_existing = existing_by_key.get(legacy_key)
+                if legacy_existing is not None and legacy_existing.id not in used_existing_ids:
+                    existing = legacy_existing
+
+            if existing is not None:
+                matched_existing_by_key[case["semantic_key"]] = existing
+                used_existing_ids.add(existing.id)
+
+        stale_cases = [
+            test_case
+            for test_case in existing_cases
+            if test_case.id not in used_existing_ids
+        ]
+        if stale_cases:
+            qctestsModel.objects.filter(id__in=[test_case.id for test_case in stale_cases]).delete()
+
+        rows_to_rekey = []
+        for case in desired_cases:
+            existing = matched_existing_by_key.get(case["semantic_key"])
+            if existing and existing.testcase_id != case["testcase_id"]:
+                existing.testcase_id = f"TMP-{existing.id}"
+                rows_to_rekey.append(existing)
+
+        if rows_to_rekey:
+            qctestsModel.objects.bulk_update(rows_to_rekey, ["testcase_id"])
+
+        for case in desired_cases:
+            existing = matched_existing_by_key.get(case["semantic_key"])
+            if existing:
+                changed_fields = []
+                for field in ("testcase_id", "test_type", "description", "steps", "expected_outcome"):
+                    if getattr(existing, field) != case[field]:
+                        setattr(existing, field, case[field])
+                        changed_fields.append(field)
+                if changed_fields:
+                    existing.save(update_fields=changed_fields)
+                continue
+
+            qctestsModel.objects.create(
+                testcase_id=case["testcase_id"],
+                test_type=case["test_type"],
+                description=case["description"],
+                steps=case["steps"],
+                expected_outcome=case["expected_outcome"],
+                tested_by_admin=False,
+                tested_by_owner=False,
+                admin_username="",
+                owner_username="",
+                study_id=study_id,
+            )
 
     def _trigger_update_json_script(self):
         """
