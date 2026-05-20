@@ -127,35 +127,12 @@
   let logoutTriggered = false;
   let fallbackLastActivityAt = Date.now();
 
-    function getSessionModal() {
-    if (!sessionModalElement) {
+
+  function getSessionModal() {
+    if (!sessionModalElement || !window.bootstrap || !window.bootstrap.Modal) {
       return null;
     }
-
-    if (window.bootstrap && window.bootstrap.Modal) {
-      const ModalClass = window.bootstrap.Modal;
-      if (typeof ModalClass.getOrCreateInstance === "function") {
-        return ModalClass.getOrCreateInstance(sessionModalElement);
-      }
-      if (typeof ModalClass.getInstance === "function") {
-        return ModalClass.getInstance(sessionModalElement) || new ModalClass(sessionModalElement);
-      }
-      try {
-        return new ModalClass(sessionModalElement);
-      } catch (error) {
-        // Fall through to the jQuery-based Bootstrap 4 modal API.
-      }
-    }
-
-    if (window.jQuery) {
-      const modalElement = window.jQuery(sessionModalElement);
-      return {
-        show() { modalElement.modal("show"); },
-        hide() { modalElement.modal("hide"); }
-      };
-    }
-
-    return null;
+    return window.bootstrap.Modal.getOrCreateInstance(sessionModalElement);
   }
   function readLastActivityAt() {
     try {
