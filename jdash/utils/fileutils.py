@@ -114,11 +114,100 @@ def handle_uploaded_file(f, name):
             
 def parse_get_dashboard_csv(study_name):
     df = read_study_df(study_name)
+    try:
+        study_meta = get_json_data(study_name)
+    except Exception:
+        study_meta = {}
+    df = merge_wearable_dashboard_data(df, study_name, study_meta.get("wearables", []))
     # parsing the CSV in json format.
     json_records = df.reset_index().to_json(orient='records')
     data = json.loads(json_records)
     return data
 
+
+
+def build_wearable_dashboard_sensor_name(wearable_name, sensor_label):
+    """
+    Build the canonical dashboard sensor key for a wearable stream.
+
+    Args:
+        wearable_name (str): Device/manufacturer name, e.g. ``Garmin``.
+        sensor_label (str): Wearable sensor label from study metadata.
+
+    Returns:
+        str: Normalized dashboard sensor name such as ``garmin_HEART_RATE``.
+    """
+    sensor_label = str(sensor_label or "").strip()
+    sensor_label = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", sensor_label)
+    sensor_label = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", sensor_label)
+    sensor_label = re.sub(r"[^A-Za-z0-9]+", "_", sensor_label)
+    sensor_label = re.sub(r"_+", "_", sensor_label).strip("_").upper()
+
+    wearable_name = str(wearable_name or "").strip()
+    wearable_name = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", wearable_name)
+    wearable_name = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", wearable_name)
+    wearable_name = re.sub(r"[^A-Za-z0-9]+", "_", wearable_name)
+    wearable_name = re.sub(r"_+", "_", wearable_name).strip("_").lower()
+
+    if wearable_name and sensor_label:
+        return f"{wearable_name}_{sensor_label}"
+    return sensor_label
+
+
+def merge_wearable_dashboard_data(base_df, study_name, wearables):
+    """
+    Merge wearable-specific dashboard CSV data into the main dashboard dataframe.
+
+    Args:
+        base_df (pd.DataFrame): Main dashboard dataframe.
+        study_name (str): Study identifier.
+        wearables (list): Wearable configuration list from study metadata.
+
+    Returns:
+        pd.DataFrame: Combined dataframe with wearable metrics included when present.
+    """
+    merged_df = base_df.copy()
+
+    for wearable in wearables or []:
+        wearable_df = pd.DataFrame()
+        candidate_path = os.path.join(config.storage_folder, f"jtrack_wearables_{study_name}.csv")
+        if os.path.isfile(candidate_path):
+            try:
+                wearable_df = pd.read_csv(candidate_path)
+                print(wearable_df.columns)
+            except Exception as exc:
+                logger.warning(
+                    "Failed to read wearable dashboard csv for study=%s path=%s error=%s",
+                    study_name,
+                    candidate_path,
+                    exc,
+                )
+
+        if wearable_df.empty:
+            continue
+
+        if merged_df.empty:
+            merged_df = wearable_df
+            continue
+
+        join_keys = [key for key in ("subject_name", "app") if key in merged_df.columns and key in wearable_df.columns]
+        if not join_keys:
+            logger.warning(
+                "Skipping wearable dashboard merge for study=%s wearable=%s because no join keys were found.",
+                study_name,
+                wearable,
+            )
+            continue
+
+        merged_df = merged_df.copy()
+        merged_df["__row_order"] = range(len(merged_df))
+        merged_indexed = merged_df.set_index(join_keys)
+        wearable_indexed = wearable_df.drop_duplicates(subset=join_keys, keep="last").set_index(join_keys)
+        merged_df = merged_indexed.combine_first(wearable_indexed).reset_index()
+        if "__row_order" in merged_df.columns:
+            merged_df = merged_df.sort_values("__row_order", na_position="last").drop(columns="__row_order")
+
+    return merged_df
 
 def update_study_df(study_name, id):
     study_df = read_study_df(study_name)

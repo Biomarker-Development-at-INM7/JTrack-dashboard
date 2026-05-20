@@ -54,6 +54,10 @@ class Subject:
                 sensor = k.split(' ', 1)[1]
                 self.sensor_last_times_received[sensor] = v
                 self.last_times_received.append(v)
+        
+        if self.app == 'ema' and 'last_time_received_ema' in obj:
+            self.sensor_last_times_received['ema'] = obj['last_time_received_ema']
+            self.last_times_received.append(obj['last_time_received_ema'])
 
         if subject_json is not None:
             self.study_enrolled_in = subject_json.get('studyId')
@@ -127,17 +131,16 @@ class Subject:
     def get_sensor_activity_code(self, value, study_obj):
         """
         activity status codes
-        0: delayed sensor data (>= 2 days)
-        1: left prematurely
-        2: study duration reached, but not left
-        3: study duration reached,  left
-        4: multiple qr codes
+        0: delayed sensor data while still in study (>= 2 days)
+        1: study duration exceeded while still in study
+        2: active / recently received sensor data
+        3: subject has left study; stream treated as closed
+        4: no sensor data received yet
 
         :param subject object and study object
         :return: activity_status_code
         """
         sensors_dict = {}
-        missing_data = False
         today = datetime.now(timezone.utc)  # timezone-aware datetime
 
         registered_timestamp_in_s = datetime.strptime(self.date_registered, timestamp_format).replace(
@@ -150,48 +153,73 @@ class Subject:
         last_mandatory_send_in_s = today if not left_timestamp_in_s else left_timestamp_in_s
 
         time_in_study_days = int(str(self.time_in_study).split(' ')[0])
+        dashboard_sensor_list = (study_obj or {}).get("dashboard_sensor_list")
+        if dashboard_sensor_list is None:
+            allowed_sensors = None
+        else:
+            allowed_sensors = {
+                str(sensor).strip().lower()
+                for sensor in (dashboard_sensor_list or [])
+            }
+            if self.app == 'ema':
+                allowed_sensors.add('ema')
+            if not allowed_sensors:
+                return {}
 
         # Send a dictionary with sensor as key, and a value dictionary with tool tip desc and code
         for (k, value) in self.sensor_last_times_received.items():
-            sensor_activity_dict = {}
-            if value != 'none':
-                sensor_activity_dict['sensor_code'] = constants.sensor_list[k]
+            if allowed_sensors is not None and str(k).strip().lower() not in allowed_sensors:
+                continue
+            sensor_activity_dict = {
+                'sensor_code': constants.sensor_list.get(k, k),
+                'days_since_received': None,
+            }
 
+            if self._is_missing_sensor_value(value):
+                sensor_activity_dict['status_code'] = 4
+                sensor_activity_dict['status_desc'] = constants.no_sensor_not_received
+            elif left_timestamp_in_s is not None:
+                sensor_activity_dict['status_code'] = 3
+                if (left_timestamp_in_s - registered_timestamp_in_s).days < int(study_obj['duration']):
+                    sensor_activity_dict['status_desc'] = constants.no_sensor_left_early
+                else:
+                    sensor_activity_dict['status_desc'] = constants.no_sensor_duration_reached
+            elif time_in_study_days > int(study_obj['duration']):
+                sensor_activity_dict['status_code'] = 1
+                sensor_activity_dict['status_desc'] = constants.no_sensor_duration_exceeded
+            else:
                 sensor_ltr_in_s = self.check_format_of_timestamp(value)
 
                 # Use 'today' here directly (it's timezone aware)
                 days_since_last_received = (today - sensor_ltr_in_s).days
+                sensor_activity_dict['days_since_received'] = days_since_last_received
 
-                if time_in_study_days >= int(study_obj['duration']):
-                    sensor_activity_dict['status_code'] = 3
-                    sensor_activity_dict['status_desc'] = constants.no_sensor_duration_reached
-
-                # left_timestamp_in_s can be none
-
-                if left_timestamp_in_s is not None:
-                    if (left_timestamp_in_s
-                        - registered_timestamp_in_s).days  < int(study_obj['duration']):
-                        sensor_activity_dict['status_code'] = 1
-                        sensor_activity_dict['status_desc'] = constants.no_sensor_left_early
-
-                if days_since_last_received < int(study_obj['duration']) and days_since_last_received >= 2:
+                if days_since_last_received >= 2:
                     sensor_activity_dict['status_code'] = 0
                     sensor_activity_dict['status_desc'] = constants.no_sensor_data
-
-                if days_since_last_received < 2:
+                else:
                     sensor_activity_dict['status_code'] = 2
                     sensor_activity_dict['status_desc'] = constants.sensor_data_active
 
-                if 'status_code' not in sensor_activity_dict:
-                    sensor_activity_dict['status_code'] = 'none'
-                if 'status_desc' not in sensor_activity_dict:
-                    sensor_activity_dict['status_desc'] = 'none'
-
-                sensor_activity_dict['days_since_received'] = days_since_last_received
-                sensors_dict[k] = sensor_activity_dict
+            sensors_dict[k] = sensor_activity_dict
 
         return sensors_dict
 
+    @staticmethod
+    def _is_missing_sensor_value(value):
+        """
+        Normalize dashboard "no timestamp" variants.
+
+        Args:
+            value: Raw last_time_received value.
+
+        Returns:
+            bool: True when the value represents an absent timestamp.
+        """
+        if value is None:
+            return True
+        normalized = str(value).strip().lower()
+        return normalized in {"", "none", "null"}
 
     def check_format_of_timestamp(self, last_time_received):
         """
@@ -203,7 +231,7 @@ class Subject:
         Returns:
             datetime | None: Parsed timezone-aware datetime or ``None`` for missing values.
         """
-        if last_time_received == 'none':
+        if self._is_missing_sensor_value(last_time_received):
             return None
         if "-" in last_time_received:
             dt = datetime.strptime(last_time_received, timestamp_format)

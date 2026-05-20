@@ -34,6 +34,7 @@ from jdash.utils.utils import (
     get_latest_received_study_sensor_details,
 )
 from jdash.utils.fileutils import (
+        build_wearable_dashboard_sensor_name,
     get_json_data,
     change_permissions,
     save_study_json,
@@ -300,9 +301,12 @@ class Study:
         logger.info("Study.display_context called for study_name=%s", self.study_name)
         ctx = {'meta_data': self.meta}
         self._ensure_legacy_survey_ids(ctx["meta_data"])
+        dashboard_sensors = self._get_dashboard_sensor_names(ctx["meta_data"])
+        ctx["meta_data"]["dashboard_sensor_list"] = dashboard_sensors
+        ctx["meta_data"]["sensor_size"] = len(dashboard_sensors) * 2
         raw = parse_get_dashboard_csv(self.study_name)
         # ensure all sensors appear
-        for sensor in ctx['meta_data'].get(constants.key_name_sensor_list, []):
+        for sensor in dashboard_sensors:
             for row in raw:
                 row.setdefault(f"{sensor} n_batches", 0)
                 row.setdefault(f"{sensor} last_time_received", "none")
@@ -313,6 +317,43 @@ class Study:
         logger.info("Study.display_context finished for study_name=%s", self.study_name)
         logger.debug("Study.display_context return_value=%s", ctx)
         return ctx
+    
+    @staticmethod
+    def _get_dashboard_sensor_names(meta_data):
+        """
+        Build the sensor list used by the live-monitoring table.
+
+        This includes passive sensors, active sensors, and wearable sensors so
+        dashboard rows can surface Garmin/wearable metrics when those columns
+        exist in the CSV.
+        """
+        ordered = []
+
+        def _add(sensor_name):
+            sensor_name = str(sensor_name or "").strip()
+            if sensor_name and sensor_name not in ordered:
+                ordered.append(sensor_name)
+
+        for sensor_name in meta_data.get(constants.key_name_sensor_list, []) or []:
+            _add(sensor_name)
+
+        for sensor_name in meta_data.get("sensor_list_limited", []) or []:
+            _add(sensor_name)
+
+        for wearable in meta_data.get("wearables", []) or []:
+            if not isinstance(wearable, dict):
+                continue
+            wearable_name = wearable.get("sensorname", "")
+            for sensor in wearable.get("sensors", []) or []:
+                if not isinstance(sensor, dict):
+                    continue
+                _add(
+                    build_wearable_dashboard_sensor_name(
+                        wearable_name,
+                        sensor.get("wearable_sensor", ""),
+                    )
+                )
+        return ordered
 
     @staticmethod
     def _ensure_legacy_survey_ids(meta_data: dict):

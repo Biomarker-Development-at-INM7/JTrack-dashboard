@@ -1,4 +1,5 @@
 {% load static %}
+{% load custom_tags %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -23,7 +24,25 @@
         {% block content %}
         {% endblock %}
     </div>
-
+    {% get_partner_logo_paths as partner_logo_paths %}
+    <section class="partners-marquee-section" aria-label="Collaboration partners">
+        <div class="container-fluid">
+            <div class="footer-partners-strip">
+                <div class="footer-partners-track">
+                    {% for logo_path in partner_logo_paths %}
+                    <span class="footer-partner-logo">
+                        <img src="{% static logo_path %}" alt="{{ logo_path|cut:'icons/partners/'|cut:'.png'|cut:'.jpg'|cut:'.jpeg'|cut:'.svg'|cut:'.webp' }}">
+                    </span>
+                    {% endfor %}
+                    {% for logo_path in partner_logo_paths %}
+                    <span class="footer-partner-logo" aria-hidden="true">
+                        <img src="{% static logo_path %}" alt="">
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </section>
     {% include "footer.html" with request=request %}
 </body>
 </html>
