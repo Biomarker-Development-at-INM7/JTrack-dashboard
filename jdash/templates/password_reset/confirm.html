@@ -1,0 +1,56 @@
+{% extends 'login_base.html' %}
+{% load i18n %}
+
+{% block content %}
+<div class="login-page-shell">
+  <div class="contact-card-wrap">
+    <div class="card shadow contact-card">
+      <div class="card-body">
+        {% if validlink %}
+        <div class="contact-card-header">
+          <h1>{% trans "password_reset_confirm_title" %}</h1>
+          <p>{% trans "password_reset_confirm_desc" %}</p>
+        </div>
+
+        <form method="post">
+          {% csrf_token %}
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
+          {% endif %}
+
+          <div class="mb-3">
+            <label for="id_new_password1" class="form-label">{% trans "password_reset_new_password_label" %}</label>
+            <input type="password" name="new_password1" autocomplete="new-password" required id="id_new_password1" class="form-control">
+            {% if form.new_password1.errors %}
+            <div class="text-danger small mt-2">{{ form.new_password1.errors }}</div>
+            {% endif %}
+          </div>
+
+          <div class="mb-4">
+            <label for="id_new_password2" class="form-label">{% trans "password_reset_confirm_password_label" %}</label>
+            <input type="password" name="new_password2" autocomplete="new-password" required id="id_new_password2" class="form-control">
+            {% if form.new_password2.errors %}
+            <div class="text-danger small mt-2">{{ form.new_password2.errors }}</div>
+            {% endif %}
+          </div>
+
+          <div class="d-grid">
+            <button type="submit" class="btn btn-primary">{% trans "password_reset_confirm_btn" %}</button>
+          </div>
+        </form>
+        {% else %}
+        <div class="contact-card-header">
+          <h1>{% trans "password_reset_invalid_title" %}</h1>
+          <p>{% trans "password_reset_invalid_desc" %}</p>
+        </div>
+        <div class="d-grid gap-2">
+          <a class="btn btn-primary" href="{% url 'password_reset' %}">{% trans "password_reset_request_new_link_btn" %}</a>
+          <a class="btn btn-outline-secondary" href="{% url 'login' %}">{% trans "password_reset_back_login_btn" %}</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

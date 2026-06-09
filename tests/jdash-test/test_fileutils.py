@@ -23,10 +23,11 @@ import pytest
 from unittest.mock import patch, mock_open
 
 # --- Standard Library ---
+import pandas as pd
 
 # --- Local Imports ---
 # Do this AFTER django.setup()
-from jdash.classes import fileutils
+from jdash.utils import fileutils
 
 # Test create_download_file_log writes header and row when file does not exist
 @patch("os.path.isfile", return_value=False)
@@ -65,14 +66,19 @@ def test_updated_status_updates_sent_email_row(mock_file):
     "sensor_list": ["sensor1", "sensor2"],
     "sensor_list_limited": ["sensor3"]
 }))
+@patch("jdash.utils.fileutils.sync_enrolled_subjects_count")
+@patch("jdash.utils.fileutils.get_user_list", return_value=["StudyX_001", "StudyX_002"])
+@patch("jdash.utils.fileutils.read_study_df", return_value=pd.DataFrame({"subject_name": ["StudyX_001_1"]}))
 @patch("os.path.join", side_effect=lambda *args: "/".join(args))
-def test_get_json_data_transformations(mock_join, mock_file):
+def test_get_json_data_transformations(mock_join, mock_read_df, mock_get_user_list, mock_sync_count, mock_file):
     result = fileutils.get_json_data("StudyX")
     assert result["number_of_subjects"] == 5
     assert result["sensor_size"] == 6  # 2*2 + 2*1
+    assert result["number_of_enrolled_subjects"] == 2
+    mock_sync_count.assert_called_once_with("StudyX", 2)
 
 # Test get_all_json_data calls get_json_data for each directory
-@patch("jdash.classes.fileutils.get_json_data")
+@patch("jdash.utils.fileutils.get_json_data")
 def test_get_all_json_data_calls_get_json_data(mock_get_json_data):
     dirs = ["dir1", "dir2"]
     mock_get_json_data.side_effect = lambda d: { "key": d }
@@ -112,3 +118,73 @@ def test_change_permissions_calls_chown_and_chmod(mock_chmod, mock_chown):
 def test_open_study_json_returns_json(mock_join, mock_file):
     data = fileutils.open_study_json("study")
     assert data == {"key": "value"}
+
+
+@patch("jdash.utils.fileutils.get_json_data", return_value={"wearables": [{"sensorname": "Garmin"}]})
+def test_parse_get_dashboard_csv_merges_wearable_dashboard_csv(mock_get_json_data, tmp_path):
+    study_name = "WearableStudy"
+    fileutils.config.storage_folder = str(tmp_path)
+    fileutils.config.csv_prefix = "jutrack_dashboard_"
+
+    base_df = pd.DataFrame([
+        {"subject_name": "subj1_1", "app": "main", "status_code": 0, "activity n_batches": 12}
+    ])
+    base_df.to_csv(tmp_path / f"jutrack_dashboard_{study_name}.csv", index=False)
+
+    wearable_df = pd.DataFrame([
+        {"subject_name": "subj1_1", "app": "main", "GarminSteps n_batches": 33, "GarminSteps last_time_received": "2026-05-19 10:00:00"}
+    ])
+    wearable_df.to_csv(tmp_path / f"jtrack_wearable_{study_name}.csv", index=False)
+
+    parsed = fileutils.parse_get_dashboard_csv(study_name)
+
+    assert parsed[0]["subject_name"] == "subj1_1"
+    assert parsed[0]["activity n_batches"] == 12
+    assert parsed[0]["GarminSteps n_batches"] == 33
+    assert parsed[0]["GarminSteps last_time_received"] == "2026-05-19 10:00:00"
+
+
+def test_normalize_wearable_dashboard_columns_leaves_legacy_code_style_names_untouched():
+    wearable_df = pd.DataFrame([
+        {
+            "subject_name": "subj1_1",
+            "app": "main",
+            "at_n_batches": 21,
+            "at_last_time_received": "2026-05-19 12:00:00",
+        }
+    ])
+    wearable = {"sensors": [{"wearable_sensor": "activity"}]}
+
+    normalized = fileutils.normalize_wearable_dashboard_columns(wearable_df, wearable)
+
+    assert "at_n_batches" in normalized.columns
+    assert "at_last_time_received" in normalized.columns
+    assert normalized.loc[0, "at_n_batches"] == 21
+
+
+def test_normalize_wearable_dashboard_columns_maps_prefixed_indexed_names():
+    wearable_df = pd.DataFrame([
+        {
+            "subject_name": "subj1_1",
+            "app": "main",
+            "garmin_ACTIGRAPHY_1 n_batches": 17,
+            "garmin_ACTIGRAPHY_1 last_time_received": "2026-05-19 09:30:00",
+        }
+    ])
+    wearable = {
+        "sensorname": "Garmin",
+        "sensors": [{"wearable_sensor": "ACTIGRAPHY"}],
+    }
+
+    normalized = fileutils.normalize_wearable_dashboard_columns(wearable_df, wearable)
+
+    assert "garmin_ACTIGRAPHY n_batches" in normalized.columns
+    assert "garmin_ACTIGRAPHY last_time_received" in normalized.columns
+    assert normalized.loc[0, "garmin_ACTIGRAPHY n_batches"] == 17
+
+
+def test_build_wearable_dashboard_sensor_name_normalizes_camel_case():
+    assert (
+        fileutils.build_wearable_dashboard_sensor_name("Garmin", "HeartRate")
+        == "garmin_HEART_RATE"
+    )

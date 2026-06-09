@@ -138,32 +138,49 @@ def calculate_stats_of_number_of_subjects(study_name, number_of_subjects):
     """
     stats_json = {}
     temp_json = {'removed': [], 'completed': [], 'leftstudy': [], 'instudy': []}
+    status_rank = {'removed': 0, 'leftstudy': 1, 'completed': 2, 'instudy': 3}
     df = read_study_df(study_name)
-
+    subjects_by_status = {}
     if not df.empty:
         # parsing the CSV in json format.
         json_records = df.reset_index().to_json(orient='records')
         data = json.loads(json_records)
         for obj in data:
             if obj["status_code"] == 1:
-                temp_json['leftstudy'].append(obj['subject_name'])
+                status = 'leftstudy'
             elif obj["status_code"] == 2:
-                temp_json['completed'].append(obj['subject_name'])
+                status = 'completed'
             elif obj["status_code"] == 3:
-                temp_json['removed'].append(obj['subject_name'])
+                status = 'removed'
             else:
-                temp_json['instudy'].append(obj['subject_name'])
+                status = 'instudy'
+
+            subject_name = str(obj['subject_name'])
+            subject_key = subject_name[:-2]
+            current_status = subjects_by_status.get(subject_key)
+            if current_status is None or status_rank[status] > status_rank[current_status]:
+                subjects_by_status[subject_key] = status
+
+        for subject_name, status in subjects_by_status.items():
+            temp_json[status].append(subject_name)
 
         stats_json['leftstudy'] = len(temp_json['leftstudy'])
-        stats_json['leftstudy_percentage'] = round(100 * (stats_json['leftstudy'] / number_of_subjects), 1)
         stats_json['instudy'] = len(temp_json['instudy'])
-        stats_json['instudy_percentage'] = round(100 * (stats_json['instudy'] / number_of_subjects), 1)
         stats_json['completed'] = len(temp_json['completed'])
-        stats_json['completed_percentage'] = round(100 * (stats_json['completed'] / number_of_subjects), 1)
         stats_json['removed'] = len(temp_json['removed'])
-        stats_json['removed_percentage'] = round(100 * (stats_json['removed'] / number_of_subjects), 1)
+        enrolled_subjects = (
+            stats_json['leftstudy']
+            + stats_json['instudy']
+            + stats_json['completed']
+            + stats_json['removed']
+        )
+
+        stats_json['leftstudy_percentage'] = round(100 * (stats_json['leftstudy'] / enrolled_subjects), 1)
+        stats_json['instudy_percentage'] = round(100 * (stats_json['instudy'] / enrolled_subjects), 1)
+        stats_json['completed_percentage'] = round(100 * (stats_json['completed'] / enrolled_subjects), 1)
+        stats_json['removed_percentage'] = round(100 * (stats_json['removed'] / enrolled_subjects), 1)
         
-        
+
     return stats_json
 
 def get_subject_details_of_study(study_name, data):

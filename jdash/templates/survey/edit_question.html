@@ -65,11 +65,9 @@
       <li class="nav-item">
         <a class="nav-link "  href="{%url 'home' %}">{% trans "index_tab1" %}</a>
       </li>
-      {% if request.user|has_group:"Investigator" or request.user|has_group:"administrator" %}
       <li class="nav-item">
         <a class="nav-link active" aria-current="page" href="{%url 'survey'  %}">{% trans "index_tab2" %}</a>
       </li>
-      {% endif %}
       <li class="nav-item">
         <a class="nav-link" href="{%url 'analytics' study_name='all' %}">{% trans "index_tab3" %}</a>
       </li>
@@ -214,14 +212,16 @@
                 </div>
                 <div class="row">
                   <div id = "activate_condition_div" class="form-group  col mb-4" style="display:none">
-                    {{ question_form.activation_condition}}
-                    <label >{% trans "question_activation_condition" %}</label>
+                      {{ question_form.activation_condition}}
+                    <label>{% trans "question_activation_condition" %}</label>
+                    <div id="activation_condition_options" class="mt-2" style="display:none"></div>
                     <span><small><i>{{question_help_text.activation_condition}}</i></small></span>
                   </div>
 
                   <div id = "deactivate_condition_div" class=" form-group col mb-4" style="display:none">
-                      {{ question_form.deactivation_condition}}
-                      <label >{% trans "question_deactivation_condition" %}</label>
+                        {{ question_form.deactivation_condition}}
+                      <label>{% trans "question_deactivation_condition" %}</label>
+                      <div id="deactivation_condition_options" class="mt-2" style="display:none"></div>
                       <span><small><i>{{question_help_text.deactivation_condition}}</i></small></span>
                   </div>
                 </div>
@@ -323,7 +323,7 @@
     </div>
 </div>
 
-
+{% if request.user|can_manage_survey %}
 <!-- Update Button -->
 <div class="row mt-3">
   <div class="col">
@@ -331,14 +331,12 @@
       type="button"
       name="update_button"
       onclick="display_info()"
-      data-bs-toggle="modal"
-      data-bs-target="#updateModal"
       class="btn btn-primary">
       {% trans "question_update_button" %}
     </button>
   </div>
 </div>
-
+{% endif %}
 
 </form>
 
@@ -382,4 +380,5 @@
     });
 </script>
 {{ previous_question_data|json_script:"prev-question-data" }}
+{{ question_category_map|json_script:"question-category-map" }}
 {% endblock %}

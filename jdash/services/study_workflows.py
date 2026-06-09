@@ -222,11 +222,11 @@ def remove_subjects_from_study(study_name, subject_to_remove, context):
     Mark a selected subject as removed within the in-memory study detail context.
     """
     logger.info("remove_subjects_from_study:start")
-
     try:
-        subject_id_with_modality = str(subject_to_remove).split(constants.value_sep)[0]
-        subject_id, app = subject_id_with_modality.split(constants.sep)
-        group_id = subject_id.split("_")[0]
+        selected_subject_value = str(subject_to_remove)
+        subject_id_with_modality = selected_subject_value.split(constants.value_sep, 1)[0]
+        subject_id, app = subject_id_with_modality.split(constants.sep, 1)
+        group_id = subject_id[:-2]
     except Exception as exc:
         logger.error("Failed to parse subject identifier '%s': %s", subject_to_remove, exc)
         return context
@@ -235,15 +235,26 @@ def remove_subjects_from_study(study_name, subject_to_remove, context):
     if group_subjects:
         for obj in group_subjects:
             if obj.get("subject_name") == subject_id and obj.get("app") == app:
-                obj["status_code"] = 3
+                obj["status_code"] = constants.remove_status_code
+                try:
+                    Subject.remove_from_study(study_name, subject_id_with_modality)
+                except Exception as exc:
+                    logger.exception(
+                        "Failed to update removed status in subject JSON for '%s': %s",
+                        subject_id_with_modality,
+                        exc,
+                    )
+                    context["error_message"] = controller_error_message(exc)
+                    break
                 context["success_message"] = f"{subject_id} has been succesfully removed"
+                break
     else:
         logger.warning("Group '%s' not found or is empty. Skipping status update.", group_id)
 
     try:
-        context["subject_details"]["ids_to_be_removed"].remove(subject_to_remove)
+        context["subject_details"]["ids_to_be_removed"].remove(selected_subject_value)
     except ValueError:
-        logger.warning("Subject '%s' not found in ids_to_be_removed.", subject_to_remove)
+        logger.warning("Subject '%s' not found in ids_to_be_removed.", selected_subject_value)
 
     logger.info("remove_subjects_from_study:end")
     if "success_message" not in context:

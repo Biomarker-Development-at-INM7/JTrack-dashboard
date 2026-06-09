@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
-from jdash.apps import constants
-from jdash.classes import utils
+from jdash.config import constants
+from jdash.utils import utils
 from django.contrib.auth.models import User, Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from jdash.interface.session_manager import SessionManager
@@ -2019,3 +2019,64 @@ def test_update_test_case_flags_invalid_id():
     assert result["success_count"] == 0
     assert result["failure_count"] == 1
     assert len(result["errors"]) == 0  # Logging is used but no error is appended
+
+
+def test_create_sql_statements_for_quality_control_tests_includes_platform_specific_cases(tmp_path):
+    output_file = tmp_path / "quality_control.sql"
+    study_data = {
+        "survey": {
+            "questions": [{"db_id": 42, "title": "Mood question"}],
+        },
+        "sensor_list": ["accelerometer"],
+        "sensor_list_limited": ["pedometer"],
+        "wearables": [{
+            "sensorname": "Garmin",
+            "model": "Venu 3",
+            "sensors": [{"wearable_sensor": "Heart Rate"}],
+        }],
+    }
+
+    utils.create_sql_statements_for_quality_control_tests(study_data, output_file, 17)
+    sql = output_file.read_text()
+    first_insert = sql.strip().split(";\n", 1)[0]
+
+    assert 'SUB-01' in first_insert
+    assert 'EMA-42' in sql
+    assert 'PSEN-AND-0' in sql
+    assert 'PSEN-IOS-0' in sql
+    assert 'WDEV-AND-0-0' in sql
+    assert 'WDEV-IOS-0-0' in sql
+    assert 'Verify Garmin wearable data is logged correctly for Heart Rate on Android' in sql
+    assert 'ASEN-0' in sql
+
+
+def test_create_sql_statements_for_quality_control_tests_falls_back_to_question_order_without_db_id(tmp_path):
+    output_file = tmp_path / "quality_control_legacy_ema.sql"
+    study_data = {
+        "survey": {
+            "questions": [{"title": "Legacy mood question"}],
+        },
+        "sensor_list": [],
+        "sensor_list_limited": [],
+        "wearables": [],
+    }
+
+    utils.create_sql_statements_for_quality_control_tests(study_data, output_file, 17)
+    sql = output_file.read_text()
+
+    assert "EMA-0" in sql
+
+
+def test_create_sql_statements_for_quality_control_tests_ignores_empty_survey_dict(tmp_path):
+    output_file = tmp_path / "quality_control_empty_survey.sql"
+    study_data = {
+        "survey": {},
+        "sensor_list": [],
+        "sensor_list_limited": [],
+        "wearables": [],
+    }
+
+    utils.create_sql_statements_for_quality_control_tests(study_data, output_file, 17)
+    sql = output_file.read_text()
+
+    assert "EMA-" not in sql

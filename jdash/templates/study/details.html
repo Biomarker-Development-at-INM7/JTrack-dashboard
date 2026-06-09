@@ -271,11 +271,16 @@
       <div class="row">
         <div class="d-flex justify-content-between align-items-center">
           <div class="d-flex justify-content-start align-items-center">
-            
+               {% if request.user|can_manage_study %}
             <h3><a class="edit" name="edit_study" title="Edit" href="{% url 'edit_study' study_name=meta_data.name %}"  >
               <i class="fas fa-pencil-alt"></i></a>{{meta_data.name}} </h3>
+            {% else %}
+            <h3>{{meta_data.name}}</h3>
+            {% endif %}
           </div>
+           {% if request.user|can_manage_study %}
           <a class="btn btn-outline-primary" href="{% url 'qc_study' study_name=meta_data.name %}" >{% trans "global_qc" %}</a>
+          {% endif %}
       </div>
           
           <div class="col-xs-12 col-sm-9 justify-content-end d-flex" >
@@ -395,7 +400,7 @@
                   </div>
                 
                   <div class="row">
-
+                     {% if request.user|can_manage_study %}
                     <form name="createSubjectForm"  class="row row-cols-lg-auto g-3 align-items-center" action="{%url 'details' study_name=meta_data.name %}" method="POST">
                       {% csrf_token %}
                       <div class="col-12">
@@ -406,11 +411,13 @@
                       </div>
                       
                     </form>
+                    {% endif %}
                   </div>     
               </div>
               
           </div>
           <hr class="my-4">
+                {% if request.user|can_manage_study %}
           <div class="card-body">
                 <h6 class="heading-small text-muted mb-4">{% trans "study_details_remove_subject" %}</h6>
                 <div class="pl-lg-4">
@@ -428,6 +435,7 @@
                   </form>   
                 </div>
             </div>
+                {% endif %}
             <hr class="my-4">
             <div class="card-body">
                   <h6 class="heading-small text-muted mb-4">{% trans "study_details_send_notification" %}</h6>
@@ -444,7 +452,7 @@
                   </form> 
                   </div>
               <hr class="my-4">
-              {% if request.user|has_group:"Investigator" or request.user|has_group:"administrator" %}
+               {% if request.user|can_manage_study %}
               <div class="card-body">
                   <h6 class="heading-small text-muted mb-4">{% trans "study_details_close_study" %}</h6>
                   <form name="closeForm" action="{%url 'close' study_name=meta_data.name %}" method="POST">
@@ -474,9 +482,11 @@
                     <img src="{% static 'icons/icon-pdf-100.png' %}" height="35"></a>
                   <a name="study_data_download" data-bs-toggle="modal" data-bs-target="#downloadStudyDataModal" data-bs-toggle="tooltip" title="{% trans 'study_details_download_data' %}">
                     <img src="{% static 'icons/download-128.png' %}" height="35"></a>
+                   {% if request.user|can_manage_study %}
                   <button type="button" class="btn "  data-bs-toggle="modal"
                       data-bs-target="#deleteDataModal" data-bs-toggle="tooltip" title="{% trans 'global_delete' %}" id="delete_subjects" onclick="form_innerhtml_modal()">
                     <img src="{% static 'icons/remove-data-100.png' %}" height="35"> </button>
+                     {% endif %}
                 </div>
                 
 

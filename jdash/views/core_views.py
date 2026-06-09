@@ -2,13 +2,17 @@ import logging
 
 from django.conf import settings
 from django.contrib import messages, auth
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login, logout,get_user_model
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.forms import AuthenticationForm,PasswordResetForm, SetPasswordForm
+from django.contrib.auth.tokens import default_token_generator
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
-
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode
+from django.views.decorators.cache import never_cache
 from jdash.services.notification import send_email
 from jdash.services.study import get_all_study_details
 from jdash.forms import ContactUsForm
@@ -58,7 +62,7 @@ def session_check(request):
 
     return JsonResponse({"active": True})
 
-
+@never_cache
 @login_required
 def index(request):
     """
@@ -132,7 +136,7 @@ def index(request):
             return render(request, constants.error_page, context)
     return render(request, constants.login_page)
 
-
+@never_cache
 def login_request(request):
     """
     Handles the login flow for the application.
@@ -145,6 +149,9 @@ def login_request(request):
     """
     context = {}
     allowed_usernames = set(getattr(settings, "MAINTENANCE_ALLOWED_USERNAMES", []))
+
+    if request.method != constants.post_method and request.user.is_authenticated:
+        return redirect(constants.url_name_for_logout)
 
     if request.method == constants.post_method:
         form = AuthenticationForm(request, data=request.POST)
@@ -187,7 +194,7 @@ def csrf_failure(request, reason=""):
     messages.error(request, "Session expired. Please log in again.")
     return redirect('/login/')
 
-
+@never_cache
 @login_required
 def logout_request(request):
     """
@@ -198,6 +205,7 @@ def logout_request(request):
     """
     logout(request)
     auth.logout(request)
+    messages.success(request, textmessages.success_logged_out)
     return redirect(constants.url_name_for_login)
 
 
@@ -222,3 +230,83 @@ def contact_email(request):
             return render(request, constants.success, context)
     context[constants.key_name_contact_form] = ContactUsForm()
     return render(request, constants.contact_us, context)
+
+
+
+
+@never_cache
+def password_reset_request(request):
+    """
+    Start the public JDash password reset flow.
+
+    The view uses Django's PasswordResetForm for token generation and email
+    delivery, while keeping the rendered page fully under JDash templates.
+    """
+    form = PasswordResetForm(request.POST or None)
+    if request.method == constants.post_method and form.is_valid():
+        if _password_reset_has_eligible_user(form):
+            form.save(
+                request=request,
+                use_https=request.is_secure(),
+                from_email=getattr(settings, "SUPPORT_EMAIL", None),
+                email_template_name=constants.password_reset_email,
+                subject_template_name=constants.password_reset_subject,
+            )
+        else:
+            logger.info("Password reset requested for an unknown or ineligible email address.")
+        return redirect(constants.url_name_for_password_reset_done)
+
+    return render(request, constants.password_reset_form_page, {"form": form})
+
+
+def _password_reset_has_eligible_user(form):
+    email = form.cleaned_data.get("email")
+    return bool(email and any(form.get_users(email)))
+
+
+@never_cache
+def password_reset_done(request):
+    """Render the non-revealing reset-email-sent page."""
+    return render(request, constants.password_reset_done_page)
+
+
+def _user_from_reset_uid(uidb64):
+    UserModel = get_user_model()
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        return UserModel._default_manager.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, ValidationError, UserModel.DoesNotExist):
+        return None
+
+
+@never_cache
+def password_reset_confirm(request, uidb64, token):
+    """
+    Validate a password reset token and let the user choose a new password.
+    """
+    user = _user_from_reset_uid(uidb64)
+    validlink = user is not None and default_token_generator.check_token(user, token)
+    form = None
+
+    if validlink:
+        form = SetPasswordForm(user, request.POST or None)
+        if request.method == constants.post_method and form.is_valid():
+            form.save()
+            return redirect(constants.url_name_for_password_reset_complete)
+
+    return render(
+        request,
+        constants.password_reset_confirm_page,
+        {
+            "form": form,
+            "validlink": validlink,
+        },
+    )
+
+
+@never_cache
+def password_reset_complete(request):
+    """Render the password-reset-success page."""
+    return render(request, constants.password_reset_complete_page)
+
+

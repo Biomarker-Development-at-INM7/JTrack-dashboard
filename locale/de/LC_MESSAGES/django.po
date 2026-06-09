@@ -254,19 +254,27 @@ msgstr ""
 #: jdash/templates/footer.html:116
 
 msgid "footer_contactdelbtn"
-msgstr "Hier entlang"
+msgstr "Löschanfrage"
 
 #: jdash/templates/footer.html:112
 
 msgid "footer_contactdesc"
 msgstr ""
-"Wenn Sie an einer Zusammenarbeit mit uns interessiert sind oder mehr über "
-"JTrack oder unsere Studien erfahren möchten"
+"Wenn Sie an einer Zusammenarbeit mit uns interessiert sind oder mehr über <br>JTrack oder unsere Studien erfahren möchten"
 
 #: jdash/templates/footer.html:109
 
 msgid "footer_contacthead"
 msgstr "Kontaktieren Sie uns"
+
+msgid "contact_us_title"
+msgstr "Kontaktieren Sie uns"
+
+msgid "contact_us_subtitle"
+msgstr "Senden Sie uns eine Nachricht. Wir melden uns bei Ihnen."
+
+msgid "contact_us_submit"
+msgstr "Nachricht senden"
 
 #: jdash/templates/footer.html:151
 
@@ -352,6 +360,9 @@ msgstr "von"
 msgid "header_group"
 msgstr "Arbeitsgruppe Biomarkerentwicklung, INM-7"
 
+msgid "recording_duration"
+msgstr "Aufnahmedauer"
+
 #: jdash/templates/index.html:32
 
 msgid "index_add"
@@ -436,7 +447,7 @@ msgstr "Umfragen"
 #: jdash/templates/analytics/view_analytics.html:17 jdash/templates/index.html:24 jdash/templates/study/create_study.html:57 jdash/templates/study/details.html:237 jdash/templates/study/edit_study.html:59 jdash/templates/study/sop_list_study.html:25 jdash/templates/study/study_audit_list.html:24 jdash/templates/survey/create_question.html:51 jdash/templates/survey/create_survey.html:212 jdash/templates/survey/edit_question.html:74 jdash/templates/survey/survey_audit_list.html:24 jdash/templates/survey/survey_list.html:80
 
 msgid "index_tab3"
-msgstr "Analysen"
+msgstr "Compliance-Überwachung"
 
 #: jdash/templates/index.html:51
 
@@ -669,6 +680,9 @@ msgstr "Austrittsdatum"
 msgid "study_details_date_registered"
 msgstr "Registrierungsdatum"
 
+msgid "study_details_data_available_next_day"
+msgstr "Bitte beachten Sie, dass die Daten einen Tag nach der Synchronisierung des Geräts durch den Teilnehmer im Dashboard verfügbar sind."
+
 #: jdash/templates/study/details.html:159
 
 msgid "study_details_delete_data_confirm"
@@ -756,6 +770,9 @@ msgstr "Informationen"
 
 msgid "study_details_last_time_received_ema"
 msgstr "Letzter EMA-Empfang"
+
+msgid "study_details_live_monitoring_data_info"
+msgstr "Die folgende Tabelle zeigt die von den Teilnehmenden übermittelten Live-Datenmetriken."
 
 #: jdash/templates/study/details.html:430
 
@@ -1142,6 +1159,9 @@ msgstr "Unterstützte Formate: JSON, CSV, XLS, XLSX, XLSM. Bei Excel-Uploads wir
 msgid "text_error_message_invalid_username_pswd"
 msgstr "Ungültiger Benutzername oder ungültiges Passwort."
 
+msgid "text_success_logged_out"
+msgstr "Sie wurden abgemeldet."
+
 msgid "text_error_message_to_contact_support"
 msgstr "Ups! Etwas ist schiefgelaufen. Bitte versuchen Sie es später erneut oder kontaktieren Sie den Support."
 
@@ -1323,4 +1343,313 @@ msgstr ""
 "beendet."
 
 #: jdash/templates/nav.html:40
+
+
+msgid "All selected values"
+msgstr "Alle ausgewählten Werte"
+
+msgid "All subjects"
+msgstr "Alle Probanden"
+
+msgid "Choose Study"
+msgstr "Studie auswählen"
+
+msgid "Choose X-axis"
+msgstr "X-Achse auswählen"
+
+msgid "Daily Sensor Overview"
+msgstr "Tägliche Sensorübersicht"
+
+msgid "Detailed Sensor Data"
+msgstr "Detaillierte Sensordaten"
+
+msgid "Filter subject-id:"
+msgstr "Nach subject-id filtern:"
+
+msgid "Filter subjects"
+msgstr "Probanden filtern"
+
+msgid "Graph"
+msgstr "Grafik"
+
+msgid "Select EMA dimension"
+msgstr "EMA-Dimension auswählen"
+
+msgid "Select EMA metric"
+msgstr "EMA-Metrik auswählen"
+
+msgid "Select sensor"
+msgstr "Sensor auswählen"
+
+msgid "Select study"
+msgstr "Studie auswählen"
+
+msgid "Select which sensor"
+msgstr "Sensor auswählen"
+
+msgid "Select X-axis variable"
+msgstr "X-Achsenvariable auswählen"
+
+msgid "Select X-axis variable:"
+msgstr "X-Achsenvariable auswählen:"
+
+msgid "Select x-axis (Date or study_day)"
+msgstr "X-Achse auswählen (Date oder study_day)"
+
+msgid "Select Y-axis variable"
+msgstr "Y-Achsenvariable auswählen"
+
+msgid "Select Y-axis variable:"
+msgstr "Y-Achsenvariable auswählen:"
+
+msgid "Table"
+msgstr "Tabelle"
+
+msgid "Filter X-axis values:"
+msgstr "X-Achsenwerte filtern:"
+
+
+msgid "branding_hero_title"
+msgstr "Willkommen auf der JTrack Digital Platform"
+
+msgid "branding_hero_description"
+msgstr "Verwalten Sie longitudinale Studien mit EMA-Befragungen, Wearable-Sensoren, Teilnehmenden-Tracking und Qualitätskontrolle in einem Dashboard."
+
+msgid "branding_apps_section_title"
+msgstr "Begleit-Apps zur Datenerhebung bei Teilnehmenden"
+
+msgid "branding_apps_aria_label"
+msgstr "JTrack-Apps"
+
+msgid "branding_app_ema_description"
+msgstr "Erfassen Sie Ecological Momentary Assessments, tägliche Symptome und Studienfragebögen direkt von Teilnehmenden im Alltag."
+
+msgid "branding_app_social_description"
+msgstr "Erfassen Sie soziale Interaktionen, Aktivitätskontext und Verhaltensmuster im Alltag für longitudinale digitale Gesundheitsforschung."
+
+msgid "branding_app_ema_app_store_alt"
+msgstr "JTrack EMA im App Store herunterladen"
+
+msgid "branding_app_ema_google_play_alt"
+msgstr "JTrack EMA bei Google Play herunterladen"
+
+msgid "branding_app_social_app_store_alt"
+msgstr "JTrack Social im App Store herunterladen"
+
+msgid "branding_app_social_google_play_alt"
+msgstr "JTrack Social bei Google Play herunterladen"
+
+msgid "Show password"
+msgstr "Passwort anzeigen"
+
+msgid "Hide password"
+msgstr "Passwort ausblenden"
+
+msgid "branding_partners_aria_label"
+msgstr "Kooperationspartner"
+
+msgid "branding_partners_title"
+msgstr "Kooperationspartner"
+
+msgid "Documentation"
+msgstr "Doktoren"
+
+msgid "Git Repository"
+msgstr "GitHub"
+
+msgid "Username"
+msgstr "Benutzername"
+
+msgid "Password"
+msgstr "Passwort"
+
+msgid "Login"
+msgstr "Anmelden"
+
+msgid "branding_app_ema_name"
+msgstr "JTrack EMA"
+
+msgid "branding_app_social_name"
+msgstr "JTrack Social"
+
+msgid "branding_fz_juelich_alt"
+msgstr "Forschungszentrum Jülich"
+
+
+msgid "branding_app_insights_name"
+msgstr "JTrack Insights"
+
+msgid "branding_app_insights_description"
+msgstr "Erkunden Sie Studiendaten, Dashboards und Berichte für Forschungsteams."
+
+msgid "branding_app_casee_name"
+msgstr "Case-E"
+
+msgid "branding_app_casee_description"
+msgstr "Verwalten Sie strukturierte elektronische Case Report Forms für die Erfassung klinischer und studienbezogener Daten."
+
+msgid "branding_reference_paper"
+msgstr "Referenzpublikation"
+
+msgid "branding_bb_alt"
+msgstr "Brain & Behaviour"
+
+msgid "English"
+msgstr "Englisch"
+
+msgid "Deutsch"
+msgstr "Deutsch"
+
+msgid "Force refresh"
+msgstr "Aktualisieren erzwingen"
+
+msgid "Fetched from current CSV"
+msgstr "Aus aktueller CSV geladen"
+
+msgid "Enter fullscreen"
+msgstr "Vollbild öffnen"
+
+msgid "Share"
+msgstr "Teilen"
+
+msgid "Download"
+msgstr "Herunterladen"
+
+msgid "Export to .CSV"
+msgstr "Als .CSV exportieren"
+
+msgid "Export to Excel"
+msgstr "Nach Excel exportieren"
+
+msgid "Download as image"
+msgstr "Als Bild herunterladen"
+
+msgid "Live Monitoring"
+msgstr "Übersicht"
+
+msgid "Subject Data"
+msgstr "Themenübersicht"
+
+msgid "Sensor Data"
+msgstr "Sensorübersicht"
+
+msgid "Live Monitoring Summary"
+msgstr "Studienübersicht"
+
+msgid "Sensor Status"
+msgstr "Sensorstatus"
+
+msgid "Subject Status"
+msgstr "Probandenstatus"
+
+msgid "Recent Coverage"
+msgstr "Aktuelle Abdeckung"
+
+msgid "Processing Freshness"
+msgstr "Verarbeitungsaktualität"
+
+msgid "Warnings"
+msgstr "Warnungen"
+
+msgid "Alerts"
+msgstr "Warnmeldungen"
+
+msgid "Alert"
+msgstr "Warnmeldung"
+
+msgid "No live monitoring alerts."
+msgstr "Keine Live-Monitoring-Warnmeldungen."
+
+msgid "password_reset_forgot_password_btn"
+msgstr "Passwort vergessen?"
+
+msgid "password_reset_form_title"
+msgstr "Passwort zurücksetzen"
+
+msgid "password_reset_form_desc"
+msgstr "Geben Sie die E-Mail-Adresse Ihres Kontos ein. Wir senden Ihnen einen Link zum Zurücksetzen des Passworts."
+
+msgid "password_reset_email_label"
+msgstr "E-Mail-Adresse"
+
+msgid "password_reset_send_link_btn"
+msgstr "Link zum Zurücksetzen senden"
+
+msgid "password_reset_back_login_btn"
+msgstr "Zurück zur Anmeldung"
+
+msgid "password_reset_done_title"
+msgstr "Prüfen Sie Ihre E-Mails"
+
+msgid "password_reset_done_desc"
+msgstr "Wenn ein Konto für diese E-Mail-Adresse existiert, wurde ein Link zum Zurücksetzen des Passworts gesendet."
+
+msgid "password_reset_confirm_title"
+msgstr "Neues Passwort wählen"
+
+msgid "password_reset_confirm_desc"
+msgstr "Geben Sie Ihr neues Passwort zweimal ein, damit wir es überprüfen können."
+
+msgid "password_reset_new_password_label"
+msgstr "Neues Passwort"
+
+msgid "password_reset_confirm_password_label"
+msgstr "Neues Passwort bestätigen"
+
+msgid "password_reset_confirm_btn"
+msgstr "Passwort zurücksetzen"
+
+msgid "password_reset_invalid_title"
+msgstr "Link zum Zurücksetzen ungültig"
+
+msgid "password_reset_invalid_desc"
+msgstr "Dieser Link zum Zurücksetzen des Passworts ist ungültig oder wurde bereits verwendet. Bitte fordern Sie einen neuen Link an."
+
+msgid "password_reset_request_new_link_btn"
+msgstr "Neuen Link anfordern"
+
+msgid "password_reset_complete_title"
+msgstr "Passwort wurde zurückgesetzt"
+
+msgid "password_reset_complete_desc"
+msgstr "Ihr Passwort wurde aktualisiert. Sie können sich jetzt mit dem neuen Passwort anmelden."
+
+msgid "password_reset_login_btn"
+msgstr "Anmelden"
+
+msgid "password_reset_email_subject"
+msgstr "Setzen Sie Ihr JDash-Passwort zurück"
+
+msgid "password_reset_email_intro"
+msgstr "Sie erhalten diese E-Mail, weil für Ihr JDash-Konto das Zurücksetzen des Passworts angefordert wurde."
+
+msgid "password_reset_email_link_intro"
+msgstr "Öffnen Sie den folgenden Link, um ein neues Passwort zu wählen:"
+
+msgid "password_reset_email_ignore"
+msgstr "Wenn Sie das Zurücksetzen des Passworts nicht angefordert haben, können Sie diese E-Mail ignorieren."
+
+msgid "create_survey_question_order_title"
+msgstr "Sequenz aktualisieren"
+
+msgid "create_survey_question_order_old_sequence_label"
+msgstr "Alte Sequenz"
+
+msgid "create_survey_question_order_new_sequence_label"
+msgstr "Neue Sequenz"
+
+msgid "create_survey_question_order_save_btn"
+msgstr "Speichern"
+
+msgid "create_survey_question_order_change_btn"
+msgstr "Reihenfolge ändern"
+
+msgid "create_survey_question_order_success"
+msgstr "Fragenreihenfolge aktualisiert."
+
+msgid "create_survey_question_order_belongs_error"
+msgstr "Die Frage gehört nicht zu dieser Umfrage."
+
+msgid "create_survey_question_order_range_error"
+msgstr "Die Fragenreihenfolge muss zwischen 1 und %(total)s liegen."
 

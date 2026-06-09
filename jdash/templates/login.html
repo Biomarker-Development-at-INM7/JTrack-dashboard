@@ -1,70 +1,216 @@
 {% extends 'login_base.html' %}
 {% load static %}
+{% load i18n %}
+{% load custom_tags %}
 
 {% block content %}
-    
-    <div class="row justify-content-center mt-5">
-        <div class="col-xl-4 col-lg-6 col-md-6">
-            <div class="card shadow">
-                <div class="card-body">
-                    {% if messages %}
-                        <ul class="messages">
-                            {% for message in messages %}
-                            <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
-                            {% endfor %}
-                        </ul>
-                    {% endif %}
-
-                    <form action="{% url 'login' %}" method="post">
-                        {% csrf_token %}
-                        <div class="mb-4">
-                            <label for="username" class="form-label">Username</label>
-                            <input type="text" class="form-control" name="username" id="username" />
-                        </div>
-                        <div class="mb-4">
-                            <label for="password" class="form-label">Password</label>
-                            <div style="position: relative;">
-                                <input type="password" class="form-control" name="password" id="password" />
-                                <button
-                                    type="button"
-                                    class="btn"
-                                    id="togglePassword"
-                                    aria-label="Show password"
-                                    aria-pressed="false"
-                                    style="position: absolute; top: 50%; right: 0.5rem; transform: translateY(-50%); border: 0; box-shadow: none; background: transparent; padding: 0.25rem 0.5rem;"
-                                >
-                                    <i class="fa fa-eye" aria-hidden="true"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="d-grid">
-                            <input name="login" type="submit" value="Login" class="btn btn-success" />
-                        </div>
-                    </form>
+<main class="branding-hero">
+  <div class="branding-hero-layout">
+    <section class="branding-hero-content">
+      <div class="branding-hero-title-row">
+        <h1>{% trans "branding_hero_title" %}</h1>
+        <a class="branding-app-reference-link" href="https://doi.org/10.3389/fpubh.2021.763621" target="_blank" rel="noreferrer" aria-label="{% trans 'branding_reference_paper' %}">
+          <i class="fas fa-book-open" aria-hidden="true"></i>
+        </a>
+      </div>
+      
+      <div class="branding-hero-actions">
+        <!-- <a href="{% url 'contact_email' %}" class="btn btn-outline-primary btn-lg">{% trans "footer_contactbtn" %}</a>
+      --></div>
+      
+      <div class="branding-app-grid" aria-label="{% trans 'branding_apps_aria_label' %}">
+            <div class="branding-app-card">
+          <div class="branding-app-body">
+            <div class="branding-app-heading">
+              <img class="branding-app-thumb" src="{% static 'icons/jtrack-ema.jpeg' %}" alt="{% trans 'branding_app_ema_name' %}">
+              <div class="branding-app-text">
+                <div class="branding-app-title-row">
+                  <h2 class="branding-app-title">{% trans "branding_app_ema_name" %}</h2>
+                  <a class="branding-app-reference-link" href="https://pmc.ncbi.nlm.nih.gov/articles/PMC11815298/" target="_blank" rel="noreferrer" aria-label="{% trans 'branding_reference_paper' %}">
+                    <i class="fas fa-book-open" aria-hidden="true"></i>
+                  </a>
                 </div>
+                <p class="branding-app-copy">{% trans "branding_app_ema_description" %}</p>
+              </div>
             </div>
+
+            <div class="branding-app-links">
+              <a href="https://apps.apple.com/de/app/jtrack-ema/id1605100657" target="_blank" rel="noreferrer">
+                <img class="branding-store-badge branding-store-badge--apple" src="http://upload.wikimedia.org/wikipedia/commons/0/0f/Available_on_the_App_Store_%28black%29_SVG.svg" alt="{% trans 'branding_app_ema_app_store_alt' %}">
+              </a>
+              <a href="https://play.google.com/store/apps/details?id=inm7.JTrack.JTrack_EMA_Plus" target="_blank" rel="noreferrer">
+                <img class="branding-store-badge branding-store-badge--google" src="https://gallery.mailchimp.com/b88b3ba75f26335343bfecdc0/images/5e301e76-08a9-459e-ad1a-b9eab2f28c0c.png" alt="{% trans 'branding_app_ema_google_play_alt' %}">
+              </a>
+            </div>
+          </div>
         </div>
+
+        <div class="branding-app-card">
+          <div class="branding-app-body">
+            <div class="branding-app-heading">
+              <img class="branding-app-thumb" src="{% static 'icons/jtrack-social.jpeg' %}" alt="{% trans 'branding_app_social_name' %}">
+              <div class="branding-app-text">
+                <div class="branding-app-title-row">
+                  <h2 class="branding-app-title">{% trans "branding_app_social_name" %}</h2>
+                  <a class="branding-app-reference-link" href="https://www.jmir.org/2025/1/e51689" target="_blank" rel="noreferrer" aria-label="{% trans 'branding_reference_paper' %}">
+                    <i class="fas fa-book-open" aria-hidden="true"></i>
+                  </a>
+                </div>
+                <p class="branding-app-copy">{% trans "branding_app_social_description" %}</p>
+              </div>
+            </div>
+
+            <div class="branding-app-links">
+              <a href="https://apps.apple.com/de/app/jtrack-social/id1645319896" target="_blank" rel="noreferrer">
+                <img class="branding-store-badge branding-store-badge--apple" src="http://upload.wikimedia.org/wikipedia/commons/0/0f/Available_on_the_App_Store_%28black%29_SVG.svg" alt="{% trans 'branding_app_social_app_store_alt' %}">
+              </a>
+              <a href="https://play.google.com/store/apps/details?id=inm7.JTrack.JTrack_Social" target="_blank" rel="noreferrer">
+                <img class="branding-store-badge branding-store-badge--google" src="https://gallery.mailchimp.com/b88b3ba75f26335343bfecdc0/images/5e301e76-08a9-459e-ad1a-b9eab2f28c0c.png" alt="{% trans 'branding_app_social_google_play_alt' %}">
+              </a>
+            </div>
+          </div>
+        </div>
+        <!-- <div class="branding-app-card">
+          <div class="branding-app-body">
+            <div class="branding-app-heading">
+              <a href="https://ecrf.inm7.de/login" target="_blank" rel="noreferrer">
+                <img class="branding-app-thumb branding-app-thumb--casee" src="{% static 'icons/Logo_CaseE.png' %}" alt="{% trans 'branding_app_casee_name' %}">
+              </a>
+              <div class="branding-app-title-row">
+                <a class="branding-app-title-link" href="https://ecrf.inm7.de/login" target="_blank" rel="noreferrer">
+                  <h2 class="branding-app-title">{% trans "branding_app_casee_name" %}</h2>
+                </a>
+                
+              </div>
+            </div>
+            <p class="branding-app-copy">{% trans "branding_app_casee_description" %}</p>
+
+            
+          </div>
+        </div> -->
+        <!-- <div class="branding-app-card" >
+          <div class="branding-app-body">
+            <div class="branding-app-heading">
+              <a href="" target="_blank" rel="noreferrer">
+                <img class="branding-app-thumb" src="{% static 'icons/jtrack-insights.jpeg' %}" alt="{% trans 'branding_app_insights_name' %}">
+              </a>
+              <div class="branding-app-title-row">
+                <a class="branding-app-title-link" href="" target="_blank" rel="noreferrer">
+                  <h2 class="branding-app-title">{% trans "branding_app_insights_name" %}</h2>
+                </a>
+                
+              </div>
+            </div>
+            <p class="branding-app-copy">{% trans "branding_app_insights_description" %}</p>
+
+            
+          </div>
+        </div> -->
+      </div>
+      <div class="casee-section" aria-label="{% trans 'branding_app_casee_name' %}">
+        <div class="casee-disclaimer">
+          <a href="https://ecrf.inm7.de/login" target="_blank" rel="noreferrer">
+            <img class="branding-app-thumb branding-app-thumb--casee-large" src="{% static 'icons/Logo_CaseE.png' %}" alt="{% trans 'branding_app_casee_name' %}">
+          </a>
+          <div class="casee-disclaimer-text">
+            <a class="branding-app-title-link" href="https://ecrf.inm7.de/login" target="_blank" rel="noreferrer">
+              <h1 class="casee-section-title">{% trans "branding_app_casee_name" %}</h1>
+            </a>
+            <p class="branding-app-casee">{% trans "branding_app_casee_description" %}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="branding-login-card" aria-label="{% trans 'Login' %}">
+      <div class="login-org-logo">
+        <a href="https://www.fz-juelich.de/" target="_blank" rel="noreferrer">
+          <img src="{% static 'icons/fz-icon.png' %}" alt="{% trans 'branding_fz_juelich_alt' %}">
+        </a>
+        <a href="https://www.fz-juelich.de/" target="_blank" rel="noreferrer">
+          <img class="login-bb-logo" src="{% static 'icons/bb-icon.png' %}" alt="{% trans 'branding_bb_alt' %}">
+        </a>
+      </div>
+      {% if messages %}
+      <ul class="messages">
+        {% for message in messages %}
+        <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      <form action="{% url 'login' %}" method="post">
+        {% csrf_token %}
+        <div class="mb-4">
+          <label for="username" class="form-label">{% trans "Username" %}</label>
+          <input type="text" class="form-control" name="username" id="username">
+        </div>
+        <div class="mb-4">
+          <label for="password" class="form-label">{% trans "Password" %}</label>
+          <div class="password-input-wrap">
+            <input type="password" class="form-control" name="password" id="password">
+            <button
+              type="button"
+              class="btn password-toggle"
+              id="togglePassword"
+              aria-label="{% trans 'Show password' %}"
+              aria-pressed="false"
+              data-show-label="{% trans 'Show password' %}"
+              data-hide-label="{% trans 'Hide password' %}">
+              <i class="fas fa-eye" aria-hidden="true"></i>
+            </button>
+          </div>
+          <div class="text-end mt-2">
+            <a href="{% url 'password_reset' %}" class="small">{% trans "password_reset_forgot_password_btn" %}</a>
+          </div>
+        </div>
+
+        <div class="d-grid">
+          <input name="login" type="submit" value="{% trans 'Login' %}" class="btn btn-primary">
+        </div>
+      </form>
+    </aside>
+  </div>
+</main>
+
+{% get_partner_logo_paths as partner_logo_paths %}
+<section class="branding-partners" aria-label="{% trans 'branding_partners_aria_label' %}">
+  <h2 class="branding-partners-title">{% trans "branding_partners_aria_label" %}</h2>
+  <div class="branding-partners-inner">
+    <div class="footer-partners-track">
+      {% for logo_path in partner_logo_paths %}
+      <span class="branding-partner-logo">
+        <img src="{% static logo_path %}" alt="{{ logo_path|cut:'icons/partners/'|cut:'.png'|cut:'.jpg'|cut:'.jpeg'|cut:'.svg'|cut:'.webp' }}">
+      </span>
+      {% endfor %}
+      {% for logo_path in partner_logo_paths %}
+      <span class="branding-partner-logo" aria-hidden="true">
+        <img src="{% static logo_path %}" alt="">
+      </span>
+      {% endfor %}
     </div>
-    <script>
-        (function () {
-            const passwordInput = document.getElementById("password");
-            const toggleButton = document.getElementById("togglePassword");
+  </div>
+</section>
 
-            if (!passwordInput || !toggleButton) {
-                return;
-            }
+<script>
+  (function () {
+    const passwordInput = document.getElementById("password");
+    const toggleButton = document.getElementById("togglePassword");
 
-            toggleButton.addEventListener("click", function () {
-                const showPassword = passwordInput.type === "password";
-                const icon = toggleButton.querySelector("i");
-                passwordInput.type = showPassword ? "text" : "password";
-                toggleButton.setAttribute("aria-label", showPassword ? "Hide password" : "Show password");
-                toggleButton.setAttribute("aria-pressed", showPassword ? "true" : "false");
-                if (icon) {
-                    icon.className = showPassword ? "fa fa-eye-slash" : "fa fa-eye";
-                }
-            });
-        })();
-    </script>
+    if (!passwordInput || !toggleButton) {
+      return;
+    }
+
+    toggleButton.addEventListener("click", function () {
+      const showPassword = passwordInput.type === "password";
+      const icon = toggleButton.querySelector("i");
+      passwordInput.type = showPassword ? "text" : "password";
+      toggleButton.setAttribute("aria-label", showPassword ? toggleButton.dataset.hideLabel : toggleButton.dataset.showLabel);
+      toggleButton.setAttribute("aria-pressed", showPassword ? "true" : "false");
+      if (icon) {
+        icon.className = showPassword ? "fas fa-eye-slash" : "fas fa-eye";
+      }
+    });
+  })();
+</script>
 {% endblock %}
+

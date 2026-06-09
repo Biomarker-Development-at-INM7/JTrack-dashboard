@@ -318,7 +318,7 @@ class Subject:
             Subject.write_pdf(study_name, subject_name)
             os.chown(pdf_path, 33, 3619)
         result = start_number + number_to_create
-        logger.info("Subject.create_pdfs_for_study finished for study_name=%s", study_name)
+        logger.debug("Subject.create_pdfs_for_study finished for study_name=%s", study_name)
         logger.debug("Subject.create_pdfs_for_study return_value=%s", result)
         return result
 
@@ -333,7 +333,7 @@ class Subject:
         Returns:
             int: Number of generated subject files.
         """
-        logger.info("Subject.count_pdfs called for study_name=%s", study_name)
+        logger.debug("Subject.count_pdfs called for study_name=%s", study_name)
         path = os.path.join(
             settings.DASH_FOLDER,
             config.app_study_folder,
@@ -343,10 +343,10 @@ class Subject:
         if os.path.exists(path):
             contents = os.listdir(path)
             result = len(contents)
-            logger.info("Subject.count_pdfs finished for study_name=%s", study_name)
+            logger.debug("Subject.count_pdfs finished for study_name=%s", study_name)
             logger.debug("Subject.count_pdfs return_value=%s", result)
             return result
-        logger.info("Subject.count_pdfs finished for study_name=%s", study_name)
+        logger.debug("Subject.count_pdfs finished for study_name=%s", study_name)
         logger.debug("Subject.count_pdfs return_value=%s", 0)
         return 0
 
@@ -367,7 +367,6 @@ class Subject:
             study_name,
             subject_to_remove,
         )
-        os.setuid(33)
         (subject_id, app) = str(subject_to_remove).split(constants.sep)
         user_json_path = os.path.join(config.users_folder, study_name + '_' + subject_id + '.json')
         time_left = int(round(time.time() * 1000))
@@ -458,5 +457,5 @@ class Subject:
         pdf_string += "</body></html>"
         pdfkit.from_string(pdf_string, pdf_path, options={"enable-local-file-access": ""})
         os.chmod(pdf_path, 0o0775)
-        logger.info("Subject.write_pdf finished for study_id=%s subject_name=%s", study_id, subject_name)
+        logger.debug("Subject.write_pdf finished for study_id=%s subject_name=%s", study_id, subject_name)
         logger.debug("Subject.write_pdf return_value=%s", None)

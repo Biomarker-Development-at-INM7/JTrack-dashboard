@@ -1,10 +1,13 @@
 {% load static %}
 {% load i18n %}
+{% load custom_tags %}
 <nav class="navbar sticky-top navbar-light bg-light">
-  <div class="container-fluid">
-    <div class="col-sm-6 d-flex align-items-right">
-    <div class="d-flex align-items-left">
-      <img src="{% static 'icons/logo.png' %}" height="75" >
+  <div class="container-fluid jdash-navbar">
+    <div class="jdash-navbar-brand">
+    <div class="d-flex align-items-center">
+        <a href="{% url 'home' %}" aria-label="JDash">
+        <img src="{% static 'icons/logo.png' %}" height="75" alt="JDash">
+      </a>
     </div>
     <!-- Title -->
     <div  id="title-div">
@@ -20,35 +23,11 @@
       </h6>
     </div>
     </div>
-    <div class="col-sm-2 d-flex align-items-left">
+    <div class="jdash-navbar-actions">
     <!-- Logged-in User -->
     {% if user.is_authenticated %}
-<div class="col media-body d-flex align-items-left justify-content-end gap-2">
-  <span class="mb-0 text-sm font-weight-bold me-2" style="color: black;">
-    {{ user.username }}
-  </span>
-  <span id="logout-timer" style="margin-right: 10px; font-weight: bold;"></span>
-  <a href="{% url 'logout' %}">
-    <img src="{% static 'icons/logout-58.png' %}" height="35" alt="{% trans 'Logout' %}">
-  </a>
-</div>
-
-<!-- Modal -->
-<div class="modal fade" id="sessionModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content text-center">
-      <div class="modal-header">
-        <h5 class="modal-title">{% trans "Session expiring soon" %}</h5>
-      </div>
-      <div class="modal-body">
-        <p>{% trans "Your session will expire in less than a minute due to inactivity." %}</p>
-        <p>{% trans "Please interact with the page to stay logged in." %}</p>
-      </div>
-    </div>
-  </div>
-</div>
 <!-- Language switcher -->
-<div class="col d-flex ms-auto align-items-center gap-2">
+<div class="jdash-language-switcher">
   <!--
     <form action="/i18n/setlang/" method="post" style="display:inline;">
       {% csrf_token %}
@@ -68,23 +47,61 @@
       </button>
   </form>
   -->
-  <form action="{% url 'set_language' %}" method="post" style="display:inline;">
+  <form action="{% url 'set_language' %}" method="post">
     {% csrf_token %}
     <input type="hidden" name="language" value="en">
     <input type="hidden" name="next" class="language-next" data-language="en" value="{{ request.get_full_path }}">
-    <button type="submit" style="border:none; background:none;">
+    <button type="submit" class="jdash-language-button">
       <img src="{% static 'icons/flag-en.png' %}" alt="English" height="24">
     </button>
   </form>
 
-  <form action="{% url 'set_language' %}" method="post" style="display:inline;">
+  <form action="{% url 'set_language' %}" method="post">
     {% csrf_token %}
     <input type="hidden" name="language" value="de">
     <input type="hidden" name="next" class="language-next" data-language="de" value="{{ request.get_full_path }}">
-    <button type="submit" style="border:none; background:none;">
+    <button type="submit" class="jdash-language-button">
       <img src="{% static 'icons/flag-de.png' %}" alt="Deutsch" height="24">
     </button>
   </form>
+  <div
+    id="session-timer-config"
+    data-timeout-seconds="1200"
+    data-modal-threshold-seconds="60"
+    data-check-interval-ms="30000"
+    data-keepalive-throttle-ms="60000"
+    data-logout-url="{% url 'logout' %}"
+    data-session-check-url="{% url 'session_check' %}">
+  </div>
+</div>
+<div class="jdash-user-menu">
+    <span class="jdash-user-identity">
+    <span class="jdash-username">{{ user.username }}</span>
+    {% with role_label=user|role_group_label %}
+      {% if role_label %}
+      <span class="jdash-user-role">{{ role_label }}</span>
+      {% endif %}
+    {% endwith %}
+  </span>
+  <span id="logout-timer" class="jdash-logout-timer"></span>
+  <a href="{% url 'logout' %}" class="jdash-nav-icon-link">
+    <img src="{% static 'icons/logout-58.png' %}" height="35" alt="{% trans 'Logout' %}">
+  </a>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="sessionModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content text-center">
+      <div class="modal-header">
+        <h5 class="modal-title">{% trans "Session expiring soon" %}</h5>
+      </div>
+      <div class="modal-body">
+        <p>{% trans "Your session will expire in less than a minute due to inactivity." %}</p>
+        <p>{% trans "Please interact with the page to stay logged in." %}</p>
+      </div>
+    </div>
+  </div>
 </div>
 </div>
 <script>
@@ -113,140 +130,8 @@
   document.querySelectorAll(".language-next").forEach((input) => {
     input.value = buildLanguageSwitchPath(input.dataset.language);
   });
-
-  const timeoutSeconds = 20 * 60;
-  const timeoutMs = timeoutSeconds * 1000;
-  const modalThresholdSeconds = 60;
-  const modalThresholdMs = modalThresholdSeconds * 1000;
-  const checkIntervalMs = 30 * 1000;
-  const logoutUrl = "{% url 'logout' %}";
-  const sessionCheckUrl = "{% url 'session_check' %}";
-  const timerDisplay = document.getElementById("logout-timer");
-  const sessionModalElement = document.getElementById("sessionModal");
-  const activityStorageKey = "jdashLastActivityAt";
-  let logoutTriggered = false;
-  let fallbackLastActivityAt = Date.now();
-
-
-  function getSessionModal() {
-    if (!sessionModalElement || !window.bootstrap || !window.bootstrap.Modal) {
-      return null;
-    }
-    return window.bootstrap.Modal.getOrCreateInstance(sessionModalElement);
-  }
-  function readLastActivityAt() {
-    try {
-      const rawValue = window.sessionStorage.getItem(activityStorageKey);
-      const parsedValue = Number(rawValue);
-      if (Number.isFinite(parsedValue) && parsedValue > 0) {
-        fallbackLastActivityAt = parsedValue;
-        return parsedValue;
-      }
-    } catch (error) {
-      // Fall back to in-memory tracking when storage is unavailable.
-    }
-    return fallbackLastActivityAt;
-  }
-
-  function writeLastActivityAt(timestamp) {
-    fallbackLastActivityAt = timestamp;
-    try {
-      window.sessionStorage.setItem(activityStorageKey, String(timestamp));
-    } catch (error) {
-      // Ignore storage failures and keep using the in-memory fallback.
-    }
-  }
-
-  function clearLastActivityAt() {
-    try {
-      window.sessionStorage.removeItem(activityStorageKey);
-    } catch (error) {
-      // Ignore storage failures.
-    }
-  }
-
-  function ensureLastActivityAt() {
-    const timestamp = readLastActivityAt();
-    if (!timestamp) {
-      const now = Date.now();
-      writeLastActivityAt(now);
-      return now;
-    }
-    return timestamp;
-  }
-
-  function logoutNow() {
-    if (logoutTriggered) {
-      return;
-    }
-    logoutTriggered = true;
-    clearLastActivityAt();
-    window.location.assign(logoutUrl);
-  }
-
-  function updateTimer() {
-    const elapsedMs = Date.now() - ensureLastActivityAt();
-    const remainingMs = Math.max(0, timeoutMs - elapsedMs);
-    const remainingSeconds = Math.ceil(remainingMs / 1000);
-    const minutes = Math.floor(remainingSeconds / 60);
-    const seconds = remainingSeconds % 60;
-
-    if (timerDisplay) {
-      timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, "0")}`;
-    }
-
-    const sessionModal = getSessionModal();
-    if (sessionModal) {
-      if (remainingMs > 0 && remainingMs <= modalThresholdMs) {
-        sessionModal.show();
-      } else {
-        sessionModal.hide();
-      }
-    }
-
-    if (remainingMs <= 0) {
-      logoutNow();
-    }
-  }
-
-  function markActivity() {
-    writeLastActivityAt(Date.now());
-    const sessionModal = getSessionModal();
-    if (sessionModal) {
-      sessionModal.hide();
-    }
-    updateTimer();
-  }
-
-  ensureLastActivityAt();
-
-  ["keydown", "click", "scroll", "touchstart"].forEach((eventName) => {
-    document.addEventListener(eventName, markActivity, { passive: true });
-  });
-
-  window.addEventListener("focus", updateTimer);
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) {
-      updateTimer();
-    }
-  });
-
-  setInterval(() => {
-    fetch(sessionCheckUrl, {
-      method: "GET",
-      credentials: "same-origin"
-    }).then((res) => {
-      if (res.status === 401 || res.redirected) {
-        logoutNow();
-      }
-    }).catch(() => {
-      logoutNow();
-    });
-  }, checkIntervalMs);
-
-  updateTimer();
-  setInterval(updateTimer, 1000);
 </script>
+<script src="{% static 'js/session-timer.js' %}"></script>
 {% endif %}
 
   </div>

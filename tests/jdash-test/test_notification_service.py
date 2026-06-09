@@ -26,7 +26,7 @@ from unittest.mock import MagicMock, patch, mock_open
 
 # --- Local Imports ---
 # Do this AFTER django.setup()
-from jdash.classes import notification
+from jdash.services import notification
 
 
 @patch("google.auth.transport.requests.Request")
@@ -56,13 +56,13 @@ def test_get_access_token_valid():
     assert token == "valid_token"
 
 
-@patch("jdash.classes.notification.requests.post")
+@patch("jdash.services.notification.requests.post")
 @patch("builtins.open", new_callable=mock_open, read_data='{"pushNotification_token":"token123","deviceBrand":"Android"}')
 @patch("json.load")
 @patch("google.oauth2.service_account.Credentials.from_service_account_file")
-@patch("jdash.classes.notification.get_access_token")
-@patch("jdash.classes.notification.get_receivers_tokens")
-@patch("jdash.classes.notification.push_notification")
+@patch("jdash.services.notification.get_access_token")
+@patch("jdash.services.notification.get_receivers_tokens")
+@patch("jdash.services.notification.push_notification")
 def test_send_push_notification_all_variants(
     mock_push_notification,
     mock_get_receivers_tokens,
@@ -107,7 +107,7 @@ def test_send_push_notification_all_variants(
     assert errors == ["success", "success"]
 
 
-@patch("jdash.classes.notification.requests.post")
+@patch("jdash.services.notification.requests.post")
 def test_push_notification_sends_post(mock_post):
     mock_post.return_value.text = "OK"
     result = notification.push_notification(
@@ -168,9 +168,9 @@ def test_generate_verification_code_range():
         assert 100000 <= code <= 999999
 
 
-@patch("jdash.classes.notification.smtplib.SMTP")
-@patch("jdash.classes.notification.render_to_string")
-@patch("jdash.classes.notification.add_verification_code")
+@patch("jdash.services.notification.smtplib.SMTP")
+@patch("jdash.services.notification.render_to_string")
+@patch("jdash.services.notification.add_verification_code")
 def test_send_email_various_links(mock_add_ver_code, mock_render, mock_smtp):
     # Setup mocks
     mock_render.side_effect = lambda template, ctx: f"Rendered {template} with {ctx}"

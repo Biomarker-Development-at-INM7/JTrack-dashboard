@@ -1,7 +1,7 @@
 import json
 import logging
 from operator import itemgetter
-
+import re
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.db.models import F
@@ -57,6 +57,17 @@ def update_survey_info_in_db(form, survey_id):
 
 def create_survey_in_db(study_name, survey_dict, user):
     """Create a survey and its questions/answers from imported JSON data."""
+    def _normalize_import_value(value):
+        if value in (None, "", []):
+            return []
+        if isinstance(value, list):
+            raw_items = value
+        elif isinstance(value, str):
+            raw_items = re.split(r"[,;]", value)
+        else:
+            raw_items = [value]
+        return [int(str(item).strip()) for item in raw_items if str(item).strip()]
+
     if constants.key_name_survey in survey_dict:
         survey_dict = survey_dict[constants.key_name_survey]
 
@@ -84,16 +95,12 @@ def create_survey_in_db(study_name, survey_dict, user):
             question_data["clockTime_end"] = [
                 int(x) for x in question_data["clockTime_end"].split(";")
             ]
-        if question_data["activate_question"].strip():
-            if question_data["activate_question"] != "" and ";" in question_data["activate_question"]:
-                question_data["activate_question"] = [
-                    int(x) for x in question_data["activate_question"].split(";")
-                ]
-        if question_data["deactivate_question"].strip():
-            if question_data["deactivate_question"] != "" and ";" in question_data["deactivate_question"]:
-                question_data["deactivate_question"] = [
-                    int(x) for x in question_data["deactivate_question"].split(";")
-                ]
+        question_data["activate_question"] = _normalize_import_value(
+            question_data.get("activate_question")
+        )
+        question_data["deactivate_question"] = _normalize_import_value(
+            question_data.get("deactivate_question")
+        )
 
         if (
             question_data[constants.field_name_clockTime] > 0
@@ -367,7 +374,6 @@ def retrieve_question_details(question_id):
     """Return serialized question details including answers."""
     data = questionModel.objects.filter(id=question_id).values()
     question_json = json.loads(question_db_serializer(data))[0]
-    logger.info("retrieve_question_details:::%s", question_json)
     question_json["answer"] = retrieve_all_answers_for_questions(question_id)
     for answer in question_json["answer"]:
         answer["answerSortId"] = answer["id"]

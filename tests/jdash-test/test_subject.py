@@ -4,8 +4,8 @@ import time
 import pytest
 from unittest.mock import patch, MagicMock, mock_open, call
 from datetime import datetime, timedelta
-from jdash.classes import subject
-from jdash.apps import constants
+from jdash.services import subject
+from jdash.config import constants
 
 @pytest.fixture
 def sample_subject_obj():
@@ -78,6 +78,185 @@ def test_get_sensor_activity_code_logic(sample_subject_obj, sample_subject_json,
     assert result['sensor1']['sensor_code'] == 'Sensor 1 Code'
 
 
+def test_get_sensor_activity_code_left_study_forces_completed_status(monkeypatch):
+    monkeypatch.setitem(constants.sensor_list, 'sensor1', 'Sensor 1 Code')
+    subject_obj = {
+        "subject_name": "subj1",
+        "app": "app",
+        "sensor1 last_time_received": "2025-06-10 17:54:12",
+        "status_code": 1,
+        "date_registered": "2025-06-08 17:54:12",
+        "date_left_study": "2025-06-09 17:54:12",
+        "time_in_study": "1 days",
+    }
+
+    subj = subject.Subject(subject_obj, {"studyId": "study1"})
+    result = subj.get_sensor_activity_code(None, {'duration': '4'})
+
+    assert result['sensor1']['status_code'] == 3
+    assert result['sensor1']['status_desc'] == constants.no_sensor_left_early
+
+
+def test_get_sensor_activity_code_duration_exceeded_uses_warning_status(monkeypatch):
+    monkeypatch.setitem(constants.sensor_list, 'sensor1', 'Sensor 1 Code')
+    subject_obj = {
+        "subject_name": "subj1",
+        "app": "app",
+        "sensor1 last_time_received": "2025-06-10 17:54:12",
+        "status_code": 0,
+        "date_registered": "2025-06-08 17:54:12",
+        "date_left_study": "none",
+        "time_in_study": "5 days",
+    }
+
+    subj = subject.Subject(subject_obj, {"studyId": "study1"})
+    result = subj.get_sensor_activity_code(None, {'duration': '4'})
+
+    assert result['sensor1']['status_code'] == 1
+    assert result['sensor1']['status_desc'] == constants.no_sensor_duration_exceeded
+
+
+def test_get_sensor_activity_code_none_timestamp_uses_no_data_yet_status(monkeypatch):
+    monkeypatch.setitem(constants.sensor_list, 'sensor1', 'Sensor 1 Code')
+    subject_obj = {
+        "subject_name": "subj1",
+        "app": "app",
+        "sensor1 last_time_received": "none",
+        "status_code": 0,
+        "date_registered": "2025-06-08 17:54:12",
+        "date_left_study": "none",
+        "time_in_study": "1 days",
+    }
+
+    subj = subject.Subject(subject_obj, {"studyId": "study1"})
+    result = subj.get_sensor_activity_code(None, {'duration': '4'})
+
+    assert result['sensor1']['status_code'] == 4
+    assert result['sensor1']['status_desc'] == constants.no_sensor_not_received
+
+
+def test_get_sensor_activity_code_none_timestamp_overrides_duration_exceeded(monkeypatch):
+    monkeypatch.setitem(constants.sensor_list, 'sensor1', 'Sensor 1 Code')
+    subject_obj = {
+        "subject_name": "subj1",
+        "app": "app",
+        "sensor1 last_time_received": "none",
+        "status_code": 0,
+        "date_registered": "2025-06-08 17:54:12",
+        "date_left_study": "none",
+        "time_in_study": "5 days",
+    }
+
+    subj = subject.Subject(subject_obj, {"studyId": "study1"})
+    result = subj.get_sensor_activity_code(None, {'duration': '4'})
+
+    assert result['sensor1']['status_code'] == 4
+    assert result['sensor1']['status_desc'] == constants.no_sensor_not_received
+
+
+def test_get_sensor_activity_code_none_timestamp_overrides_left_study(monkeypatch):
+    monkeypatch.setitem(constants.sensor_list, 'sensor1', 'Sensor 1 Code')
+    subject_obj = {
+        "subject_name": "subj1",
+        "app": "app",
+        "sensor1 last_time_received": "none",
+        "status_code": 1,
+        "date_registered": "2025-06-08 17:54:12",
+        "date_left_study": "2025-06-09 17:54:12",
+        "time_in_study": "1 days",
+    }
+
+    subj = subject.Subject(subject_obj, {"studyId": "study1"})
+    result = subj.get_sensor_activity_code(None, {'duration': '4'})
+
+    assert result['sensor1']['status_code'] == 4
+    assert result['sensor1']['status_desc'] == constants.no_sensor_not_received
+
+
+def test_get_sensor_activity_code_blank_timestamp_overrides_left_study(monkeypatch):
+    monkeypatch.setitem(constants.sensor_list, 'sensor1', 'Sensor 1 Code')
+    subject_obj = {
+        "subject_name": "subj1",
+        "app": "app",
+        "sensor1 last_time_received": "",
+        "status_code": 1,
+        "date_registered": "2025-06-08 17:54:12",
+        "date_left_study": "2025-06-09 17:54:12",
+        "time_in_study": "1 days",
+    }
+
+    subj = subject.Subject(subject_obj, {"studyId": "study1"})
+    result = subj.get_sensor_activity_code(None, {'duration': '4'})
+
+    assert result['sensor1']['status_code'] == 4
+    assert result['sensor1']['status_desc'] == constants.no_sensor_not_received
+
+
+def test_get_sensor_activity_code_filters_to_dashboard_sensor_list(monkeypatch):
+    monkeypatch.setitem(constants.sensor_list, 'sensor1', 'Sensor 1 Code')
+    monkeypatch.setitem(constants.sensor_list, 'sensor2', 'Sensor 2 Code')
+    subject_obj = {
+        "subject_name": "subj1",
+        "app": "app",
+        "sensor1 last_time_received": "2025-06-10 17:54:12",
+        "sensor2 last_time_received": "2025-06-10 17:54:12",
+        "status_code": 0,
+        "date_registered": "2025-06-08 17:54:12",
+        "date_left_study": "none",
+        "time_in_study": "1 days",
+    }
+
+    subj = subject.Subject(subject_obj, {"studyId": "study1"})
+    result = subj.get_sensor_activity_code(None, {
+        'duration': '4',
+        'dashboard_sensor_list': ['sensor1'],
+    })
+
+    assert 'sensor1' in result
+    assert 'sensor2' not in result
+
+
+def test_get_sensor_activity_code_empty_dashboard_sensor_list_returns_no_sensors(monkeypatch):
+    monkeypatch.setitem(constants.sensor_list, 'sensor1', 'Sensor 1 Code')
+    subject_obj = {
+        "subject_name": "subj1",
+        "app": "app",
+        "sensor1 last_time_received": "2025-06-10 17:54:12",
+        "status_code": 0,
+        "date_registered": "2025-06-08 17:54:12",
+        "date_left_study": "none",
+        "time_in_study": "1 days",
+    }
+
+    subj = subject.Subject(subject_obj, {"studyId": "study1"})
+    result = subj.get_sensor_activity_code(None, {
+        'duration': '4',
+        'dashboard_sensor_list': [],
+    })
+
+    assert result == {}
+
+
+def test_get_sensor_activity_code_keeps_ema_when_dashboard_sensor_list_is_empty():
+    subject_obj = {
+        "subject_name": "subj1",
+        "app": "ema",
+        "status_code": 0,
+        "date_registered": "2025-06-08 17:54:12",
+        "date_left_study": "none",
+        "time_in_study": "1 days",
+        "last_time_received_ema": "2025-06-10 17:54:12",
+    }
+
+    subj = subject.Subject(subject_obj, {"studyId": "study1"})
+    result = subj.get_sensor_activity_code(None, {
+        'duration': '4',
+        'dashboard_sensor_list': [],
+    })
+
+    assert 'ema' in result
+
+
 def test_check_format_of_timestamp_datetime_and_unix():
     obj = {
         'subject_name': 'subj1',
@@ -147,8 +326,8 @@ def test_get_subject_details_json_error(mock_file):
 
 @patch('os.chown')
 @patch('os.path.isfile')
-@patch('jdash.classes.subject.create_qr_codes')
-@patch('jdash.classes.subject.write_to_pdf')
+@patch('jdash.services.subject.create_qr_codes')
+@patch('jdash.services.subject.write_to_pdf')
 def test_create_subjects_for_study_creates_new_files(mock_write_pdf, mock_create_qr, mock_isfile, mock_chown, tmp_path):
     # Setup paths in config to tmp_path
     subject.config.dash_folder = str(tmp_path)
@@ -195,7 +374,7 @@ def test_count_number_of_subject_pdf_counts_files(mock_listdir, mock_exists):
 
 @patch('builtins.open', new_callable=mock_open, read_data='{"pushNotification_token": "token"}')
 @patch('json.load')
-@patch('jdash.classes.subject.constants')
+@patch('jdash.services.subject.constants')
 @patch('os.setuid')
 @patch('builtins.open', new_callable=mock_open)
 @patch('json.dump')

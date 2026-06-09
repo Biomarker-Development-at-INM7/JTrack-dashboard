@@ -127,7 +127,11 @@ def context_for_question_page(survey_id, question_id):
     survey_details = retrieve_survey_details(survey_id)
     questions = retrieve_all_questions_for_survey(survey_id)
     category_details = retrieve_all_categories_for_survey(survey_id)
-
+    context["question_category_map"] = {
+        str(question.get("sortId")): str(question.get("category"))
+        for question in questions
+        if question.get("sortId") is not None
+    }
     context[constants.key_name_survey_id] = survey_id
     context[constants.key_name_survey_title] = survey_details["title"]
     context[constants.key_name_question_id] = question_id
