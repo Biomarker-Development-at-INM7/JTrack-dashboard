@@ -104,9 +104,8 @@
                             </div>
                             <div class="footer-text footer-support-copy">
                                 <div class="footer-support-inline">
-                                    <span>{% trans "footer_contactdesc" %}
-                                    <a type="button" href="{% url 'contact_email' %}" class="btn
-                                        btn-outline-light btn-sm">{% trans "footer_contactbtn" %}</a></span>
+                                    <span>{% trans "footer_contactdesc" %}</span>
+                                    <a type="button" href="{% url 'contact_email' %}" class="btn btn-outline-light btn-sm">{% trans "footer_contactbtn" %}</a>
                                 </div>
                                 <p class="footer-support-delete">
                                     {% trans "footer_contactdel" %}
@@ -139,20 +138,20 @@
                             <div class="footer-widget-heading">
                                 <h3>Resources</h3>
                             </div>
-                            <div class="footer-text footer-resource-links">
-                                <a class="footer_link footer-resource-link"
-                                   href="https://github.com/Biomarker-Development-at-INM7/JTrack-dashboard"
-                                   rel="noreferrer"
-                                   target="_blank">
-                                    <i class="fab fa-github" aria-hidden="true"></i>
-                                    <span>Git Repository</span>
-                                </a>
-                                <a class="footer_link footer-resource-link"
+                            <div class="footer-text">
+                                <a class="footer_link"
                                    href="https://jtrack.readthedocs.io/en/latest/JTrack_Dashboard.html"
                                    rel="noreferrer"
                                    target="_blank">
-                                    <i class="fas fa-book-open" aria-hidden="true"></i>
-                                    <span>Documentation</span>
+                                    JTrack Dashboard Documentation
+                                </a>
+                            </div>
+                            <div class="footer-org-logos">
+                                <a href="https://www.fz-juelich.de/en/inm/inm-7/" target="_blank" rel="noreferrer">
+                                    <img src="{% static 'icons/bb-icon.png' %}" alt="INM-7 Biomarker Development">
+                                </a>
+                                <a href="https://www.fz-juelich.de/" target="_blank" rel="noreferrer">
+                                    <img src="{% static 'icons/fz-icon.png' %}" alt="Forschungszentrum Juelich">
                                 </a>
                             </div>
                         </div>
