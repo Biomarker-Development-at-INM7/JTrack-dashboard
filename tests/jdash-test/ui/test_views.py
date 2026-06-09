@@ -8,7 +8,7 @@ from django.contrib.sessions.middleware import SessionMiddleware
 from django.contrib.messages.middleware import MessageMiddleware
 from django.contrib import messages
 from jdash.models import FileDownloadToken
-from jdash.apps import constants
+from jdash.config import constants
 from datetime import datetime, timedelta
 import uuid
 from unittest.mock import patch, MagicMock

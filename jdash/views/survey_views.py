@@ -8,7 +8,7 @@ from django.db import IntegrityError
 from django.forms.formsets import formset_factory
 from django.http.response import HttpResponse
 from django.shortcuts import render
-
+from django.utils.translation import gettext as _
 from jdash.audit.services import SurveyAuditService
 from jdash.services.controller import (
     create_question_answer_for_survey,
@@ -36,7 +36,11 @@ from jdash.services.datahelper import (
     get_question_form_data,
     get_survey_form_data,
 )
-from jdash.repositories.survey_repository import delete_survey_for_user
+from jdash.repositories.survey_repository import (
+        delete_survey_for_user,
+        retrieve_all_questions_for_survey,
+        retrieve_all_categories_for_survey
+)
 from jdash.utils.fileutils import get_json_data
 from jdash.interface.session_manager import SessionManager
 from jdash.models import Survey as SurveyModel
@@ -80,6 +84,26 @@ def create_survey(request, survey_id=0, question_id=0):
             survey_id = request.POST[constants.key_name_survey_id]
             question_id = request.POST[constants.field_name_question_id]
             context = delete_question_from_survey(question_id, survey_id)
+        elif constants.button_name_update_question_sort in request.POST:
+            survey_id = int(request.POST.get(constants.key_name_survey_id, survey_id))
+            question_id = int(request.POST[constants.field_name_question_id])
+            questions = retrieve_all_questions_for_survey(survey_id)
+            question_ids = {question["db_id"] for question in questions}
+            try:
+                new_sort_id = int(request.POST[constants.key_name_sortId])
+            except (TypeError, ValueError):
+                new_sort_id = 0
+            if question_id not in question_ids:
+                messages.error(request, _("create_survey_question_order_belongs_error"))
+            elif new_sort_id < 1 or new_sort_id > len(questions):
+                messages.error(
+                    request,
+                    _("create_survey_question_order_range_error") % {"total": len(questions)},
+                )
+            else:
+                SurveyService.update_question_order(question_id, new_sort_id)
+                messages.success(request, _("create_survey_question_order_success"))
+            context = context_for_create_survey_page(survey_id)
         request.session[constants.session_key_survey_details] = None
     except TypeError as e:
         logger.info("TypeError: %s", e)

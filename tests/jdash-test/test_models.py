@@ -183,3 +183,4 @@ def test_quality_control_testcase(user):
         study=study
     )
     assert str(qc) == "TestCaseID: TC-001"
+    assert qc.notes == ""

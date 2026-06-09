@@ -1,0 +1,10 @@
+{% load i18n %}
+{% autoescape off %}
+{% trans "password_reset_email_intro" %}
+
+{% trans "password_reset_email_link_intro" %}
+{{ protocol }}://{{ domain }}{% url 'password_reset_confirm' uidb64=uid token=token %}
+
+{% trans "password_reset_email_ignore" %}
+{% endautoescape %}
+

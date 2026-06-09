@@ -83,7 +83,7 @@
 </div> 
 	  
 	<div class="row mb-3 align-items-start">
-		{% if not request.user|has_group:"Viewer"  %}
+        {% if request.user|can_manage_survey  %}
 		<div id="toolbar" class="col-md-6 col-lg-6">
 			<div class="d-flex flex-wrap align-items-center gap-2">
 				<button type="button"
@@ -128,6 +128,7 @@
             {% endif %}
            
 		</div>
+        {% if request.user|can_manage_survey  %}
 		<div class="alert alert-light border mb-3" role="alert">
 			<div class="fw-semibold mb-2">{% trans "survey_list_two_ways_title" %}</div>
 			<div class="small">
@@ -139,6 +140,7 @@
 				</div>
 			</div>
 		</div>
+        {% endif %}
 		<table id ="survey_table" class="table-responsive"
 			data-search="true"
 			data-pagination="true"
@@ -180,18 +182,19 @@
 						 title="{% trans 'global_edit' %}">
 						<i class="fa fa-edit fa-lg"></i>
 					  </a>
-
+                        {% if request.user|can_manage_survey %}
 					  <a class="copy"
 						 href="{% url 'duplicate_survey' survey_id=survey.id %}"
 						 title="{% trans 'global_copy' %}">
 						<i class="fa fa-copy fa-lg"></i>
 					  </a>
+                      {% endif %}
 					  <a class="log"
 						 href="{% url 'survey_audit' survey_id=survey.id %}"
 						 title="{% trans 'global_history' %}">
 						<i class="fa fa-history fa-lg"></i>
 					  </a>
-
+                    {% if request.user|can_manage_survey %}
 					  <a class="delete"
 						 href="#"
 						 title="{% trans 'global_delete' %}"
@@ -200,6 +203,7 @@
 						 data-bs-target="#deleteModal">
 						<i class="fa fa-trash fa-lg"></i>
 					  </a>
+                        {% endif %}
 					</td>
 					{% endif %}
 

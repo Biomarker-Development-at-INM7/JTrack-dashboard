@@ -1,5 +1,5 @@
 import pytest
-from jdash.textmessages import TextMessages
+from jdash.config.textmessages import TextMessages
 
 @pytest.fixture
 def messages():

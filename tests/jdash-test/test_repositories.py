@@ -28,13 +28,13 @@ from datetime import date
 
 # --- Local Imports ---
 # Do this AFTER django.setup()
-from jdash.classes import dbutils
-from jdash.apps import constants
+from jdash.repositories import dbutils
+from jdash.config import constants
 from jdash.models import Study, Survey, Question, Answer, Category, FileDownloadToken, QualityControlTests
 
 
 class TestSetEmailForUser:
-    @patch("jdash.classes.dbutils.User.objects.get")
+    @patch("jdash.repositories.dbutils.User.objects.get")
     def test_set_email_success(self, mock_get):
         user_mock = MagicMock()
         mock_get.return_value = user_mock
@@ -42,13 +42,13 @@ class TestSetEmailForUser:
         user_mock.save.assert_called_once()
         assert user_mock.email == "test@example.com"
 
-    @patch("jdash.classes.dbutils.User.objects.get", side_effect=User.DoesNotExist)
+    @patch("jdash.repositories.dbutils.User.objects.get", side_effect=User.DoesNotExist)
     def test_set_email_user_not_found(self, mock_get):
         with pytest.raises(User.DoesNotExist):
             dbutils.set_email_for_user("missinguser", "x@example.com")
 
 class TestRetireveAllStudiesForUser:
-    @patch("jdash.classes.dbutils.studymodel.objects")
+    @patch("jdash.repositories.dbutils.studymodel.objects")
     def test_admin_gets_all_studies(self, mock_study):
         mock_user = MagicMock()
         mock_user.groups.all.return_value = [MagicMock(name="administrator")]
@@ -56,7 +56,7 @@ class TestRetireveAllStudiesForUser:
         result = dbutils.retireve_all_studies_for_user(mock_user)
         assert "Study A" in result
 
-    @patch("jdash.classes.dbutils.studymodel.objects")
+    @patch("jdash.repositories.dbutils.studymodel.objects")
     def test_nonadmin_filters_correctly(self, mock_study):
         mock_user = MagicMock()
         mock_user.groups.all.return_value = [MagicMock(name="project1_group")]
@@ -65,8 +65,8 @@ class TestRetireveAllStudiesForUser:
         assert result == "[]"
 
 class TestCreateNewStudy:
-    @patch("jdash.classes.dbutils.studymodel.objects.create")
-    @patch("jdash.classes.dbutils.create_new_study_group")
+    @patch("jdash.repositories.dbutils.studymodel.objects.create")
+    @patch("jdash.repositories.dbutils.create_new_study_group")
     def test_create_study_basic(self, mock_create_group, mock_create_study):
         mock_user = MagicMock()
         form_data = {
@@ -86,8 +86,8 @@ class TestCreateNewStudy:
         mock_create_group.assert_called_once()
 
 class TestCreateNewSurvey:
-    @patch("jdash.classes.dbutils.User.objects.get")
-    @patch("jdash.classes.dbutils.surveyModel.objects.create")
+    @patch("jdash.repositories.dbutils.User.objects.get")
+    @patch("jdash.repositories.dbutils.surveyModel.objects.create")
     def test_create_new_survey(self, mock_create, mock_get):
         mock_get.return_value.id = 1
         form = {"title": "Survey", "description": "desc", "topN": 5}
@@ -97,7 +97,7 @@ class TestCreateNewSurvey:
         assert result == mock_create.return_value
 
 class TestUpdateSurveyInfo:
-    @patch("jdash.classes.dbutils.surveyModel.objects.get")
+    @patch("jdash.repositories.dbutils.surveyModel.objects.get")
     def test_update_survey_fields(self, mock_get):
         survey = MagicMock()
         mock_get.return_value = survey
@@ -119,9 +119,9 @@ class TestFailingCases:
 
 class TestCreateSurveyInDB:
     @patch("jdash.models.Survey.objects.create")
-    @patch("jdash.classes.dbutils.create_categories_in_db_from_data")
+    @patch("jdash.repositories.dbutils.create_categories_in_db_from_data")
     @patch("jdash.models.Question.objects.create")
-    @patch("jdash.classes.dbutils.create_answer_from_file_in_db")
+    @patch("jdash.repositories.dbutils.create_answer_from_file_in_db")
     def test_create_survey_success(self, mock_create_answer, mock_create_question, mock_create_categories, mock_create_survey):
         # Arrange
         user = MagicMock()
@@ -266,7 +266,7 @@ def test_create_answer_in_db(mock_create):
     )
 
 
-@patch("jdash.classes.dbutils.create_answer_from_file_in_db")
+@patch("jdash.repositories.dbutils.create_answer_from_file_in_db")
 @patch("jdash.models.Question.objects.create")
 def test_create_question_answers_in_db(mock_question_create, mock_create_answer):
     survey_id = 123
@@ -392,9 +392,9 @@ def test_update_study_db_details_missing_name_key():
         dbutils.update_study_db_details(form_data)
 
 
-@patch('jdash.classes.dbutils.User.objects.get')
-@patch('jdash.classes.dbutils.Group.objects.get')
-@patch('jdash.classes.dbutils.Permission.objects.get')
+@patch('jdash.repositories.dbutils.User.objects.get')
+@patch('jdash.repositories.dbutils.Group.objects.get')
+@patch('jdash.repositories.dbutils.Permission.objects.get')
 def test_assign_all_group_permissions(mock_permission_get, mock_group_get, mock_user_get):
     # Arrange
     username = "testuser"
@@ -446,7 +446,7 @@ def test_assign_all_group_permissions(mock_permission_get, mock_group_get, mock_
     ])
 
 
-@patch("jdash.classes.dbutils.studymodel.objects.filter")
+@patch("jdash.repositories.dbutils.studymodel.objects.filter")
 def test_close_study_model(mock_filter):
     study_name = "Test Study"
 
@@ -465,10 +465,10 @@ def test_close_study_model(mock_filter):
     assert result is True
 
 
-@patch("jdash.classes.dbutils.SessionManager.get_specific_session_data")
-@patch("jdash.classes.dbutils.surveyModel.objects")
-@patch("jdash.classes.dbutils.get_list_surveys_for_user")
-@patch("jdash.classes.dbutils.survey_serializer")
+@patch("jdash.repositories.dbutils.SessionManager.get_specific_session_data")
+@patch("jdash.repositories.dbutils.surveyModel.objects")
+@patch("jdash.repositories.dbutils.get_list_surveys_for_user")
+@patch("jdash.repositories.dbutils.survey_serializer")
 def test_retrieve_all_survey_for_user_admin(mock_survey_serializer, mock_get_list_surveys, mock_survey_objects, mock_get_session):
     # Setup mock session data for administrator group
     mock_get_session.side_effect = [
@@ -494,8 +494,8 @@ def test_retrieve_all_survey_for_user_admin(mock_survey_serializer, mock_get_lis
     assert result == json.loads(expected_json)
 
 
-@patch("jdash.classes.dbutils.SessionManager.get_specific_session_data")
-@patch("jdash.classes.dbutils.get_list_surveys_for_user")
+@patch("jdash.repositories.dbutils.SessionManager.get_specific_session_data")
+@patch("jdash.repositories.dbutils.get_list_surveys_for_user")
 def test_retrieve_all_survey_for_user_non_admin(mock_get_list_surveys, mock_get_session):
     # Setup mock session data for non-admin group
     mock_get_session.side_effect = [
@@ -567,7 +567,7 @@ def test_delete_answer_in_db(mock_get):
     mock_answer_instance.delete.assert_called_once()
 
 
-@patch('jdash.classes.dbutils.questionModel.objects.filter')
+@patch('jdash.repositories.dbutils.questionModel.objects.filter')
 def test_update_question_in_db(mock_filter):
     # Prepare the mock queryset and its update method
     mock_queryset = MagicMock()
@@ -631,7 +631,7 @@ def test_update_question_in_db(mock_filter):
     (["administrator"], None, False),          # Admin: no owner filter
     (["investigator"], "user_obj", True),     # Non-admin: filter by owner
 ])
-@patch("jdash.classes.dbutils.surveyModel.objects.filter")
+@patch("jdash.repositories.dbutils.surveyModel.objects.filter")
 def test_delete_survey_for_user(mock_filter, group_name, user_owner, expected_filter_owner_call):
     survey_id = 123
 
@@ -676,7 +676,7 @@ def test_delete_survey_for_user(mock_filter, group_name, user_owner, expected_fi
     assert result is True
 
 
-@patch("jdash.classes.dbutils.questionModel.objects.filter")
+@patch("jdash.repositories.dbutils.questionModel.objects.filter")
 def test_delete_question_from_db(mock_filter):
     question_id = 10
     survey_id = 20
@@ -715,10 +715,10 @@ def mock_answer_queryset():
         {"id": 2, "text": "Answer 2"},
     ]
 
-@patch("jdash.classes.dbutils.answerModel.objects.filter")
-@patch("jdash.classes.dbutils.questionModel.objects.filter")
-@patch("jdash.classes.dbutils.question_db_serializer")
-@patch("jdash.classes.dbutils.answer_serializer")
+@patch("jdash.repositories.dbutils.answerModel.objects.filter")
+@patch("jdash.repositories.dbutils.questionModel.objects.filter")
+@patch("jdash.repositories.dbutils.question_db_serializer")
+@patch("jdash.repositories.dbutils.answer_serializer")
 def test_retrieve_all_questions_for_survey(
     mock_answer_serializer,
     mock_question_serializer,
@@ -762,10 +762,10 @@ def test_retrieve_all_questions_for_survey(
         assert isinstance(question["answer"], list)
 
 
-@patch("jdash.classes.dbutils.answerModel.objects.filter")
-@patch("jdash.classes.dbutils.questionModel.objects.filter")
-@patch("jdash.classes.dbutils.question_serializer")
-@patch("jdash.classes.dbutils.answer_serializer")
+@patch("jdash.repositories.dbutils.answerModel.objects.filter")
+@patch("jdash.repositories.dbutils.questionModel.objects.filter")
+@patch("jdash.repositories.dbutils.question_serializer")
+@patch("jdash.repositories.dbutils.answer_serializer")
 def test_retrieve_download_questions_for_survey(
     mock_answer_serializer,
     mock_question_serializer,
@@ -808,8 +808,8 @@ def test_retrieve_download_questions_for_survey(
         assert isinstance(question["answer"], list)
 
 
-@patch("jdash.classes.dbutils.answerModel.objects.filter")
-@patch("jdash.classes.dbutils.answer_serializer")
+@patch("jdash.repositories.dbutils.answerModel.objects.filter")
+@patch("jdash.repositories.dbutils.answer_serializer")
 def test_retrieve_all_answers_for_questions(mock_answer_serializer, mock_answer_filter, mock_answer_queryset):
     question_id = 123
 
@@ -838,8 +838,8 @@ def mock_category_queryset():
         {"id": 2, "categoryValue": 20, "categoryTitle": "Cat B"},
     ]
 
-@patch("jdash.classes.dbutils.categoryModel.objects.filter")
-@patch("jdash.classes.dbutils.category_serializer")
+@patch("jdash.repositories.dbutils.categoryModel.objects.filter")
+@patch("jdash.repositories.dbutils.category_serializer")
 def test_retrieve_all_categories_for_survey(mock_category_serializer, mock_category_filter, mock_category_queryset):
     survey_id = 42
 
@@ -862,7 +862,7 @@ def test_retrieve_all_categories_for_survey(mock_category_serializer, mock_categ
 
 
 @pytest.mark.django_db
-@patch("jdash.classes.dbutils.surveyModel.objects.get")
+@patch("jdash.repositories.dbutils.surveyModel.objects.get")
 def test_retrieve_survey(mock_get):
     survey_id = 123
     mock_survey = MagicMock()
@@ -874,7 +874,7 @@ def test_retrieve_survey(mock_get):
     assert result == mock_survey
 
 @pytest.mark.django_db
-@patch("jdash.classes.dbutils.questionModel.objects.get")
+@patch("jdash.repositories.dbutils.questionModel.objects.get")
 def test_retrieve_question(mock_get):
     question_id = 456
     mock_question = MagicMock()
@@ -886,8 +886,8 @@ def test_retrieve_question(mock_get):
     assert result == mock_question
 
 @pytest.mark.django_db
-@patch("jdash.classes.dbutils.surveyModel.objects.filter")
-@patch("jdash.classes.dbutils.survey_serializer")
+@patch("jdash.repositories.dbutils.surveyModel.objects.filter")
+@patch("jdash.repositories.dbutils.survey_serializer")
 def test_retrieve_survey_details(mock_serializer, mock_filter):
     survey_id = 789
     mock_values = [{"id": survey_id, "title": "Test Survey"}]
@@ -901,9 +901,9 @@ def test_retrieve_survey_details(mock_serializer, mock_filter):
     assert result == mock_values[0]
 
 @pytest.mark.django_db
-@patch("jdash.classes.dbutils.questionModel.objects.filter")
-@patch("jdash.classes.dbutils.question_db_serializer")
-@patch("jdash.classes.dbutils.retrieve_all_answers_for_questions")
+@patch("jdash.repositories.dbutils.questionModel.objects.filter")
+@patch("jdash.repositories.dbutils.question_db_serializer")
+@patch("jdash.repositories.dbutils.retrieve_all_answers_for_questions")
 def test_retrieve_question_details(mock_answers, mock_serializer, mock_filter):
     question_id = 101
     question_data = [{"id": question_id, "title": "Question 1"}]
@@ -920,8 +920,8 @@ def test_retrieve_question_details(mock_answers, mock_serializer, mock_filter):
     assert result["id"] == question_data[0]["id"]
 
 @pytest.mark.django_db
-@patch("jdash.classes.dbutils.questionModel.objects.filter")
-@patch("jdash.classes.dbutils.question_serializer")
+@patch("jdash.repositories.dbutils.questionModel.objects.filter")
+@patch("jdash.repositories.dbutils.question_serializer")
 def test_retrieve_questions_greater_than_sortId(mock_serializer, mock_filter):
     survey_id = 1
     sort_id = 10
@@ -936,7 +936,7 @@ def test_retrieve_questions_greater_than_sortId(mock_serializer, mock_filter):
     assert result == questions_data
 
 @pytest.mark.django_db
-@patch("jdash.classes.dbutils.downloadFile.objects.filter")
+@patch("jdash.repositories.dbutils.downloadFile.objects.filter")
 def test_add_verification_code(mock_filter):
     token = "abc123"
     code = "verify_code"
@@ -953,10 +953,10 @@ def test_add_verification_code(mock_filter):
 
 
 @pytest.mark.django_db
-@patch("jdash.classes.dbutils.survey_serializer")
-@patch("jdash.classes.dbutils.custom_serializer")
-@patch("jdash.classes.dbutils.surveyModel.objects.filter")
-@patch("jdash.classes.dbutils.studymodel.objects.filter")
+@patch("jdash.repositories.dbutils.survey_serializer")
+@patch("jdash.repositories.dbutils.custom_serializer")
+@patch("jdash.repositories.dbutils.surveyModel.objects.filter")
+@patch("jdash.repositories.dbutils.studymodel.objects.filter")
 def test_get_list_surveys_for_user(mock_study_filter, mock_survey_filter, mock_custom_serializer, mock_survey_serializer):
     user = MagicMock()
     ema_studies = ["StudyA", "StudyB"]
@@ -1034,7 +1034,7 @@ def test_get_list_surveys_for_user(mock_study_filter, mock_survey_filter, mock_c
 
 
 @pytest.mark.django_db
-@patch("jdash.classes.dbutils.categoryModel.objects.filter")
+@patch("jdash.repositories.dbutils.categoryModel.objects.filter")
 def test_get_categories_from_db(mock_filter):
     survey_id = 123
     mock_qs = MagicMock(name="QuerySet")
@@ -1046,7 +1046,7 @@ def test_get_categories_from_db(mock_filter):
     assert result == mock_qs
 
 @pytest.mark.django_db
-@patch("jdash.classes.dbutils.categoryModel.objects.create")
+@patch("jdash.repositories.dbutils.categoryModel.objects.create")
 def test_create_categories_in_db(mock_create):
     survey_id = 10
     category_data = {
@@ -1070,7 +1070,7 @@ def test_create_categories_in_db(mock_create):
     assert args_list[1]['categoryTitle'] == "Cat2"
 
 @pytest.mark.django_db
-@patch("jdash.classes.dbutils.categoryModel.objects.create")
+@patch("jdash.repositories.dbutils.categoryModel.objects.create")
 def test_create_categories_in_db_from_data(mock_create):
     survey_id = 10
     category_data = [
@@ -1085,8 +1085,8 @@ def test_create_categories_in_db_from_data(mock_create):
     assert mock_create.call_args_list[1].kwargs['categoryTitle'] == "Cat4"
 
 @pytest.mark.django_db
-@patch("jdash.classes.dbutils.studymodel.objects.filter")
-@patch("jdash.classes.dbutils.qctestsModel.objects.filter")
+@patch("jdash.repositories.dbutils.studymodel.objects.filter")
+@patch("jdash.repositories.dbutils.qctestsModel.objects.filter")
 def test_retrieve_test_cases_for_study(mock_qctests_filter, mock_study_filter):
     study_name = "Test Study"
     mock_study_qs = MagicMock()
@@ -1108,16 +1108,22 @@ def test_retrieve_test_cases_for_study(mock_qctests_filter, mock_study_filter):
 
 
 @pytest.mark.django_db
-@patch("jdash.classes.dbutils.qctestsModel.objects.get")
+@patch("jdash.repositories.dbutils.qctestsModel.objects.get")
 def test_update_test_case_flags_success(mock_get):
     testcase_updates = [
-        {'id': 1, 'tested_by_admin': True, 'tested_by_owner': False},
+        {'id': 1, 'tested_by_admin': True, 'tested_by_owner': False, 'notes': 'Checked on device A'},
         {'id': 2, 'tested_by_admin': False},
     ]
     username = "admin_user"
 
     mock_instance_1 = MagicMock()
     mock_instance_2 = MagicMock()
+    mock_instance_1.tested_by_admin = False
+    mock_instance_1.tested_by_owner = True
+    mock_instance_1.notes = ""
+    mock_instance_2.tested_by_admin = True
+    mock_instance_2.tested_by_owner = False
+    mock_instance_2.notes = ""
 
     # Mock .save() to prevent errors
     mock_instance_1.save = MagicMock()
@@ -1128,9 +1134,11 @@ def test_update_test_case_flags_success(mock_get):
     result = dbutils.update_test_case_flags(testcase_updates, username)
 
     assert result['success_count'] == 2
+    assert mock_instance_1.notes == "Checked on device A"
+    assert mock_instance_1.notes_updated_by == username
 
 @pytest.mark.django_db
-@patch("jdash.classes.dbutils.qctestsModel.objects.get")
+@patch("jdash.repositories.dbutils.qctestsModel.objects.get")
 def test_update_test_case_flags_failure(mock_get):
     testcase_updates = [{'id': 1, 'tested_by_admin': True}]
     username = "admin_user"
@@ -1145,7 +1153,7 @@ def test_update_test_case_flags_failure(mock_get):
     assert result['errors'] == []  # Note: your function currently does not append errors
 
 @pytest.mark.django_db
-@patch("jdash.classes.dbutils.studymodel.objects.filter")
+@patch("jdash.repositories.dbutils.studymodel.objects.filter")
 def test_retrieve_study_details_by_title(mock_filter):
     study_name = "Study A"
     mock_qs = MagicMock()

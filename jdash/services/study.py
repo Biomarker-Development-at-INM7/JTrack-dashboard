@@ -778,7 +778,14 @@ def get_all_study_details(user):
             investigators, viewers = _get_study_group_members(study[constants.key_name_study_title], user)
             study["investigators"] = investigators
             study["viewers"] = viewers
-            number_of_subjects = json_data.get(constants.key_name_number_of_subjects, 0) or 0
+            sensor_list_limited = json_data.get(constants.field_name_sensor_list_limited, [])
+            study[constants.field_name_sensor_list_limited] = (
+                sensor_list_limited if isinstance(sensor_list_limited, list) else []
+            )
+            number_of_subjects = Subject.count_pdfs(study[constants.key_name_study_title])
+            study[constants.key_name_number_of_subjects] = number_of_subjects
+            study["enrolled_subjects"] = json_data.get("number_of_enrolled_subjects", 0) or 0
+            study["duration"] = json_data.get("duration", 0) or 0
             if number_of_subjects:
                 study_stats = calculate_stats_of_number_of_subjects(
                     study[constants.key_name_study_title],

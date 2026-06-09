@@ -274,7 +274,7 @@
               <td data-visible="false">{{ question.answer | get_id|safe}}</td>
                
               <td>
-                  {% if not request.user|has_group:"Viewer"  %}
+                  {% if request.user|can_manage_survey  %}
                   <a class="edit"  href="{%url 'edit_survey'
                       study_name=study_name %}" title="View"
                       data-id="{{question}}" data-bs-toggle="modal"

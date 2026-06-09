@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock
-from jdash.classes import datahelper
+from jdash.services import datahelper
 
 # Patch gettext to simplify assertions
 datahelper.gettext = lambda s: s
@@ -42,14 +42,163 @@ def test_get_study_form_data():
 
     request = MagicMock()
     request.FILES = {
-        'json_file': MagicMock(read=lambda: b'1'),
+        'json_file': MagicMock(read=lambda: b'{"questions": []}'),
         'images_zip_file': True
     }
+    study_device_formset = MagicMock()
+    study_device_formset.forms = []
 
-    result = datahelper.get_study_form_data(form, formset, request)
+    result = datahelper.get_study_form_data(
+        form,
+        formset,
+        request,
+        study_device_formset,
+        [],
+    )
     assert result['name'] == 'Study 1'
     assert result['images'] is True
+    assert result['survey'] == {"questions": []}
     assert result['task_list'][0]['task_name'] == 'Walk'
+    assert result['wearables'] == []
+    assert result['device_sensor_rows'] == []
+
+
+def test_get_study_device_config_builders_with_garmin_overrides():
+    device = MagicMock()
+    device.id = 11
+    device.name = "Garmin"
+    device.model = "Venu 3"
+
+    sensor = MagicMock()
+    sensor.label = "Heart Rate"
+
+    default_sampling_rate = MagicMock()
+    default_sampling_rate.value = "1Hz"
+    default_sampling_rate.id = 101
+
+    override_sampling_rate = MagicMock()
+    override_sampling_rate.value = "5Hz"
+    override_sampling_rate.id = 102
+
+    default_unit = MagicMock()
+    default_unit.value = "bpm"
+    default_unit.id = 201
+
+    override_unit = MagicMock()
+    override_unit.value = "beats/minute"
+    override_unit.id = 202
+
+    device_sensor = MagicMock()
+    device_sensor.id = 301
+    device_sensor.device_id = device.id
+    device_sensor.sensor = sensor
+    device_sensor.default_sampling_rate = default_sampling_rate
+    device_sensor.default_unit = default_unit
+
+    device_form = MagicMock()
+    device_form.cleaned_data = {"device": device}
+    study_device_formset = MagicMock()
+    study_device_formset.forms = [device_form]
+
+    sensor_form = MagicMock()
+    sensor_form.cleaned_data = {
+        "device_sensor": device_sensor,
+        "sampling_rate": override_sampling_rate,
+        "unit": override_unit,
+    }
+    sensor_formset = MagicMock()
+    sensor_formset.forms = [sensor_form]
+
+    wearables = datahelper.get_study_device_config_json(
+        study_device_formset,
+        [sensor_formset],
+    )
+    db_rows = datahelper.get_study_device_config_rows_for_db(
+        study_device_formset,
+        [sensor_formset],
+    )
+
+    assert wearables == [{
+        "id": device.id,
+        "sensorname": "Garmin",
+        "model": "Venu 3",
+        "sensors": [{
+            "wearable_sensor": "Heart Rate",
+            "sampling_rate": "5Hz",
+            "unit": "beats/minute",
+        }],
+    }]
+    assert db_rows == [{
+        "device_id": device.id,
+        "device_sensor_id": device_sensor.id,
+        "sampling_rate_id": override_sampling_rate.id,
+        "unit_id": override_unit.id,
+    }]
+
+
+def test_get_study_device_config_builders_fall_back_to_device_default_unit():
+    device = MagicMock()
+    device.id = 11
+    device.name = "Garmin"
+    device.model = "Venu 3"
+
+    sensor = MagicMock()
+    sensor.label = "Heart Rate"
+
+    default_sampling_rate = MagicMock()
+    default_sampling_rate.value = "1Hz"
+    default_sampling_rate.id = 101
+
+    default_unit = MagicMock()
+    default_unit.value = "bpm"
+    default_unit.id = 201
+
+    device_sensor = MagicMock()
+    device_sensor.id = 301
+    device_sensor.device_id = device.id
+    device_sensor.sensor = sensor
+    device_sensor.default_sampling_rate = default_sampling_rate
+    device_sensor.default_unit = default_unit
+
+    device_form = MagicMock()
+    device_form.cleaned_data = {"device": device}
+    study_device_formset = MagicMock()
+    study_device_formset.forms = [device_form]
+
+    sensor_form = MagicMock()
+    sensor_form.cleaned_data = {
+        "device_sensor": device_sensor,
+        "sampling_rate": None,
+        "unit": None,
+    }
+    sensor_formset = MagicMock()
+    sensor_formset.forms = [sensor_form]
+
+    wearables = datahelper.get_study_device_config_json(
+        study_device_formset,
+        [sensor_formset],
+    )
+    db_rows = datahelper.get_study_device_config_rows_for_db(
+        study_device_formset,
+        [sensor_formset],
+    )
+
+    assert wearables == [{
+        "id": device.id,
+        "sensorname": "Garmin",
+        "model": "Venu 3",
+        "sensors": [{
+            "wearable_sensor": "Heart Rate",
+            "sampling_rate": "1Hz",
+            "unit": "bpm",
+        }],
+    }]
+    assert db_rows == [{
+        "device_id": device.id,
+        "device_sensor_id": device_sensor.id,
+        "sampling_rate_id": None,
+        "unit_id": None,
+    }]
 
 def test_get_survey_form_data():
     form = MagicMock()
@@ -107,7 +256,10 @@ def test_get_answer_form_data():
         'maxText': None
     }
 
-    result = datahelper.get_answer_form_data([answer])
+    formset = MagicMock()
+    formset.forms = [answer]
+
+    result = datahelper.get_answer_form_data(formset)
     assert result['answers'][0]['text'] == 'Yes'
     assert result['answers'][0]['value'] == 0.1
 

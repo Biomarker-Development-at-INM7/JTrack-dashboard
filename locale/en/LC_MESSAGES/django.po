@@ -229,17 +229,26 @@ msgstr "If you are already collaborating and want to delete your data"
 #: jdash/templates/footer.html:116
 
 msgid "footer_contactdelbtn"
-msgstr "request here"
+msgstr "Delete Request"
 
 #: jdash/templates/footer.html:112
 
 msgid "footer_contactdesc"
-msgstr "If you are interested in collaborating with us or would like to learn more about JTrack or our studies"
+msgstr "If you are interested in collaborating with us or would like to learn more about<br> JTrack or our studies"
 
 #: jdash/templates/footer.html:109
 
 msgid "footer_contacthead"
 msgstr "Contact us"
+
+msgid "contact_us_title"
+msgstr "Reach out Today!"
+
+msgid "contact_us_subtitle"
+msgstr "Send us a message and we will get back to you."
+
+msgid "contact_us_submit"
+msgstr "Send Message"
 
 #: jdash/templates/footer.html:151
 
@@ -320,6 +329,9 @@ msgstr "by"
 
 msgid "header_group"
 msgstr "Biomarker Development Group, INM-7"
+
+msgid "recording_duration"
+msgstr "Recording duration"
 
 #: jdash/templates/index.html:32
 
@@ -405,7 +417,7 @@ msgstr "Surveys"
 #: jdash/templates/analytics/view_analytics.html:17 jdash/templates/index.html:24 jdash/templates/study/create_study.html:57 jdash/templates/study/details.html:237 jdash/templates/study/edit_study.html:59 jdash/templates/study/sop_list_study.html:25 jdash/templates/study/study_audit_list.html:24 jdash/templates/survey/create_question.html:51 jdash/templates/survey/create_survey.html:212 jdash/templates/survey/edit_question.html:74 jdash/templates/survey/survey_audit_list.html:24 jdash/templates/survey/survey_list.html:80
 
 msgid "index_tab3"
-msgstr "Analytics"
+msgstr "Compliance Monitoring"
 
 #: jdash/templates/index.html:51
 
@@ -638,6 +650,9 @@ msgstr "Date Left Study"
 msgid "study_details_date_registered"
 msgstr "Date Registered"
 
+msgid "study_details_data_available_next_day"
+msgstr "Please note that the data will be available in the dashboard one day after the participant syncs the device."
+
 #: jdash/templates/study/details.html:159
 
 msgid "study_details_delete_data_confirm"
@@ -725,6 +740,9 @@ msgstr "Information"
 
 msgid "study_details_last_time_received_ema"
 msgstr "Last EMA Received"
+
+msgid "study_details_live_monitoring_data_info"
+msgstr "The table below presents the live data metrics transmitted by subjects."
 
 #: jdash/templates/study/details.html:430
 
@@ -1111,6 +1129,9 @@ msgstr "Supported formats: JSON, CSV, XLS, XLSX, XLSM. Excel uploads use the fir
 msgid "text_error_message_invalid_username_pswd"
 msgstr "Invalid username or password."
 
+msgid "text_success_logged_out"
+msgstr "You have been logged out."
+
 msgid "text_error_message_to_contact_support"
 msgstr "Oops! Something went wrong. Please try again later or contact support."
 
@@ -1289,3 +1310,313 @@ msgstr "Timestamp"
 msgid "Your session will expire in less than a minute due to inactivity."
 msgstr "Your session will expire in less than a minute due to inactivity."
 
+
+
+
+msgid "All selected values"
+msgstr "All selected values"
+
+msgid "All subjects"
+msgstr "All subjects"
+
+msgid "Choose Study"
+msgstr "Choose Study"
+
+msgid "Choose X-axis"
+msgstr "Choose X-axis"
+
+msgid "Daily Sensor Overview"
+msgstr "Daily Sensor Overview"
+
+msgid "Detailed Sensor Data"
+msgstr "Detailed Sensor Data"
+
+msgid "Filter subject-id:"
+msgstr "Filter subject-id:"
+
+msgid "Filter subjects"
+msgstr "Filter subjects"
+
+msgid "Graph"
+msgstr "Graph"
+
+msgid "Select EMA dimension"
+msgstr "Select EMA dimension"
+
+msgid "Select EMA metric"
+msgstr "Select EMA metric"
+
+msgid "Select sensor"
+msgstr "Select sensor"
+
+msgid "Select study"
+msgstr "Select study"
+
+msgid "Select which sensor"
+msgstr "Select which sensor"
+
+msgid "Select X-axis variable"
+msgstr "Select X-axis variable"
+
+msgid "Select X-axis variable:"
+msgstr "Select X-axis variable:"
+
+msgid "Select x-axis (Date or study_day)"
+msgstr "Select x-axis (Date or study_day)"
+
+msgid "Select Y-axis variable"
+msgstr "Select Y-axis variable"
+
+msgid "Select Y-axis variable:"
+msgstr "Select Y-axis variable:"
+
+msgid "Table"
+msgstr "Table"
+
+msgid "Filter X-axis values:"
+msgstr "Filter X-axis values:"
+
+
+msgid "branding_hero_title"
+msgstr "Welcome to JTrack Digital Platform"
+
+msgid "branding_hero_description"
+msgstr "Manage longitudinal studies with EMA surveys, wearable sensors, participant tracking and quality control in one dashboard."
+
+msgid "branding_apps_section_title"
+msgstr "Companion apps for participant data collection"
+
+msgid "branding_apps_aria_label"
+msgstr "JTrack apps"
+
+msgid "branding_app_ema_description"
+msgstr "Collect ecological momentary assessments, daily symptoms, and study questionnaires directly from participants in real-world settings."
+
+msgid "branding_app_social_description"
+msgstr "Track social interaction, activity context, and daily-life behavior patterns for longitudinal digital health research."
+
+msgid "branding_app_ema_app_store_alt"
+msgstr "Download JTrack EMA on the App Store"
+
+msgid "branding_app_ema_google_play_alt"
+msgstr "Get JTrack EMA on Google Play"
+
+msgid "branding_app_social_app_store_alt"
+msgstr "Download JTrack Social on the App Store"
+
+msgid "branding_app_social_google_play_alt"
+msgstr "Get JTrack Social on Google Play"
+
+msgid "Show password"
+msgstr "Show password"
+
+msgid "Hide password"
+msgstr "Hide password"
+
+msgid "branding_partners_aria_label"
+msgstr "Collaboration partners"
+
+msgid "branding_partners_title"
+msgstr "Collaborating Partners"
+
+msgid "Documentation"
+msgstr "Docs"
+
+msgid "Git Repository"
+msgstr "GitHub"
+
+msgid "Username"
+msgstr "Username"
+
+msgid "Password"
+msgstr "Password"
+
+msgid "Login"
+msgstr "Login"
+
+msgid "branding_app_ema_name"
+msgstr "JTrack EMA"
+
+msgid "branding_app_social_name"
+msgstr "JTrack Social"
+
+
+msgid "branding_app_insights_name"
+msgstr "JTrack Insights"
+
+msgid "branding_app_insights_description"
+msgstr "Explore study data, dashboards, and reports for research teams."
+
+msgid "branding_app_casee_name"
+msgstr "Case-E"
+
+msgid "branding_app_casee_description"
+msgstr "Manage structured electronic case report forms for clinical and study data capture."
+
+msgid "branding_reference_paper"
+msgstr "Reference publication"
+
+msgid "branding_fz_juelich_alt"
+msgstr "Forschungszentrum Juelich"
+
+msgid "branding_bb_alt"
+msgstr "Brain & Behaviour"
+
+msgid "English"
+msgstr "English"
+
+msgid "Deutsch"
+msgstr "Deutsch"
+
+msgid "Force refresh"
+msgstr "Force refresh"
+
+msgid "Fetched from current CSV"
+msgstr "Fetched from current CSV"
+
+msgid "Enter fullscreen"
+msgstr "Enter fullscreen"
+
+msgid "Share"
+msgstr "Share"
+
+msgid "Download"
+msgstr "Download"
+
+msgid "Export to .CSV"
+msgstr "Export to .CSV"
+
+msgid "Export to Excel"
+msgstr "Export to Excel"
+
+msgid "Download as image"
+msgstr "Download as image"
+
+msgid "Live Monitoring"
+msgstr "Overview"
+
+msgid "Subject Data"
+msgstr "Subject Overview"
+
+msgid "Sensor Data"
+msgstr "Sensor Overview"
+
+msgid "Live Monitoring Summary"
+msgstr "Study Summary"
+
+msgid "Sensor Status"
+msgstr "Sensor Status"
+
+msgid "Subject Status"
+msgstr "Subject Status"
+
+msgid "Recent Coverage"
+msgstr "Recent Coverage"
+
+msgid "Processing Freshness"
+msgstr "Processing Freshness"
+
+msgid "Warnings"
+msgstr "Warnings"
+
+msgid "Alerts"
+msgstr "Alerts"
+
+msgid "Alert"
+msgstr "Alert"
+
+msgid "No live monitoring alerts."
+msgstr "No live monitoring alerts."
+
+msgid "password_reset_forgot_password_btn"
+msgstr "Forgot password?"
+
+msgid "password_reset_form_title"
+msgstr "Reset password"
+
+msgid "password_reset_form_desc"
+msgstr "Enter your account email address and we will send you a password reset link."
+
+msgid "password_reset_email_label"
+msgstr "Email address"
+
+msgid "password_reset_send_link_btn"
+msgstr "Send reset link"
+
+msgid "password_reset_back_login_btn"
+msgstr "Back to login"
+
+msgid "password_reset_done_title"
+msgstr "Check your email"
+
+msgid "password_reset_done_desc"
+msgstr "If an account exists for that email address, a password reset link has been sent."
+
+msgid "password_reset_confirm_title"
+msgstr "Choose a new password"
+
+msgid "password_reset_confirm_desc"
+msgstr "Enter your new password twice so we can verify it."
+
+msgid "password_reset_new_password_label"
+msgstr "New password"
+
+msgid "password_reset_confirm_password_label"
+msgstr "Confirm new password"
+
+msgid "password_reset_confirm_btn"
+msgstr "Reset password"
+
+msgid "password_reset_invalid_title"
+msgstr "Reset link invalid"
+
+msgid "password_reset_invalid_desc"
+msgstr "This password reset link is invalid or has already been used. Please request a new link."
+
+msgid "password_reset_request_new_link_btn"
+msgstr "Request new link"
+
+msgid "password_reset_complete_title"
+msgstr "Password reset complete"
+
+msgid "password_reset_complete_desc"
+msgstr "Your password has been updated. You can now log in with the new password."
+
+msgid "password_reset_login_btn"
+msgstr "Log in"
+
+msgid "password_reset_email_subject"
+msgstr "Reset your JDash password"
+
+msgid "password_reset_email_intro"
+msgstr "You are receiving this email because a password reset was requested for your JDash account."
+
+msgid "password_reset_email_link_intro"
+msgstr "Open the link below to choose a new password:"
+
+msgid "password_reset_email_ignore"
+msgstr "If you did not request this password reset, you can ignore this email."
+
+msgid "create_survey_question_order_title"
+msgstr "Update sequence"
+
+msgid "create_survey_question_order_old_sequence_label"
+msgstr "Old sequence"
+
+msgid "create_survey_question_order_new_sequence_label"
+msgstr "New sequence"
+
+msgid "create_survey_question_order_save_btn"
+msgstr "Save"
+
+msgid "create_survey_question_order_change_btn"
+msgstr "Change order"
+
+msgid "create_survey_question_order_success"
+msgstr "Question order updated."
+
+msgid "create_survey_question_order_belongs_error"
+msgstr "Question does not belong to this survey."
+
+msgid "create_survey_question_order_range_error"
+msgstr "Question order must be between 1 and %(total)s."

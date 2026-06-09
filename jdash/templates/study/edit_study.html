@@ -112,11 +112,9 @@
 	<li class="nav-item">
 	  <a class="nav-link active" aria-current="page" href="{%url 'home' %}">{% trans "index_tab1" %}</a>
 	</li>
-	{% if request.user|has_group:"Investigator" or request.user|has_group:"administrator" %}
 	<li class="nav-item">
 	  <a class="nav-link" href="{%url 'survey' %}">{% trans "index_tab2" %}</a>
 	</li>
-	{% endif %}
 	<li class="nav-item">
 	  <a class="nav-link" href="{%url 'analytics' study_name='all' %}">{% trans "index_tab3" %}</a>
 	</li>

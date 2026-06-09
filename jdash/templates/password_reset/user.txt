@@ -1,0 +1,2 @@
+{% load i18n %}{% trans "password_reset_email_subject" %}
+

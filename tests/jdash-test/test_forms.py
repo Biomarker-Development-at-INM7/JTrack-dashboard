@@ -6,8 +6,20 @@ from jdash.forms import (
     AnswerForm, QuestionForm, DeleteSubjectForm, ContactUsForm,
     DateForm, TaskForm
 )
-from jdash.models import Survey, Study, Answer, Question, Category
-from jdash.apps import constants
+from jdash.admin import DeviceSensorAdminForm
+from jdash.models import (
+    Survey,
+    Study,
+    Answer,
+    Question,
+    Category,
+    DeviceCatalog,
+    SensorCatalog,
+    SamplingRateCatalog,
+    UnitCatalog,
+    DeviceSensor,
+)
+from jdash.config import constants
 
 
 @pytest.mark.django_db
@@ -136,3 +148,56 @@ def test_date_form_valid_dates():
         'end': '2024-12-31'
     })
     assert form.is_valid()
+
+
+@pytest.mark.django_db
+def test_device_sensor_admin_form_filters_catalogs_by_instance_sensor():
+    device = DeviceCatalog.objects.create(name="Garmin")
+    sensor_a = SensorCatalog.objects.create(code="hr", label="Heart Rate")
+    sensor_b = SensorCatalog.objects.create(code="tmp", label="Temperature")
+    sampling_a = SamplingRateCatalog.objects.create(sensor=sensor_a, value="1Hz")
+    SamplingRateCatalog.objects.create(sensor=sensor_b, value="5Hz")
+    unit_a = UnitCatalog.objects.create(sensor=sensor_a, value="bpm")
+    UnitCatalog.objects.create(sensor=sensor_b, value="celsius")
+    device_sensor = DeviceSensor.objects.create(
+        device=device,
+        sensor=sensor_a,
+        default_sampling_rate=sampling_a,
+        default_unit=unit_a,
+    )
+
+    form = DeviceSensorAdminForm(instance=device_sensor)
+
+    assert list(form.fields["default_sampling_rate"].queryset) == [sampling_a]
+    assert list(form.fields["default_unit"].queryset) == [unit_a]
+
+
+@pytest.mark.django_db
+def test_device_sensor_admin_form_rejects_sampling_and_unit_from_other_sensor():
+    device = DeviceCatalog.objects.create(name="Garmin")
+    sensor_a = SensorCatalog.objects.create(code="hr", label="Heart Rate")
+    sensor_b = SensorCatalog.objects.create(code="tmp", label="Temperature")
+    sampling_a = SamplingRateCatalog.objects.create(sensor=sensor_a, value="1Hz")
+    sampling_b = SamplingRateCatalog.objects.create(sensor=sensor_b, value="5Hz")
+    unit_a = UnitCatalog.objects.create(sensor=sensor_a, value="bpm")
+    unit_b = UnitCatalog.objects.create(sensor=sensor_b, value="celsius")
+
+    form = DeviceSensorAdminForm(data={
+        "device": device.id,
+        "sensor": sensor_a.id,
+        "default_sampling_rate": sampling_b.id,
+        "default_unit": unit_b.id,
+    })
+
+    assert not form.is_valid()
+    assert "default_sampling_rate" in form.errors
+    assert "default_unit" in form.errors
+
+    valid_form = DeviceSensorAdminForm(data={
+        "device": device.id,
+        "sensor": sensor_a.id,
+        "default_sampling_rate": sampling_a.id,
+        "default_unit": unit_a.id,
+    })
+
+    assert valid_form.is_valid(), valid_form.errors

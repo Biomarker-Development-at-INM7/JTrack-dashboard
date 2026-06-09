@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from jdash.classes import survey
+from jdash.services import survey
 from jdash.models import Category
-from jdash.apps import constants
+from jdash.config import constants
 
 
 @pytest.fixture
@@ -97,9 +97,9 @@ def test_to_json_and_from_json(sample_survey_json):
     assert len(json_data['questions']) == len(sample_survey_json['questions'])
 
 
-@patch('jdash.classes.survey.retrieve_download_questions_for_survey')
-@patch('jdash.classes.survey.retrieve_all_categories_for_survey')
-@patch('jdash.classes.survey.retrieve_survey_details')
+@patch('jdash.services.survey.retrieve_download_questions_for_survey')
+@patch('jdash.services.survey.retrieve_all_categories_for_survey')
+@patch('jdash.services.survey.retrieve_survey_details')
 def test_generate_survey_json_for_download(mock_retrieve_details, mock_retrieve_categories, mock_retrieve_questions):
     """
     Test that survey JSON generation correctly combines questions, categories, and survey details.
@@ -124,7 +124,7 @@ def test_generate_survey_json_for_download(mock_retrieve_details, mock_retrieve_
     assert result['splitbyCategory'] is True
 
 
-@patch('jdash.classes.survey.create_answer_in_db')
+@patch('jdash.services.survey.create_answer_in_db')
 def test_check_and_enter_answer_in_db(mock_create_answer):
     """
     Test that answers from form data are correctly inserted into the database.
@@ -135,9 +135,9 @@ def test_check_and_enter_answer_in_db(mock_create_answer):
     assert mock_create_answer.call_count == 2
 
 
-@patch('jdash.classes.survey.update_answer_in_db')
-@patch('jdash.classes.survey.delete_answer_in_db')
-@patch('jdash.classes.survey.create_answer_in_db')
+@patch('jdash.services.survey.update_answer_in_db')
+@patch('jdash.services.survey.delete_answer_in_db')
+@patch('jdash.services.survey.create_answer_in_db')
 def test_update_answer_choice_text_details(mock_create, mock_delete, mock_update):
     """
     Test updating existing answers, deleting removed ones, and creating new answers.
@@ -188,7 +188,7 @@ def test_update_answer_choice_text_details(mock_create, mock_delete, mock_update
     mock_create.assert_called()
 
 
-@patch('jdash.classes.survey.update_answer_in_db')
+@patch('jdash.services.survey.update_answer_in_db')
 def test_update_other_answer_details(mock_update):
     """
     Test updating 'other' type answer details for a question.
@@ -201,8 +201,8 @@ def test_update_other_answer_details(mock_update):
     mock_update.assert_called_once()
 
 
-@patch('jdash.classes.survey.Question.objects.get')
-@patch('jdash.classes.survey.Question.objects.filter')
+@patch('jdash.services.survey.Question.objects.get')
+@patch('jdash.services.survey.Question.objects.filter')
 def test_update_sortid_of_questions(mock_filter, mock_get):
     """
     Test that questions are correctly reordered when sortId is updated.
@@ -269,8 +269,8 @@ def category_instance_factory():
 
 
 @pytest.mark.django_db
-@patch('jdash.classes.survey.transaction.atomic')
-@patch('jdash.classes.survey.Category.objects')
+@patch('jdash.services.survey.transaction.atomic')
+@patch('jdash.services.survey.Category.objects')
 def test_process_incategory_data_creates_updates_deletes(mock_category_objects, mock_atomic, category_instance_factory):
     # Prepare mock queryset for existing categories
     existing_categories_dict = {
@@ -344,8 +344,8 @@ def test_process_incategory_data_creates_updates_deletes(mock_category_objects, 
 
 
 @pytest.mark.django_db
-@patch('jdash.classes.survey.transaction.atomic')
-@patch('jdash.classes.survey.Category.objects')
+@patch('jdash.services.survey.transaction.atomic')
+@patch('jdash.services.survey.Category.objects')
 def test_process_incategory_data_no_changes(mock_category_objects, mock_atomic, category_instance_factory):
     # All categories in form data match existing → no create/update/delete
 
@@ -380,8 +380,8 @@ def test_process_incategory_data_no_changes(mock_category_objects, mock_atomic, 
 
 
 @pytest.mark.django_db
-@patch('jdash.classes.survey.transaction.atomic')
-@patch('jdash.classes.survey.Category.objects')
+@patch('jdash.services.survey.transaction.atomic')
+@patch('jdash.services.survey.Category.objects')
 def test_process_incategory_data_empty_form_data(mock_category_objects, mock_atomic):
     # Test with empty form data deletes all existing categories
 

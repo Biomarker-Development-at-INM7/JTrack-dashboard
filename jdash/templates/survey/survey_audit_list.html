@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css">
 <script src="{% static 'js/bootstrap-table.min.js' %}"></script>
 <script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
-<script src="{% static 'js/main.js' %}"></script>
+<script src="{% static 'js/survey.js' %}"></script>
 <script src="{% static 'js/popper.js' %}"></script>
 
 <div class="row mb-4">
@@ -57,7 +57,11 @@
   <div class="col-12">
         {% if audit_history %}
           <div class="table-responsive">
-	            <table class="table table-striped table-hover align-middle">
+	            <table id="survey_audit_table" class="table table-striped table-hover align-middle audit-table"
+                data-search="true"
+                data-pagination="true"
+                data-page-list="[10, 25, 50, 100, all]"
+                data-page-size="25">
 	              <thead class="table-dark">
 	                <tr>
 	                  <th scope="col">{% trans "Timestamp" %}</th>
@@ -74,7 +78,7 @@
                     <td>{% if entry.actor %}{{ entry.actor }}{% else %}-{% endif %}</td>
                     <td>{{ entry.object_repr }}</td>
                     <td>{{ entry.action_label }}</td>
-                    <td>
+                    <td class="audit-changes-cell">
                       {% if entry.changes %}
                         {% for field, values in entry.changes.items %}
                           {% if field not in "id sortId study" %}

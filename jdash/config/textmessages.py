@@ -28,6 +28,7 @@ class TextMessages:
     success_new_user = _("text_success_new_user")
     success_notification = _("text_success_notification")
     success_study_updated = _("text_success_study_updated")
+    success_logged_out = _("text_success_logged_out")
 
     # Error messages
     error_message_to_contact_support = _("text_error_message_to_contact_support")

@@ -1,7 +1,7 @@
 from django.test import SimpleTestCase
 from django.urls import reverse, resolve
 from jdash import views
-from jdash.apps import constants
+from jdash.config import constants
 
 class URLResolutionTests(SimpleTestCase):
     def test_home_url(self):
@@ -12,6 +12,19 @@ class URLResolutionTests(SimpleTestCase):
 
     def test_logout_url(self):
         self.assertEqual(resolve(reverse(constants.url_name_for_logout)).func, views.logout_request)
+
+    def test_password_reset_url(self):
+        self.assertEqual(resolve(reverse(constants.url_name_for_password_reset)).func, views.password_reset_request)
+
+    def test_password_reset_done_url(self):
+        self.assertEqual(resolve(reverse(constants.url_name_for_password_reset_done)).func, views.password_reset_done)
+
+    def test_password_reset_confirm_url(self):
+        url = reverse(constants.url_name_for_password_reset_confirm, kwargs={"uidb64": "MQ", "token": "sample-token"})
+        self.assertEqual(resolve(url).func, views.password_reset_confirm)
+
+    def test_password_reset_complete_url(self):
+        self.assertEqual(resolve(reverse(constants.url_name_for_password_reset_complete)).func, views.password_reset_complete)
 
     def test_contact_email_url(self):
         self.assertEqual(resolve(reverse(constants.url_name_for_contact_email)).func, views.contact_email)

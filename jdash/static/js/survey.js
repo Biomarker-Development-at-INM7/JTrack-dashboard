@@ -48,6 +48,9 @@ function initTable() {
       detailViewAlign : 'right',
       paginationParts: ['pageInfoshort', 'pageSize', 'pageList']
     })
+    $('#survey_audit_table').bootstrapTable({
+      paginationParts: ['pageInfoshort', 'pageSize', 'pageList']
+    })
   }
 
 window.operateEvents = {
@@ -309,6 +312,9 @@ function makeAllEmptyValues(){
 ///////// Questions /////
 
 function editQuestion(){
+  if (!validateAnswerChoiceSeparators() || !validateConditionQuestionCategories()) {
+    return;
+  }
   const questionForm = document.getElementById("questionForm");
   var input = document.createElement('input');
   input.type = 'hidden';
@@ -318,8 +324,9 @@ function editQuestion(){
 }
 
 function display_info(event){
-    event.preventDefault();
-  if (validateNecessaryFields() && validateClockTimes()) {
+    //event.preventDefault();
+    if (validateNecessaryFields() && validateClockTimes() && validateAnswerChoiceSeparators() 
+        && validateConditionQuestionCategories()) {
     $('#updateModal').modal('show');
   }
 
@@ -413,9 +420,10 @@ function validateClockTimes() {
         endEl.reportValidity();
         return false;
       }
-
+    const sNum = parseInt(s, 10);
+    const eNum = parseInt(e, 10);
       // Check ordering
-      if (e <= s) {
+    if (eNum <= sNum) {
         endEl.setCustomValidity(
           `Entry #${i+1}: end time (${e}) must be greater than start time (${s}).`
         );
@@ -434,7 +442,9 @@ function validateClockTimes() {
 
 
 function addQuestion(){
-
+  if (!validateConditionQuestionCategories()) {
+    return;
+  }
   quest_table = $('#quest_table')
   const questionForm = document.getElementById("questionForm");
   var x = $('#quest_table').bootstrapTable('getData').length;
@@ -457,6 +467,81 @@ function addQuestion(){
 }
 
 
+
+function getQuestionCategoryMap() {
+  const script = document.getElementById('question-category-map');
+  if (!script) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(script.textContent || '{}');
+  } catch (error) {
+    console.warn('Unable to parse question category map.', error);
+    return {};
+  }
+}
+
+function getCurrentQuestionCategory() {
+  const categoryField = document.getElementById('category');
+  return String(categoryField ? categoryField.value : '').trim();
+}
+
+function getConditionQuestionValidationErrors(fieldId, label, questionCategoryMap, currentCategory) {
+  const field = document.getElementById(fieldId);
+  if (!field) {
+    return { field: null, errors: [] };
+  }
+
+  field.setCustomValidity('');
+  const errors = parseQuestionListValue(field.value).reduce((fieldErrors, questionNumber) => {
+    const normalizedQuestionNumber = String(questionNumber).trim();
+    const referencedCategory = questionCategoryMap[normalizedQuestionNumber];
+    if (!referencedCategory) {
+      fieldErrors.push(`${label}: question ${normalizedQuestionNumber} was not found.`);
+    } else if (String(referencedCategory).trim() !== currentCategory) {
+      fieldErrors.push(`${label}: question ${normalizedQuestionNumber} belongs to another category.`);
+    }
+    return fieldErrors;
+  }, []);
+  return { field, errors };
+}
+
+function validateConditionQuestionCategories() {
+  const currentCategory = getCurrentQuestionCategory();
+  if (!currentCategory) {
+    return true;
+  }
+
+  const questionCategoryMap = getQuestionCategoryMap();
+  const validationResults = [
+    getConditionQuestionValidationErrors(
+      'activate_question',
+      'Activate question',
+      questionCategoryMap,
+      currentCategory
+    ),
+    getConditionQuestionValidationErrors(
+      'deactivate_question',
+      'Deactivate question',
+      questionCategoryMap,
+      currentCategory
+    ),
+  ];
+  const invalidResult = validationResults.find((result) => result.errors.length > 0);
+
+  if (!invalidResult) {
+    return true;
+  }
+
+  invalidResult.field.setCustomValidity(
+    `Activation/deactivation questions must belong to the selected category.\n\n${invalidResult.errors.join('\n')}`
+  );
+  invalidResult.field.reportValidity();
+  return false;
+}
+
+
 function delete_quest(){
   const deleteQuestionForm = document.getElementById("deleteQuestionForm");
   deleteQuestionForm.submit();
@@ -468,6 +553,30 @@ function remove_question(){
 }
 
 ///////// Answers /////
+
+function validateAnswerChoiceSeparators() {
+  const answerInputs = Array.from(document.querySelectorAll('.choice-formset input[name$="-text"]'));
+  const invalidInput = answerInputs.find((input) => /[,;]/.test(input.value || ''));
+
+  answerInputs.forEach((input) => input.setCustomValidity(''));
+
+  if (!invalidInput) {
+    return true;
+  }
+
+  invalidInput.setCustomValidity('Answer choices cannot contain commas or semicolons.');
+  invalidInput.reportValidity();
+  return false;
+}
+
+function clearAnswerChoiceSeparatorValidity(input) {
+  if (!input) {
+    return;
+  }
+  input.setCustomValidity(/[,;]/.test(input.value || '')
+    ? 'Answer choices cannot contain commas or semicolons.'
+    : '');
+}
 
 function addAnswer() {
   const answerForm = document.getElementById("answerForm");
@@ -703,6 +812,7 @@ function add_choices_form() {
 
   // Re-index all choice forms (sort IDs, visible numbers, etc.)
   renumberChoices();
+       refreshConditionOptionGroups();
 }
 
 function remove_choice_form(btnId) {
@@ -727,155 +837,270 @@ function remove_choice_form(btnId) {
 
   // Reindex all forms so Django can parse them
   renumberChoices();
+    refreshConditionOptionGroups();
+}
+
+function parseQuestionListValue(rawValue) {
+  const value = String(rawValue ?? '').trim();
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((item) => String(item).trim() !== '');
+    }
+  } catch (error) {
+    // Fall back to comma/semicolon separated input.
+  }
+
+  return value
+    .split(/[;,]/)
+    .map((item) => item.trim())
+    .filter((item) => item !== '');
 }
 
 function toggleActivateConditionsField(){
-  const activate_questions_list = document.getElementById('activate_question')
-  const activate_conditions = document.getElementById('activate_condition_div')
-  try {
-    // Parse the value in the textarea as JSON (an array)
-    const questionArray = JSON.parse(activate_questions_list.value);
-
-    // Check if it's a non-empty array
-    if (Array.isArray(questionArray) && questionArray.length > 0) {
-        activate_conditions.style.display = 'block'
-      }else{
-        activate_conditions.style.display = 'none'
-      }
-    } catch (e) {
-      // If JSON parsing fails (invalid JSON), hide the div
-      activate_conditions.style.display = 'none';
-    }
-
-}
-
-function toggleDeactivateConditionsField(){
-  const deactivate_questions_list = document.getElementById('deactivate_question')
-  const deactivate_conditions = document.getElementById('deactivate_condition_div')
-
-  try {
-    // Parse the value in the textarea as JSON (an array)
-    const questionArray = JSON.parse(deactivate_questions_list.value);
-
-    // Check if it's a non-empty array
-    if (Array.isArray(questionArray) && questionArray.length > 0) {
-      deactivate_conditions.style.display = 'block'
-      }else{
-        deactivate_conditions.style.display = 'none'
-      }
-    } catch (e) {
-      // If JSON parsing fails (invalid JSON), hide the div
-      deactivate_conditions.style.display = 'none';
-    }
-
-}
-
-function ensureChoiceFormCount(minCount) {
-  let currentCount = document.querySelectorAll('.choice-formset').length;
-  while (currentCount < minCount) {
-    add_choices_form();
-    currentCount = document.querySelectorAll('.choice-formset').length;
-  }
-}
-
-function setChoiceTexts(values) {
-  ensureChoiceFormCount(values.length);
-  values.forEach((value, index) => {
-    const input = document.querySelector(`[name="form-${index}-text"]`);
-    if (input) {
-      input.value = value;
-    }
-  });
-}
-
-function setSlidingDefaults(values) {
-  const defaults = {
-    value: 1,
-    defaultValue: 3,
-    stepSize: 1,
-    minValue: 1,
-    maxValue: 5,
-    minText: 'Low',
-    maxText: 'High',
-  };
-  const finalValues = { ...defaults, ...values };
-  Object.entries(finalValues).forEach(([field, value]) => {
-    const input = document.querySelector(`[name="form-0-${field}"]`);
-    if (input) {
-      input.value = value;
-    }
-  });
-}
-
-function applyQuestionTemplate(templateName) {
-  const templates = {
-    weekly_duration: {
-      questionType: '9',
-      frequency: 7,
-      nextDayToAnswer: 1,
-      deactivateOnDate: 0,
-      choices: [],
-    },
-    daily_single_choice: {
-      questionType: '1',
-      frequency: 1,
-      nextDayToAnswer: 1,
-      deactivateOnDate: 0,
-      choices: ['Yes', 'No'],
-    },
-    monthly_multiple_choice: {
-      questionType: '2',
-      frequency: 30,
-      nextDayToAnswer: 1,
-      deactivateOnDate: 0,
-      choices: ['Option 1', 'Option 2', 'Option 3'],
-    },
-    weekly_sliding_choice: {
-      questionType: '3',
-      frequency: 7,
-      nextDayToAnswer: 1,
-      deactivateOnDate: 0,
-      sliding: {
-        value: 1,
-        defaultValue: 3,
-        stepSize: 1,
-        minValue: 1,
-        maxValue: 5,
-        minText: 'Very low',
-        maxText: 'Very high',
-      },
-      choices: [],
-    },
-    weekly_free_text: {
-      questionType: '4',
-      frequency: 7,
-      nextDayToAnswer: 1,
-      deactivateOnDate: 0,
-      choices: [],
-    }
-  };
-
-  const template = templates[templateName];
-  if (!template) {
+  const activate_questions_list = document.getElementById('activate_question');
+  const activate_conditions = document.getElementById('activate_condition_div');
+  if (!activate_questions_list || !activate_conditions) {
     return;
   }
 
-  const defaultToggle = document.getElementById('flexSwitchCheckDefault');
-  if (defaultToggle) {
-    defaultToggle.checked = false;
+  const questionArray = parseQuestionListValue(activate_questions_list.value);
+  activate_conditions.style.display = questionArray.length > 0 ? 'block' : 'none';
+  rebuildConditionOptions('activation_condition', 'activation_condition_options');
+}
+
+function toggleDeactivateConditionsField(){
+  const deactivate_questions_list = document.getElementById('deactivate_question');
+  const deactivate_conditions = document.getElementById('deactivate_condition_div');
+  if (!deactivate_questions_list || !deactivate_conditions) {
+    return;
   }
 
-  $('#questionType').val(template.questionType);
-  $('#frequency').val(template.frequency);
-  $('#nextDayToAnswer').val(template.nextDayToAnswer);
-  $('#deactivateOnDate').val(template.deactivateOnDate);
+  const questionArray = parseQuestionListValue(deactivate_questions_list.value);
+  deactivate_conditions.style.display = questionArray.length > 0 ? 'block' : 'none';
+  rebuildConditionOptions('deactivation_condition', 'deactivation_condition_options');
+}
 
-  show_answer_form();
+function getAnswerChoiceTexts() {
+  const inputs = Array.from(document.querySelectorAll('.choice-formset input[name$="-text"]'));
+  return inputs
+    .map((input) => String(input.value || '').trim())
+    .filter((value, index, values) => value !== '' && values.indexOf(value) === index);
+}
 
-  if (template.questionType === '1' || template.questionType === '2') {
-    setChoiceTexts(template.choices);
+function shouldUseConditionRadioOptions() {
+  const questionType = document.getElementById('questionType');
+  const selectedValue = questionType ? String(questionType.value || '') : '';
+  return selectedValue === '1' || selectedValue === '2';
+}
+
+function parseConditionSelectionValue(rawValue) {
+  const value = String(rawValue ?? '').trim();
+  if (!value) {
+    return [];
   }
-  if (template.questionType === '3' && template.sliding) {
-    setSlidingDefaults(template.sliding);
+
+  return value
+    .split(/[;,]/)
+    .map((item) => item.trim())
+    .filter((item, index, values) => item !== '' && values.indexOf(item) === index);
+}
+
+function updateConditionDropdownSummary(summaryElement, selectedValues) {
+  if (!summaryElement) {
+    return;
+  }
+
+  summaryElement.textContent = selectedValues.length > 0
+    ? selectedValues.join(', ')
+    : 'Select condition';
+}
+
+function normalizeConditionChoice(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function rebuildConditionOptions(fieldId, containerId) {
+  const hiddenInput = document.getElementById(fieldId);
+  const container = document.getElementById(containerId);
+  const inputWrap = document.getElementById(`${fieldId}_input_wrap`);
+  if (!hiddenInput || !container) {
+    return;
+  }
+
+  const useRadioOptions = shouldUseConditionRadioOptions();
+  if (inputWrap) {
+    inputWrap.style.display = useRadioOptions ? 'none' : 'block';
+  }
+  hiddenInput.style.display = useRadioOptions ? 'none' : '';
+  
+  container.style.display = useRadioOptions ? 'block' : 'none';
+  container.classList.toggle('condition-choice-multiselect', useRadioOptions);
+  if (!useRadioOptions) {
+    container.classList.remove('condition-choice-multiselect');
+    hiddenInput.style.display = '';
+    container.innerHTML = '';
+    return;
+  }
+
+  const selectedValues = parseConditionSelectionValue(hiddenInput.value);
+  const choiceTexts = getAnswerChoiceTexts();
+  const selectedValueMap = new Map(
+    selectedValues.map((value) => [normalizeConditionChoice(value), value])
+  );
+
+  selectedValues.forEach((value) => {
+    const hasMatchingChoice = choiceTexts.some(
+      (choiceText) => normalizeConditionChoice(choiceText) === normalizeConditionChoice(value)
+    );
+    if (value && !hasMatchingChoice) {
+      choiceTexts.unshift(value);
+    }
+  });
+
+  container.innerHTML = '';
+  const options = choiceTexts.map((text) => ({ value: text, label: text }));
+  const matchedSelectedValues = options
+    .filter((option) => selectedValueMap.has(normalizeConditionChoice(option.value)))
+    .map((option) => option.value);
+
+  const dropdown = document.createElement('div');
+  dropdown.className = 'condition-choice-dropdown';
+
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'form-control condition-choice-toggle';
+  toggle.setAttribute('aria-haspopup', 'listbox');
+  toggle.setAttribute('aria-expanded', 'false');
+
+  const summary = document.createElement('span');
+  summary.className = 'condition-choice-summary';
+  updateConditionDropdownSummary(summary, matchedSelectedValues);
+
+  const caret = document.createElement('span');
+  caret.className = 'condition-choice-caret';
+  caret.setAttribute('aria-hidden', 'true');
+  caret.textContent = '▾';
+
+  toggle.appendChild(summary);
+  toggle.appendChild(caret);
+  toggle.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const isOpen = dropdown.classList.toggle('is-open');
+    toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  });
+
+  const menu = document.createElement('div');
+  menu.className = 'condition-choice-menu';
+  menu.setAttribute('role', 'listbox');
+  menu.setAttribute('aria-multiselectable', 'true');
+
+  options.forEach((option, index) => {
+    const wrapper = document.createElement('label');
+    wrapper.className = 'condition-choice-option';
+    wrapper.setAttribute('for', `${fieldId}_choice_${index}`);
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'form-check-input';
+    checkbox.name = `${fieldId}_choice`;
+    checkbox.id = `${fieldId}_choice_${index}`;
+    checkbox.value = option.value;
+    checkbox.checked = selectedValueMap.has(normalizeConditionChoice(option.value));
+
+    const labelText = document.createElement('span');
+    labelText.textContent = option.label;
+
+    checkbox.addEventListener('change', () => {
+      const selected = Array.from(
+        menu.querySelectorAll(`input[name="${fieldId}_choice"]:checked`)
+      ).map((input) => input.value.trim()).filter((value) => value !== '');
+        hiddenInput.value = selected.join(', ');
+      updateConditionDropdownSummary(summary, selected);
+    });
+
+    wrapper.appendChild(checkbox);
+    wrapper.appendChild(labelText);
+    menu.appendChild(wrapper);
+  });
+
+  dropdown.appendChild(toggle);
+  dropdown.appendChild(menu);
+  container.appendChild(dropdown);
+
+  if (choiceTexts.length === 0) {
+    const helper = document.createElement('small');
+    helper.className = 'text-muted d-block mt-1';
+    helper.textContent = 'Add answer choices to select a condition.';
+    menu.appendChild(helper);
   }
 }
+
+document.addEventListener('click', (event) => {
+  document.querySelectorAll('.condition-choice-dropdown.is-open').forEach((dropdown) => {
+    if (!dropdown.contains(event.target)) {
+      dropdown.classList.remove('is-open');
+      const toggle = dropdown.querySelector('.condition-choice-toggle');
+      if (toggle) {
+        toggle.setAttribute('aria-expanded', 'false');
+      }
+    }
+  });
+});
+
+function refreshConditionOptionGroups() {
+  rebuildConditionOptions('activation_condition', 'activation_condition_options');
+  rebuildConditionOptions('deactivation_condition', 'deactivation_condition_options');
+}
+
+function updateConditionSelectionForChoiceRename(fieldId, oldValue, newValue) {
+  const field = document.getElementById(fieldId);
+  const oldText = String(oldValue || '').trim();
+  const newText = String(newValue || '').trim();
+  if (!field || oldText === '' || oldText === newText) {
+    return;
+  }
+
+  const selectedValues = parseConditionSelectionValue(field.value);
+  let changed = false;
+  const updatedValues = selectedValues.map((value) => {
+    if (normalizeConditionChoice(value) === normalizeConditionChoice(oldText)) {
+      changed = true;
+      return newText;
+    }
+    return value;
+  }).filter((value, index, values) => value !== '' && values.indexOf(value) === index);
+
+  if (changed) {
+    field.value = updatedValues.join(', ');
+  }
+}
+
+function syncConditionSelectionsForChoiceRename(input) {
+  const oldValue = input.dataset.previousChoiceText || '';
+  const newValue = input.value || '';
+  updateConditionSelectionForChoiceRename('activation_condition', oldValue, newValue);
+  updateConditionSelectionForChoiceRename('deactivation_condition', oldValue, newValue);
+  input.dataset.previousChoiceText = newValue;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.choice-formset input[name$="-text"]').forEach((input) => {
+    input.dataset.previousChoiceText = input.value || '';
+  });
+  refreshConditionOptionGroups();
+      document.addEventListener('input', (event) => {
+    if (event.target && event.target.matches('.choice-formset input[name$="-text"]')) {
+      clearAnswerChoiceSeparatorValidity(event.target);
+      if (!event.target.checkValidity()) {
+        return;
+      }
+      syncConditionSelectionsForChoiceRename(event.target);
+      refreshConditionOptionGroups();
+    }
+  });
+});

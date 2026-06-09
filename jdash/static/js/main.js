@@ -168,6 +168,65 @@ $(function() {
   
 })
 
+let metadataTableScrollY = null;
+let metadataTableScrollRestoreUntil = 0;
+
+function captureMetadataTableScroll(event) {
+  if (!event.target.closest('#metadata_table')) {
+    return;
+  }
+
+  metadataTableScrollY = window.scrollY;
+  metadataTableScrollRestoreUntil = Date.now() + 800;
+}
+
+function preserveMetadataTableScroll() {
+  if (metadataTableScrollY === null) {
+    return;
+  }
+
+  const scrollY = metadataTableScrollY;
+  window.scrollTo(window.scrollX, scrollY);
+  [0, 50, 150].forEach((delay) => {
+    window.setTimeout(() => {
+      window.scrollTo(window.scrollX, scrollY);
+    }, delay);
+  });
+}
+
+document.addEventListener('pointerdown', captureMetadataTableScroll, true);
+document.addEventListener('mousedown', captureMetadataTableScroll, true);
+document.addEventListener('touchstart', captureMetadataTableScroll, true);
+document.addEventListener('click', function(event) {
+  const metadataTable = event.target.closest('#metadata_table');
+  if (!metadataTable) {
+    return;
+  }
+
+  const link = event.target.closest('a');
+  if (event.target.closest('.detail-icon') || (link && link.getAttribute('href') === '#')) {
+    event.preventDefault();
+  }
+}, true);
+
+window.addEventListener('scroll', function() {
+  if (
+    metadataTableScrollY !== null &&
+    metadataTableScrollY > 0 &&
+    Date.now() < metadataTableScrollRestoreUntil &&
+    window.scrollY === 0
+  ) {
+    preserveMetadataTableScroll();
+  }
+}, true);
+
+$(document).on(
+  'expand-row.bs.table collapse-row.bs.table post-body.bs.table reset-view.bs.table',
+  '#metadata_table',
+  preserveMetadataTableScroll
+);
+
+
 var filterDefaults = ['Completed', 'Instudy','Left study', 'Removed']
 
 
@@ -209,124 +268,285 @@ function detailFilter(index,row) {
   else return false;
 }
 
-function buildchildtr(table,header,n_batches,last_time_received){
-  var rowheader = document.createElement('tr');
-  var columnvalue = document.createElement('td')
-  columnvalue.innerHTML = "<strong>" + header + "</strong";
-  rowheader.append(columnvalue)
-  table.append(rowheader)
-  var row2 = document.createElement('tr');
-  row2.setAttribute('colspan','2')
+function formatBatchCount(value) {
+  if (value === null || typeof value === 'undefined' || value === '' || value === 'none') {
+    return 0;
+  }
 
-  var column21 = document.createElement('td');
-  
-  column21.innerHTML = "<p>n_batches : <span>"+n_batches +"</p></span> "
-  row2.append(column21)
-  var column22 = document.createElement('td');
-  
-  column22.innerHTML = "<p>last_time_received : <span>"+datetimeformatter(last_time_received )+"</p></span> "
-  row2.append(column22)
-  table.append(row2)
+  const numericValue = Number(value);
+  if (Number.isNaN(numericValue)) {
+    return 0;
+  }
+
+  return Math.ceil(numericValue);
+}
+
+function buildchildtr(table,header,n_batches,last_time_received,row){
+  const sensorCard = document.createElement('div');
+  const freshness = getSensorFreshnessMeta(header, last_time_received, row);
+  sensorCard.className = `study-subject-sensor-card ${freshness.cardClass}`;
+
+  const sensorHeader = document.createElement('div');
+  sensorHeader.className = 'study-subject-sensor-header';
+
+  const sensorTitle = document.createElement('div');
+  sensorTitle.className = 'study-subject-sensor-title';
+  sensorTitle.textContent = getDashboardSensorDisplayLabel(header);
+
+  const sensorBadgeGroup = document.createElement('div');
+  sensorBadgeGroup.className = 'study-subject-sensor-badges';
+
+  const batchesBadge = document.createElement('span');
+  batchesBadge.className = 'study-subject-sensor-badge study-subject-sensor-badge--count';
+  batchesBadge.textContent = `${formatBatchCount(n_batches)} batches`;
+
+  sensorBadgeGroup.appendChild(batchesBadge);
+  sensorHeader.appendChild(sensorTitle);
+  sensorHeader.appendChild(sensorBadgeGroup);
+
+  const sensorMeta = document.createElement('div');
+  sensorMeta.className = 'study-subject-sensor-meta';
+  sensorMeta.innerHTML = `
+    <span class="study-subject-sensor-meta-label">last_time_received</span>
+    <span class="study-subject-sensor-meta-value">${datetimeformatter(last_time_received)}</span>
+  `;
+
+  sensorCard.appendChild(sensorHeader);
+  sensorCard.appendChild(sensorMeta);
+  table.appendChild(sensorCard);
+}
+
+function parseStudyDaysValue(value) {
+  if (value === null || typeof value === 'undefined') {
+    return NaN;
+  }
+
+  const match = String(value).match(/-?\d+/);
+  return match ? Number(match[0]) : NaN;
+}
+
+function parseSensorActivityMap(rawValue) {
+  if (!rawValue) {
+    return {};
+  }
+
+  const decoder = document.createElement('textarea');
+  decoder.innerHTML = String(rawValue);
+  const normalized = decoder.value.trim();
+  if (!normalized) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(normalized);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function getSensorFreshnessMeta(sensorName, last_time_received, row) {
+  const sensorActivityMap = parseSensorActivityMap(row && row.sensor_activity_map);
+  const sensorState = sensorActivityMap[sensorName];
+  const statusCode = sensorState ? sensorState.status_code : null;
+
+  if (statusCode === 0) {
+    return {
+      label: 'No data',
+      cardClass: 'study-subject-sensor-card--missing',
+      badgeClass: 'study-subject-sensor-badge--missing',
+    };
+  }
+
+  if (statusCode === 1) {
+    return {
+      label: 'Left study',
+      cardClass: 'study-subject-sensor-card--left',
+      badgeClass: 'study-subject-sensor-badge--left',
+    };
+  }
+
+  if (statusCode === 2) {
+    return {
+      label: 'Active',
+      cardClass: 'study-subject-sensor-card--active',
+      badgeClass: 'study-subject-sensor-badge--active',
+    };
+  }
+
+  if (statusCode === 3) {
+    return {
+      label: 'Completed',
+      cardClass: 'study-subject-sensor-card--completed',
+      badgeClass: 'study-subject-sensor-badge--completed',
+    };
+  }
+    if (row && row.date_left_study && row.date_left_study !== 'none') {
+    return {
+      label: 'Left study',
+      cardClass: 'study-subject-sensor-card--completed',
+      badgeClass: 'study-subject-sensor-badge--completed',
+    };
+  }
+
+  if (!last_time_received || last_time_received === 'none') {
+    return {
+        label: 'Stale',
+      cardClass: 'study-subject-sensor-card--stale',
+      badgeClass: 'study-subject-sensor-badge--stale',
+    };
+  }
+
+  const parsed = new Date(last_time_received);
+  if (isNaN(parsed)) {
+    return {
+      label: 'Received',
+      cardClass: 'study-subject-sensor-card--unknown',
+      badgeClass: 'study-subject-sensor-badge--unknown',
+    };
+  }
+
+  const now = new Date();
+  const daysSince = Math.floor((now - parsed) / (1000 * 60 * 60 * 24));
+  if (daysSince >= 2) {
+    return {
+      label: 'Stale',
+      cardClass: 'study-subject-sensor-card--stale',
+      badgeClass: 'study-subject-sensor-badge--stale',
+    };
+  }
+
+  return {
+    label: 'Active',
+    cardClass: 'study-subject-sensor-card--active',
+    badgeClass: 'study-subject-sensor-badge--active',
+  };
+}
+
+
+function formatDetailLabel(value) {
+  if (!value) {
+    return '';
+  }
+
+  return String(value).trim().toLowerCase();
+}
+
+function getDashboardSensorDisplayLabel(sensorName) {
+  if (!sensorName) {
+    return '';
+  }
+
+  const displayMap = window.wearableSensorDisplayMap || {};
+  const wearableLabel = displayMap[String(sensorName).trim().toLowerCase()];
+  if (wearableLabel) {
+    return wearableLabel;
+  }
+
+  return formatDetailLabel(sensorName);
+}
+
+function parseDashboardSensorList(rawValue) {
+  if (!rawValue) {
+    return [];
+  }
+
+  if (Array.isArray(rawValue)) {
+    return rawValue.map((item) => String(item).trim()).filter((item) => item !== '');
+  }
+
+  let normalized = String(rawValue).replaceAll("&#39;", "'");
+  normalized = normalized.trim();
+  if (!normalized || normalized === '[]') {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(normalized.replaceAll("'", '"'));
+    if (Array.isArray(parsed)) {
+      return parsed.map((item) => String(item).trim()).filter((item) => item !== '');
+    }
+  } catch (error) {
+    // Fall back to legacy bracket/comma parsing below.
+  }
+
+  if (normalized.startsWith('[') && normalized.endsWith(']')) {
+    normalized = normalized.substring(1, normalized.length - 1);
+  }
+
+  return normalized
+    .split(',')
+    .map((item) => item.replaceAll("'", "").trim())
+    .filter((item) => item !== '');
+}
+
+function getDevicePlatformMeta(deviceId) {
+  const normalizedDeviceId = String(deviceId || '').trim();
+  const isAndroid = /[a-z]/.test(normalizedDeviceId);
+  return {
+    label: isAndroid ? 'Android' : 'iOS',
+    iconClass: isAndroid ? 'fab fa-android' : 'fab fa-apple',
+  };
 }
 
 function detailFormatter(index, row, element){ 
   
   
   var mainDiv = document.createElement("div");
-  mainDiv.setAttribute('class',' hiddenRow');
-      
-    var table = document.createElement('table');
-    table.setAttribute('class','ui very compact table');
-    table.setAttribute('id','sub_table');
+  mainDiv.setAttribute('class','hiddenRow study-subject-detail-panel');
 
+    var metaGrid = document.createElement('div');
+    metaGrid.setAttribute('class','study-subject-meta-grid');
+    const metaBits = [];
+    if (row['device_id'] && row['device_id'] !== 'none') {
+      const devicePlatform = getDevicePlatformMeta(row['device_id']);
+      metaBits.push(`
+        <span class="study-subject-device-platform" title="${devicePlatform.label}">
+          <i class="${devicePlatform.iconClass}" aria-label="${devicePlatform.label}" role="img"></i>
+        </span>
+      `);
+    }
+    if (row['date_registered'] && row['date_registered'] !== 'none') {
+      metaBits.push(`
+        <span class="study-subject-meta-pill">
+          <span class="study-subject-meta-label">date_registered</span>
+          <span class="study-subject-meta-value">${datetimeformatter(row['date_registered'])}</span>
+        </span>
+      `);
+    }
+    if (row['date_left_study'] && row['date_left_study'] !== 'none') {
+      metaBits.push(`
+        <span class="study-subject-meta-pill study-subject-meta-pill--right">
+          <span class="study-subject-meta-label">date_left_study</span>
+          <span class="study-subject-meta-value">${datetimeformatter(row['date_left_study'])}</span>
+        </span>
+      `);
+    }
+    metaGrid.innerHTML = metaBits.join('');
 
-    var rowdetail = document.createElement('tr');
-    //row.setAttribute('class','hiddenRow')
-
-    var column = document.createElement('td');
-    
-    column.innerHTML = "<p>device_id : <span>"+row['device_id'] +"</p></span> "
-    rowdetail.append(column)
-    table.append(rowdetail)
-
-
-    var row1 = document.createElement('tr');
-    row1.setAttribute('colspan','2')
-   
-    var column11 = document.createElement('td');
-    
-    column11.innerHTML = "<p>date_registered : <span>"+dateformatter(row['date_registered'] )+"</p></span> "
-    row1.append(column11)
-    var column12 = document.createElement('td');
-    
-    column12.innerHTML = "<p>date_left_study : <span>"+dateformatter(row['date_left_study'] )+"</p></span> "
-    row1.append(column12)
-    table.append(row1)
+    var sensorSection = document.createElement('div');
+    sensorSection.setAttribute('class','study-subject-sensor-grid');
 
     if (row["appName"] == "ema"){
       var nb = row['n_batches_ema'];
       var ltr = row['last_time_received_ema'];
-      buildchildtr(table,"ema",nb,ltr)
+      buildchildtr(sensorSection,"ema",nb,ltr,row)
     }
 
     else{
-      if (row['sensor_list'].includes(",")){
-        arr = row['sensor_list'].split(",")
-        for (var i = 0, len = arr.length; i < len; i++)  {
-          arr[i] = arr[i].replaceAll("&#39;","")
-            if (i==0){
-              arr[i] = arr[i].substring(1,arr[i].length)
-            }
-            else if (i == len - 1){
-              arr[i] = arr[i].substring(0,arr[i].length -1 )
-            }
-            
-            let nb = row['n_batches_'+arr[i].trim()];
-            let ltr = row['last_time_received_'+arr[i].trim()];
-            buildchildtr(table,arr[i],nb,ltr)
-            
-          }
+      const dashboardSensors = parseDashboardSensorList(row['dashboard_sensor_list']);
+      for (var i = 0, len = dashboardSensors.length; i < len; i++)  {
+        const sensorName = dashboardSensors[i];
+        let nb = row['n_batches_'+sensorName];
+        let ltr = row['last_time_received_'+sensorName];
+        buildchildtr(sensorSection, sensorName, nb, ltr, row)
       }
-      else{
-        var sensor = row['sensor_list']
-        sensor = sensor.replaceAll("&#39;","")
-        let nb = row['n_batches_'+sensor.substring(1,sensor.length -1)];
-        let ltr = row['last_time_received_'+sensor.substring(1,sensor.length -1)];
-        buildchildtr(table,sensor.substring(1,sensor.length -1),nb,ltr)
-      }
-
-        // logic to include active sensors
-      if (row['sensor_list_limited'].includes(",")){
-        s_arr = row['sensor_list_limited'].split(",")
-        for (var i = 0, len = s_arr.length; i < len; i++)  {
-          s_arr[i] = s_arr[i].replaceAll("&#39;","")
-            if (i==0){
-              s_arr[i] = s_arr[i].substring(1,s_arr[i].length)
-            }
-            else if (i == len - 1){
-              s_arr[i] = s_arr[i].substring(0,s_arr[i].length -1 )
-            }
-
-            let s_nb = row['n_batches_'+s_arr[i].trim()];
-            let s_ltr = row['last_time_received_'+s_arr[i].trim()];
-            buildchildtr(table,s_arr[i],s_nb,s_ltr)
-
-          }
-      }
-      else{
-          if(row['sensor_list_limited'] != '[]'){
-        var sensor_active = row['sensor_list_limited']
-        sensor_active = sensor_active.replaceAll("&#39;","")
-        let s_nb = row['n_batches_'+sensor_active.substring(1,sensor_active.length -1)];
-        let s_ltr = row['last_time_received_'+sensor_active.substring(1,sensor_active.length -1)];
-        buildchildtr(table,sensor_active.substring(1,sensor_active.length -1),s_nb,s_ltr)
-          }
-      }
-
-
     }
 
-    mainDiv.append(table);
+    if (metaBits.length > 0) {
+      mainDiv.append(metaGrid);
+    }
+    mainDiv.append(sensorSection);
   return mainDiv;
 };
 
@@ -343,12 +563,87 @@ function initTable() {
     detailViewAlign : 'right',
     paginationParts: ['pageInfoshort', 'pageSize', 'pageList']
   })
+    $('#study_audit_table').bootstrapTable({
+    paginationParts: ['pageInfoshort', 'pageSize', 'pageList']
+  })
 }
 
 
 window.operateEvents = {
 }
 
+function isMissingLastTimeValue(value) {
+  return value === null || typeof value === 'undefined' || String(value).trim().toLowerCase() === 'none' || String(value).trim() === '';
+}
+
+function hideNoDataSensorButtons() {
+  const $metadataTable = $('#metadata_table');
+  if ($metadataTable.length === 0) {
+    return;
+  }
+
+  const rows = $metadataTable.bootstrapTable('getData') || [];
+  $metadataTable.find('tbody tr[data-index]').each(function() {
+    const rowIndex = Number(this.getAttribute('data-index'));
+    const row = rows[rowIndex];
+    if (!row) {
+      return;
+    }
+
+    const sensorButtons = this.querySelectorAll('td[data-field="sensor_info"] button[data-sensor-name]');
+    sensorButtons.forEach((button) => {
+      const sensorName = String(button.getAttribute('data-sensor-name') || '').trim();
+      if (!sensorName) {
+        return;
+      }
+
+      const lastTimeKey = sensorName === 'ema' ? 'last_time_received_ema' : `last_time_received_${sensorName}`;
+      if (isMissingLastTimeValue(row[lastTimeKey])) {
+        button.remove();
+      }
+    });
+  });
+}
+
+$(document).on('post-body.bs.table', '#metadata_table', function() {
+  hideNoDataSensorButtons();
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+  hideNoDataSensorButtons();
+});
+
+function extractSensorInfoTokens(cellValue) {
+  if (!cellValue) {
+    return [];
+  }
+
+  const temp = document.createElement('div');
+  temp.innerHTML = String(cellValue);
+
+  const buttonTexts = Array.from(temp.querySelectorAll('button'))
+    .map((button) => (button.textContent || '').trim().toLowerCase())
+    .filter((value) => value !== '');
+
+  if (buttonTexts.length > 0) {
+    return buttonTexts;
+  }
+
+  return (temp.textContent || '')
+    .split(/[\s,;|/]+/)
+    .map((value) => value.trim().toLowerCase())
+    .filter((value) => value !== '');
+}
+
+window.sensorInfoFilterSearch = function(filterValue, cellValue) {
+  if (!filterValue) {
+    return true;
+  }
+
+  const target = String(filterValue).trim().toLowerCase();
+  const tokens = extractSensorInfoTokens(cellValue);
+  return tokens.includes(target);
+}
 //create study related functions
 
 
@@ -446,18 +741,24 @@ function add_task_form(){
  
   const currentTaskForms = document.getElementsByClassName("task-formset")
   const currentFormCount = currentTaskForms.length //+ 1
-
   //add new task form
+  const templateTaskForm = currentTaskForms[0]
+  if (!templateTaskForm) {
+    return
+  }
 
-  const taskFormEl = document.getElementById('form-0').cloneNode(true)
+  const sourceFormId = templateTaskForm.id || "form-0"
+  const sourceFormIndexMatch = sourceFormId.match(/form-(\d+)/)
+  const sourceFormIndex = sourceFormIndexMatch ? sourceFormIndexMatch[1] : "0"
+  const taskFormEl = templateTaskForm.cloneNode(true)
   
   taskFormEl.setAttribute('class','task-formset  border rounded p-3 mb-3')
   taskFormEl.setAttribute('id',`form-${currentFormCount}`)
-  const regex = new RegExp('form-0-','g')
+  const regex = new RegExp('form-'+sourceFormIndex+'-','g')
   taskFormEl.innerHTML  = taskFormEl.innerHTML.replace(regex,"form-"+currentFormCount+"-")
-  taskFormEl.innerHTML  = taskFormEl.innerHTML.replace('id_0_remove_btn',"id_"+currentFormCount+"_remove_btn")
+  taskFormEl.innerHTML  = taskFormEl.innerHTML.replace("id_"+sourceFormIndex+"_remove_btn","id_"+currentFormCount+"_remove_btn")
   totalTaskForms.setAttribute('value', currentFormCount + 1)
-  
+
   main.appendChild(taskFormEl)
   const initialTaskForms = document.getElementById("id_form-INITIAL_FORMS")
   if (initialTaskForms.value != 0 ){
@@ -468,7 +769,11 @@ function add_task_form(){
     
   }
   if (currentFormCount> 0){
-    document.getElementById("id_"+currentFormCount+"_remove_btn").disabled = false
+      const removeBtn = document.getElementById("id_"+currentFormCount+"_remove_btn")
+    if (removeBtn) {
+      removeBtn.disabled = false
+      removeBtn.style.display = ""
+    }
   }
 }
 
@@ -545,6 +850,7 @@ function toggleSelectAll(type, button) {
     button.textContent = shouldSelectAll ? "Unselect All" : "Select All";
 }
 
+
 function sendCheckedFlagsToServer(study_name) {
     // Get all rows in the table
     const rows = document.querySelectorAll('tbody tr');
@@ -553,16 +859,18 @@ function sendCheckedFlagsToServer(study_name) {
     const testCaseFlags = [];
     rows.forEach((row) => {
         // Get the test case ID
-        const testCaseId = row.querySelector('#testcase_db_id').textContent.trim();
+        const testCaseId = row.querySelector('.testcase-db-id').value.trim();
         // Check the state of admin and owner checkboxes
         const adminCheckbox = row.querySelector('.admin-checkbox');
         const ownerCheckbox = row.querySelector('.owner-checkbox');
+        const notesInput = row.querySelector('.qc-notes-data');
 
         // Add the test case flag states to the array
         testCaseFlags.push({
             id: testCaseId,
             tested_by_admin: adminCheckbox.checked,
             tested_by_owner: ownerCheckbox.checked,
+            notes: notesInput ? JSON.parse(notesInput.value || "[]") : [],
         });
     });
     // Convert test case flags to a JSON string
@@ -571,6 +879,197 @@ function sendCheckedFlagsToServer(study_name) {
     document.getElementById('testcaseForm').submit();
 }
 
+
+let activeQcNotesRow = null;
+
+function getQcNotesFromRow(row) {
+    const notesInput = row ? row.querySelector('.qc-notes-data') : null;
+    const rawValue = notesInput ? (notesInput.value || notesInput.textContent || '') : '';
+    if (!rawValue) {
+        return [];
+    }
+
+    try {
+        const parsed = JSON.parse(rawValue);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+        console.error('Unable to parse QC notes JSON', error);
+        return [];
+    }
+}
+
+function setQcNotesForRow(row, notes) {
+    const notesInput = row ? row.querySelector('.qc-notes-data') : null;
+    const serialized = JSON.stringify(notes);
+    if (notesInput) {
+        notesInput.value = serialized;
+        notesInput.textContent = serialized;
+    }
+
+    const container = row ? row.querySelector('.qc-note-list') : null;
+    renderQcNotesList(container, notes.slice(-3), {
+        totalCount: notes.length,
+        showSummary: notes.length > 3,
+    });
+}
+
+function getCsrfToken() {
+    const cookieValue = `; ${document.cookie}`;
+    const parts = cookieValue.split('; csrftoken=');
+    if (parts.length === 2) {
+        return parts.pop().split(';').shift();
+    }
+    return '';
+}
+
+function notifyQcComment(testCaseId, commentText, timestamp) {
+    const modal = document.getElementById('qcNotesModal');
+    const notifyUrl = modal ? modal.dataset.notifyUrl : '';
+    if (!notifyUrl) {
+        return Promise.resolve();
+    }
+
+    return fetch(notifyUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken(),
+        },
+        body: JSON.stringify({
+            id: testCaseId,
+            comment: commentText,
+            timestamp: timestamp,
+        }),
+    }).then((response) => {
+        if (!response.ok) {
+            throw new Error(`QC comment notify failed: ${response.status}`);
+        }
+        return response.json();
+    });
+}
+
+function renderQcNotesList(container, notes, options = {}) {
+    if (!container) return;
+
+    container.innerHTML = '';
+    const totalCount = options.totalCount ?? notes.length;
+    const showSummary = options.showSummary ?? false;
+
+    if (!notes || notes.length === 0) {
+        const emptyState = document.createElement('p');
+        emptyState.className = 'qc-note-empty';
+        emptyState.textContent = 'No notes yet.';
+        container.appendChild(emptyState);
+        return;
+    }
+
+    notes.forEach((note) => {
+        const item = document.createElement('div');
+        item.className = 'qc-note-item';
+
+        const text = document.createElement('p');
+        text.textContent = note.text || '';
+        item.appendChild(text);
+
+        if (note.user || note.timestamp) {
+            const meta = document.createElement('small');
+            meta.className = 'qc-note-meta';
+            meta.textContent = [note.user || '', note.timestamp || ''].filter(Boolean).join(' · ');
+            item.appendChild(meta);
+        }
+
+        container.appendChild(item);
+    });
+
+    if (showSummary && totalCount > notes.length) {
+        const summary = document.createElement('p');
+        summary.className = 'qc-note-empty';
+        summary.textContent = 'Showing last 3 notes.';
+        container.appendChild(summary);
+    }
+}
+
+function openQcNotesModal(button) {
+    activeQcNotesRow = button.closest('tr');
+    if (!activeQcNotesRow) return;
+
+    const modal = document.getElementById('qcNotesModal');
+    const listContainer = modal.querySelector('.qc-modal-list');
+    const input = document.getElementById('qcNoteInput');
+    const notes = getQcNotesFromRow(activeQcNotesRow);
+    renderQcNotesList(listContainer, notes, { totalCount: notes.length, showSummary: false });
+    input.value = '';
+    modal.classList.add('is-open');
+    input.focus();
+}
+
+function closeQcNotesModal() {
+    const modal = document.getElementById('qcNotesModal');
+    if (modal) {
+        modal.classList.remove('is-open');
+    }
+    activeQcNotesRow = null;
+}
+
+function appendQcNote() {
+    if (!activeQcNotesRow) return;
+
+    const modal = document.getElementById('qcNotesModal');
+    const input = document.getElementById('qcNoteInput');
+    const username = modal ? (modal.dataset.currentUser || '') : '';
+    const text = (input.value || '').trim();
+
+    if (!text) {
+        return;
+    }
+
+    const now = new Date();
+    const noteEntry = {
+        text: text,
+        user: username,
+        timestamp: now.toLocaleString(),
+    };
+    const testCaseId = activeQcNotesRow.querySelector('.testcase-db-id')?.value?.trim();
+
+    const notes = getQcNotesFromRow(activeQcNotesRow);
+    notes.push(noteEntry);
+    setQcNotesForRow(activeQcNotesRow, notes);
+
+    const modalList = modal ? modal.querySelector('.qc-modal-list') : null;
+    renderQcNotesList(modalList, notes, { totalCount: notes.length, showSummary: false });
+    input.value = '';
+    input.focus();
+
+    if (testCaseId) {
+        notifyQcComment(testCaseId, noteEntry.text, noteEntry.timestamp).catch((error) => {
+            console.error(error);
+        });
+    }
+}
+
+document.addEventListener('click', (event) => {
+    const modal = document.getElementById('qcNotesModal');
+    if (modal && event.target === modal) {
+        closeQcNotesModal();
+    }
+});
+
+document.addEventListener('keydown', (event) => {
+    const modal = document.getElementById('qcNotesModal');
+    if (!modal || !modal.classList.contains('is-open')) {
+        return;
+    }
+
+    if (event.key === 'Escape') {
+        closeQcNotesModal();
+    }
+
+    if (event.key === 'Enter' && event.target && event.target.id === 'qcNoteInput') {
+        event.preventDefault();
+        appendQcNote();
+    }
+});
 
 
 
@@ -649,6 +1148,13 @@ function buildReadOnlyInput(name, value, displayValue, className = "form-control
   return wrapper;
 }
 
+function formatWearableSensorDisplayLabel(value) {
+  if (!value) {
+    return "";
+  }
+
+  return String(value).trim().toLowerCase();
+}
 /** Map device_id -> DeviceSensor[] */
 function deviceSensorsByDeviceMap(deviceSensors) {
   const map = new Map();
@@ -667,8 +1173,65 @@ function fillSensorMulti(multiEl, deviceSensorsForDevice) {
   deviceSensorsForDevice.forEach(ds => {
     const opt = document.createElement("option");
     opt.value = String(ds.id); // DeviceSensor.id
-    opt.textContent = ds.sensor__label ?? `Sensor ${ds.sensor_id}`;
+    opt.textContent = formatWearableSensorDisplayLabel(ds.sensor__label) || `sensor ${ds.sensor_id}`;
     multiEl.appendChild(opt);
+  });
+}
+
+function selectedDeviceSensorsInBlock(block) {
+  return new Set(
+    Array.from(
+      block.querySelectorAll('.sensor-tbody [name$="-device_sensor"]')
+    )
+      .filter((input) => {
+        const row = input.closest("tr");
+        if (!row || row.style.display === "none") {
+          return false;
+        }
+        const deleteInput = row.querySelector('input[type="checkbox"][name$="-DELETE"]');
+        return !(deleteInput && deleteInput.checked);
+      })
+      .map((input) => String(input.value || ""))
+      .filter((value) => value !== "")
+  );
+}
+
+function syncSensorMultiAvailability(block) {
+  const multi = block.querySelector("select.sensor-multi");
+  if (!multi) return;
+
+  const selectedIds = selectedDeviceSensorsInBlock(block);
+  Array.from(multi.options).forEach((opt) => {
+    const blocked = selectedIds.has(String(opt.value || ""));
+    opt.hidden = blocked;
+    opt.disabled = blocked;
+    if (blocked) {
+      opt.selected = false;
+    }
+  });
+}
+
+function makeExistingUnitReadOnly(block) {
+  block.querySelectorAll('.sensor-tbody select[name$="-unit"]').forEach((selectEl) => {
+    if (selectEl.dataset.readonlyApplied === "true") {
+      return;
+    }
+
+    const selectedOption = selectEl.options[selectEl.selectedIndex];
+    const hiddenInput = document.createElement("input");
+    hiddenInput.type = "hidden";
+    hiddenInput.name = selectEl.name;
+    hiddenInput.value = selectEl.value;
+
+    selectEl.removeAttribute("name");
+    selectEl.disabled = true;
+    selectEl.dataset.readonlyApplied = "true";
+
+    if (selectedOption) {
+      selectEl.title = selectedOption.textContent;
+    }
+
+    selectEl.insertAdjacentElement("afterend", hiddenInput);
   });
 }
 
@@ -727,7 +1290,7 @@ function addSelectedSensorsToTable(block) {
     const dsRow = dsById.get(deviceSensorId);
     if (!dsRow) return;
   
-    const sensorLabel = dsRow.sensor__label ?? `Sensor ${dsRow.sensor_id}`;
+    const sensorLabel = formatWearableSensorDisplayLabel(dsRow.sensor__label) || `sensor ${dsRow.sensor_id}`;
     const sensorId = dsRow.sensor_id;
   
     const sensorInput = document.createElement("input");
@@ -818,6 +1381,7 @@ function addSelectedSensorsToTable(block) {
   });
 
   totalEl.value = String(idx);
+     syncSensorMultiAvailability(block);
 }
 
 /**
@@ -934,30 +1498,34 @@ function addDeviceBlock() {
     <input type="hidden" name="${sensorPrefix}-MIN_NUM_FORMS" value="0" id="id_${sensorPrefix}-MIN_NUM_FORMS">
     <input type="hidden" name="${sensorPrefix}-MAX_NUM_FORMS" value="1000" id="id_${sensorPrefix}-MAX_NUM_FORMS">
 
-    <div class="col-12 col-lg-6">
+    <div class="col-12 col-lg-5">
       <div class="form-group">
         <select class="form-control sensor-multi" multiple size="6"></select>
         <label class="text-primary">Wearable sensors for this device</label>
         <small class="text-muted">Select one or more sensors, then click Add</small>
       </div>
     </div>
-    <div class="col-12 col-lg-4 align-items-center">
+    <div class="col-12 col-lg-2 d-flex align-items-start pt-lg-4">
       <button type="button" class="btn btn-success add-selected-sensors-btn" >
         Add
       </button></div>
     
-
-    <table class="table table-striped sensor-table">
-      <thead>
-        <tr>
-          <th>Sensor</th>
-          <th>Sampling rate</th>
-          <th>Unit</th>
-          <th style="width:140px;"></th>
-        </tr>
-      </thead>
-      <tbody class="sensor-tbody"></tbody>
-    </table></div>
+        <div class="col-12 col-lg-5">
+      <div class="table-responsive">
+        <table class="table table-striped sensor-table mb-0">
+          <thead>
+            <tr>
+              <th>Sensor</th>
+              <th>Sampling rate</th>
+              <th>Unit</th>
+              <th style="width:140px;"></th>
+            </tr>
+          </thead>
+          <tbody class="sensor-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    </div>
   `;
 
   block.querySelector(".device-select").appendChild(deviceSelect);
@@ -1006,6 +1574,17 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!dev || !multi) return;
     if (!dev.value) return;
     fillSensorMulti(multi, byDevice.get(String(dev.value)) || []);
+       syncSensorMultiAvailability(block);
+    makeExistingUnitReadOnly(block);
+
+  });
+    refilterAllDeviceSelects();
+
+  const deviceBlocks = document.querySelectorAll("#device-blocks .device-block");
+  deviceBlocks.forEach((block, index) => {
+    const removeBtn = block.querySelector(".remove-device-bt");
+    if (!removeBtn) return;
+    removeBtn.style.display = index === 0 ? "none" : "";
   });
 });
 
@@ -1034,6 +1613,10 @@ document.addEventListener("click", (e) => {
     tr.style.display = "none";
   } else {
     tr.remove();
+  }
+    const block = tr.closest(".device-block");
+  if (block) {
+    syncSensorMultiAvailability(block);
   }
 });
 
@@ -1086,3 +1669,4 @@ document.addEventListener("change", (e) => {
     refilterAllDeviceSelects();
   }
 });
+

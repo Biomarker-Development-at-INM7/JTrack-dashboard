@@ -2,68 +2,50 @@
 {% load static %}
 {% load i18n %}
 {% block content %}
-<div class="row justify-content-center mt-5">
-  <div class="col-xl-8 col-lg-4 col-md-6">
-    <h5>
-      {% trans "delsub_head" %}</h5>
-    <p>{% trans "delsub_intro" %}</p>
-    
-    <ul>
-      <li>
-        <strong>{% trans "delsub_anonhead" %}</strong>{% trans "delsub_anondesc" %}</li>
-      <li>
-        <strong>{% trans "delsub_pubhead" %}</strong>{% trans "delsub_pubdesc" %}</li>
-      <li>
-        <strong>{% trans "delsub_prochead" %}</strong>{% trans "delsub_procdesc" %}</li>
-      <li>
-        <strong>{% trans "delsub_revhead" %}</strong>{% trans "delsub_revdesc" %}</li>
-    </ul>
-    <br>
-    <p>{% trans "delsub_submitdesc" %}</p>
-  </div>
-    <div class="col-xl-4 col-lg-4 col-md-6">
-        
-        <div class="card-body " style="background-color: #212529;">
+<div class="delete-subject-shell">
+  <div class="delete-subject-grid">
+    <section class="delete-subject-copy">
+      <h3>{% trans "delsub_head" %}</h3>
+      <p>{% trans "delsub_intro" %}</p>
+
+      <ul>
+        <li><strong>{% trans "delsub_anonhead" %}</strong>{% trans "delsub_anondesc" %}</li>
+        <li><strong>{% trans "delsub_pubhead" %}</strong>{% trans "delsub_pubdesc" %}</li>
+        <li><strong>{% trans "delsub_prochead" %}</strong>{% trans "delsub_procdesc" %}</li>
+        <li><strong>{% trans "delsub_revhead" %}</strong>{% trans "delsub_revdesc" %}</li>
+      </ul>
+
+      <p>{% trans "delsub_submitdesc" %}</p>
+    </section>
+
+    <aside class="card shadow delete-subject-card">
+        <div class="card-body">
             {% if error_message %}
-            <p class="bg-danger p-d ml-b">{{ error_message }}</p>
+            <p class="alert alert-danger">{{ error_message }}</p>
             {% endif %}
-            <h5 style="text-align: center;color: white;">{% trans "delsub_formhead" %}</h5>
-            <p style="text-align: center;color: white;">{% trans "delsub_formdesc" %}</p>
+            <div class="delete-subject-card-header">
+              <h2>{% trans "delsub_formhead" %}</h2>
+              <p>{% trans "delsub_formdesc" %}</p>
+            </div>
             <form action="{%url 'delete_subject_data' %}" method="POST" >
                 {% csrf_token %}
-                <div >
-                    
-                    <!-- Name input -->
-                    <div class="form-outline mb-4">{{delete_subject_form.subjectId}}
-                      <span style="color: white;"><small><i>{% trans "delsub_formexpl" %}</i></small></span>
-                   
-                       </div>
-                       
-                    <!-- Email input -->
-                    <div class="form-outline mb-4 mt-2">{{delete_subject_form.email}}
-                      
-                    </div>
-      
-                    <!-- Message input -->
-                    <div class="form-outline mb-4 mt-2">{{delete_subject_form.reason}}
-                    </div>
-      
-                    <!-- Checkbox 
-                    <div class="form-check d-flex justify-content-center mb-4">
-                      <input class="form-check-input me-2" type="checkbox" value="" id="form4Example4" checked />
-                      <label class="form-check-label" for="form4Example4">
-                        Send me a copy of this message
-                      </label>
-                    </div>-->
+                <div class="mb-3">
+                  {{delete_subject_form.subjectId}}
+                  <small class="form-text text-muted"><i>{% trans "delsub_formexpl" %}</i></small>
                 </div>
-                <div class="form-outline mb-4">
-                    <input name="delete_subject_data" type="submit"  value="Submit" role="button" class="btn btn-outline-light"  >
+                <div class="mb-3">
+                  {{delete_subject_form.email}}
+                </div>
+                <div class="mb-4">
+                  {{delete_subject_form.reason}}
+                </div>
+                <div class="d-grid">
+                    <input name="delete_subject_data" type="submit" value="Submit" role="button" class="btn btn-outline-light">
                 </div>
             </form>
         </div>
-      </div>
-    </div>
+    </aside>
   </div>
-  
+</div>
 {% endblock %}
 

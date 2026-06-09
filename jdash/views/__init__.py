@@ -4,6 +4,11 @@ from jdash.views.core_views import (
     index,
     login_request,
     logout_request,
+    password_reset_complete,
+    password_reset_confirm,
+    password_reset_done,
+    password_reset_request,
+    server_error,
     server_error,
     session_check,
 )
