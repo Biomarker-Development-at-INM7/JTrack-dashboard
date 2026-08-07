@@ -16,9 +16,7 @@
 <script src="{% static 'js/popper.js' %}"></script>
 <script src="{% static 'js/bootstrap410.min.js' %}"></script>
 
-<script>
 
-  let initialCategoryCount = 0;
 
 document.addEventListener("DOMContentLoaded", function () {
   const modal = document.getElementById("categoryModal");
@@ -199,6 +197,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   {{ survey_form.scrolling}}
                 </div>
             </div>
+            <input type="hidden" name="topN" value="-1">
 			<div class="modal-footer">
 				<input name="update_survey_info" type="submit"  value="Update" role="button" class="btn btn-primary"  >
 			</div>
@@ -249,19 +248,41 @@ document.addEventListener("DOMContentLoaded", function () {
       <form id = "deleteQuestionForm" action="{%url 'delete_question' %}" method="POST" >
         {% csrf_token %}
         <div class="modal-body">
-        {% trans "create_survey_delete_conf" %}
-      </div>
+          {% trans "create_survey_delete_conf" %}
+          <div id="delete-question-summary" class="text-muted small mt-2"></div>
+          <div id="delete-question-ids"></div>
+        </div>
       
       
       <div class="modal-footer">
         <input id = "survey_id" name="survey_id" type="hidden"  value="{{survey_id}}"   />
-        <input type="submit" name="delete_question" value="Confirm"  class="btn btn-primary" onclick="delete_quest()" />
+        <button type="submit" name="delete_question" value="1" class="btn btn-primary">Confirm</button>
       </div>
     </form>
     </div>
   </div>
 </div>
 
+<div
+  id="jdash-loading-overlay"
+  class="jdash-loading-overlay"
+  role="status"
+  aria-live="polite"
+  aria-hidden="true"
+  hidden>
+  <div class="jdash-loading-panel">
+    <div class="jdash-loading-logo-animation" aria-hidden="true">
+      <div class="jdash-loading-logo-backdrop"></div>
+      <div class="jdash-loading-logo-grid">
+        <div class="jdash-loading-logo-square jdash-loading-logo-square-tl"></div>
+        <div class="jdash-loading-logo-square jdash-loading-logo-square-tr"></div>
+        <div class="jdash-loading-logo-square jdash-loading-logo-square-br"></div>
+        <div class="jdash-loading-logo-square jdash-loading-logo-square-bl"></div>
+      </div>
+    </div>
+    <div id="jdash-loading-message" class="jdash-loading-message">{% trans "Please wait..." %}</div>
+  </div>
+</div>
 
 
 <div class="row mb-4">
@@ -311,18 +332,44 @@ document.addEventListener("DOMContentLoaded", function () {
       <button  id="addCategory"  class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#categoryModal">
       {% trans "global_categories" %}
       </button>
+      
       <a id="new_question" role="button" class="btn btn-outline-primary" href="{%url 'manage_question' survey_id=survey_id question_id=0 %}" >
         {% trans "create_survey_new_question" %}
       </a>
-     {% endif %} 
+      <span class="bulk-question-actions">
+        <button
+          id="bulk-delete-questions"
+          type="button"
+          class="btn btn-outline-danger"
+          data-bs-toggle="modal"
+          data-bs-target="#deleteModal"
+          disabled>
+          {% trans "Delete selected questions" %}
+        </button>
+        <span id="bulk-question-selected-count" class="bulk-question-selected-count"></span>
+      </span>
+      {% endif %}
+    
   </div>
 
   <!-- Information AT THE TOP -->
   <div class="d-flex justify-content-between align-items-center mb-2">
-  <div id="question-count-top" class="fw-bold">
-    {% trans "total_questions" %}: {{ questions|length }}
+    <div id="question-count-top" class="fw-bold">
+      {% blocktrans count question_count=questions|length %}{{ question_count }} total question{% plural %}{{ question_count }} total questions{% endblocktrans %}
+      {% if survey_summary %}
+      <span class="survey-summary-meta">
+        &middot;
+        {% if survey_summary.conditional_question_count %}
+        {{ survey_summary.conditional_question_count }} {% trans "conditional question" %}{{ survey_summary.conditional_question_count|pluralize }}
+        &middot;
+        {% endif %}
+        {{ survey_summary.category_count }} categor{{ survey_summary.category_count|pluralize:"y,ies" }}
+        &middot;
+        {% trans "Last updated" %}: {{ survey_summary.last_updated|date:"Y-m-d H:i" }}
+      </span>
+      {% endif %}
+    </div>
   </div>
-</div>
 
   <!-- use a button to save all question to database or while exporting to json-->
   <table id ="quest_table" class="table-responsive"
@@ -335,24 +382,36 @@ document.addEventListener("DOMContentLoaded", function () {
     <thead >
       <tr >
         <th  data-visible="false">dbid</th>
-        <th  >id</th>
+        {% if request.user|can_manage_survey %}
+        <th class="question-select-cell" data-sortable="false">
+          <input
+            id="select-all-questions"
+            class="form-check-input"
+            type="checkbox"
+            aria-label="{% trans 'Select all visible questions' %}">
+        </th>
+        {% endif %}
+        <th  >Id</th>
         <th  >title</th>
         <th  >subText</th>
         <th  >question type</th>
         <th  >category</th>
-        <th  >frequency</th>
-        <th  >activation times</th>
-        <th  >deactivation times</th>
-        <th  >day to ask</th>
+        <th data-formatter="scheduleIntervalFormatter">day of first ask/repetition interval</th>
+        <th data-formatter="scheduleTimeWindowsFormatter">activation -
+            deactivation times</th>
+        <th data-visible="false">frequency</th>
+        <th data-visible="false">clockTimeStart </th>
+        <th data-visible="false">clockTimeEnd</th>
+        <th data-visible="false">nextDayToAnswer</th>
         <th  data-visible="false" >imageURL</th>
-        <th  data-visible="false" >url</th>
+        <th  data-visible="false" >url</th>  
         <th  data-visible="false" >deactivateOnDate</th>
         <th  data-visible="false"  >deactivateOnAnswer</th>
-        <th  data-visible="false"  >activate_question</th>
-        <th  data-visible="false"  >deactivate_question</th>
         <th  data-visible="false"  >activation_condition</th>
         <th  data-visible="false"  >deactivation_condition</th>
-        <th>conditional question</th>
+        {% if survey_summary.conditional_question_count %}
+        <th data-formatter="conditionQuestionFormatter">Condition</th>
+        {% endif %}
         <th  data-events="createOperateEvents" >actions</th>
       </tr>
       
@@ -360,7 +419,16 @@ document.addEventListener("DOMContentLoaded", function () {
     <tbody>
       {% for question in questions %}
       <tr>
-        <td id="db_id">{{question.db_id}}</td>  
+        <td id="db_id">{{question.db_id}}</td>
+        {% if request.user|can_manage_survey %}
+        <td class="question-select-cell">
+          <input
+            class="form-check-input question-select"
+            type="checkbox"
+            value="{{question.db_id}}"
+            aria-label="{% trans 'Select question' %} {{question.id}}">
+        </td>
+        {% endif %}
         <td id="quest_id">
             {% if request.user|can_manage_survey %}
             <div class="question-sort-cell">
@@ -402,6 +470,8 @@ document.addEventListener("DOMContentLoaded", function () {
               {{question.category}}
           {% endif %}
         </td>
+        <td>{{ question.frequency }}||{{ question.nextDayToAnswer }}</td>
+        <td>{{ question.clockTime_start }}||{{ question.clockTime_end }}</td>
         <td id='frequency'>{{ question.frequency}}</td>
         <td id='clockTimeStart'>{{ question.clockTime_start}}</td>
         <td id='clockTimeEnd'>{{ question.clockTime_end}}</td>
@@ -410,22 +480,18 @@ document.addEventListener("DOMContentLoaded", function () {
         <td data-visible="false">{{ question.url}}</td>
         <td data-visible="false">{{ question.deactivateOnDate}}</td>
         <td data-visible="false">{{ question.deactivateOnAnswer}}</td>
-        <td data-visible="false">{{ question.activate_question}}</td>
-        <td data-visible="false">{{ question.deactivate_question}}</td>
         <td data-visible="false">{{ question.activation_condition}}</td>
         <td data-visible="false">{{ question.deactivation_condition}}</td>
-        <td>
-          {% if question.activate_question or question.deactivate_question %}
-          <i class="fa fa-check text-success" aria-label="Condition question exists"></i>
-          {% endif %}
-        </td>
+        {% if survey_summary.conditional_question_count %}
+        <td>{{ question.activate_question }}||{{ question.activation_condition }}||{{ question.deactivate_question }}||{{ question.deactivation_condition }}</td>
+        {% endif %}
         <td>  
-               {% if request.user|can_manage_survey %}
+            {% if request.user|can_manage_survey %}
           <a class="edit" name="edit_question" title="Edit" href="{%url 'manage_question' survey_id=survey_id question_id=question.db_id %}"  ><i class="fa fa-edit fa-lg"></i></a>
           <a class="copy" name="copy_question" href="{%url 'duplicate_question' survey_id=survey_id question_id=question.db_id %}" title="Duplicate"  data-id="{{question}}"  ><i class="fa fa-copy fa-lg"></i></i></a>
-          <a class="delete" href="#" title="Delete" data-id="{{question}}" data-bs-toggle="modal" data-bs-target="#deleteModal"  ><i class="fa fa-trash fa-lg"></i></a>
-          {% else %}
-          <a class="view"  name="edit_question"  title="View"  href="{%url 'manage_question' survey_id=survey_id question_id=question.db_id %}"  ><i class="fa fa-eye fa-lg"></i></a>
+          <!-- <a class="delete" href="#" title="Delete" data-id="{{question}}" data-question-id="{{question.db_id}}" data-bs-toggle="modal" data-bs-target="#deleteModal"  ><i class="fa fa-trash fa-lg"></i></a>-->
+          {% else %} 
+          <a class="view"  name="edit_question" title="View"  href="{%url 'manage_question' survey_id=survey_id question_id=question.db_id %}"  ><i class="fa fa-eye fa-lg"></i></a>
           {% endif %}
       </td>
 
@@ -437,3 +503,4 @@ document.addEventListener("DOMContentLoaded", function () {
       
 </div>
 {% endblock %}	
+

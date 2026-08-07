@@ -36,9 +36,13 @@
 		}
 
 		sensor_list_limited_options = document.getElementById('sensor_list_limited').options
-		for (let i=0;i < selected_list.length ; i++){
-			
-			sensor_list_limited_options.remove(selected_list[i]);
+        for (let i=0;i < selected_list.length ; i++){
+			for (let j = sensor_list_limited_options.length - 1; j >= 0; j--) {
+				if (sensor_list_limited_options[j].value === selected_list[i]) {
+					sensor_list_limited_options.remove(j);
+					break;
+				}
+			}
 		}
 		//document.getElementById('id_0_remove_btn').disabled = true    
 

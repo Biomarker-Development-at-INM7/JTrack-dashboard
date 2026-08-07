@@ -21,7 +21,15 @@ from jdash.services.datahelper import (
     get_question_form_data,
 )
 from jdash.services.survey import Survey
-from jdash.utils.fileutils import open_study_json, save_study_json
+from jdash.utils.fileutils import (
+    delete_legacy_survey,
+    delete_legacy_survey_question,
+    delete_legacy_survey_questions,
+    duplicate_legacy_survey_question,
+    update_legacy_survey_categories,
+    update_legacy_survey_question,
+    update_legacy_survey_question_order,
+)
 from jdash.utils.utils import get_survey_list
 
 logger = logging.getLogger("django")
@@ -57,10 +65,10 @@ def create_question_answer_for_survey(survey_id, form, answer_formset):
     """
     logger.info("create_question_answer_for_survey %s", survey_id)
     question_obj = get_question_form_data(form)
-    answers = []
-    if answer_formset.is_valid():
-        form_data = get_answer_form_data(answer_formset, int(question_obj["questionType"]))
-        answers = form_data["answers"]
+    if not answer_formset.is_valid():
+        raise ValueError("Answer form data is invalid.")
+    form_data = get_answer_form_data(answer_formset, int(question_obj["questionType"]))
+    answers = form_data["answers"]
     Survey.create_question_with_answers(survey_id, question_obj, answers)
     return context_for_create_survey_page(survey_id)
 
@@ -70,33 +78,21 @@ def update_question_answer_for_survey(question_id, form, answer_formset):
     Update a survey question and replace its associated answers.
     """
     question_obj = get_question_form_data(form)
-    answers = []
-    if answer_formset.is_valid():
-        form_data = get_answer_form_data(answer_formset, int(question_obj["questionType"]))
-        answers = form_data["answers"]
+    if not answer_formset.is_valid():
+        raise ValueError("Answer form data is invalid.")
+    form_data = get_answer_form_data(answer_formset, int(question_obj["questionType"]))
+    answers = form_data["answers"]
     survey_id = Survey.update_question_with_answers(question_id, question_obj, answers)
     context = context_for_create_survey_page(survey_id)
     logger.info("update_question_answer_for_survey::: %s", context["survey_id"])
     return context
 
 
-def update_old_survey_details(study_name, values_to_be_updated):
+def update_old_survey_details(study_name, values_to_be_updated, answer_data=None):
     """
     Update legacy file-backed survey content embedded in a study JSON file.
     """
-    study_json = open_study_json(study_name)
-    question_id = values_to_be_updated["id"]
-    Survey.update_question(question_id, title="Updated Question Title", sub_text="New subtext")
-    answer_index_to_update = 1
-    Survey.update_answer(
-        question_id,
-        answer_index_to_update,
-        answer_text="Updated Answer Text",
-        answer_value=3.14,
-    )
-    updated_survey_json = Survey.to_json()
-    save_study_json(study_name, updated_survey_json)
-    return True
+    return update_legacy_survey_question(study_name, values_to_be_updated, answer_data)
 
 
 def create_survey_from_surveyForm(form_data, user):
@@ -155,18 +151,28 @@ def upload_survey_file(uploaded_file, user):
         return context
 
 
-def delete_question_from_survey(question_id, survey_id):
+def delete_questions_from_survey(question_ids, survey_id):
     """
-    Delete a question from a survey and return refreshed editor context.
+    Delete one or more questions from a survey and return refreshed editor context.
     """
     try:
-        logger.info("delete_question_from_survey %s", question_id)
-        Survey.delete_question(question_id, survey_id)
+        logger.info("delete_questions_from_survey %s", question_ids)
+        Survey.delete_questions(question_ids, survey_id)
         return context_for_create_survey_page(survey_id)
+    except ValueError as exc:
+        logger.info(
+            "delete_questions_from_survey blocked for question_ids=%s survey_id=%s: %s",
+            question_ids,
+            survey_id,
+            exc,
+        )
+        context = context_for_create_survey_page(survey_id)
+        context[constants.key_name_error_message] = str(exc)
+        return context
     except Exception as exc:
         logger.exception(
-            "delete_question_from_survey failed for question_id=%s survey_id=%s",
-            question_id,
+            "delete_questions_from_survey failed for question_ids=%s survey_id=%s",
+            question_ids,
             survey_id,
         )
         context = context_for_create_survey_page(survey_id)
@@ -174,16 +180,53 @@ def delete_question_from_survey(question_id, survey_id):
         return context
 
 
-def delete_question_from_file(study_name, title):
+def delete_question_from_survey(question_id, survey_id):
+    """
+    Delete a question from a survey and return refreshed editor context.
+    """
+    return delete_questions_from_survey([question_id], survey_id)
+
+
+def delete_question_from_file(study_name, question_id=None, title=None):
     """
     Delete a question from a legacy file-backed survey payload.
     """
-    study_json = open_study_json(study_name)
-    question_list = study_json["survey"]["questions"]
-    for question in question_list:
-        if question["title"] == title:
-            question_list.remove(question)
-    return study_json
+    return delete_legacy_survey_question(study_name, question_id=question_id, title=title)
+
+
+def delete_questions_from_file(study_name, question_ids):
+    """
+    Delete multiple questions from a legacy file-backed survey payload.
+    """
+    return delete_legacy_survey_questions(study_name, question_ids=question_ids)
+
+
+def duplicate_question_in_file(study_name, question_id):
+    """
+    Duplicate a question in a legacy file-backed survey payload.
+    """
+    return duplicate_legacy_survey_question(study_name, question_id)
+
+
+def update_categories_in_file(study_name, category_list, collect_flag=False):
+    """
+    Update categories in a legacy file-backed survey payload.
+    """
+    return update_legacy_survey_categories(study_name, category_list, collect_flag)
+
+
+def update_question_order_in_file(study_name, question_id, new_sort_id):
+    """
+    Reorder a question in a legacy file-backed survey payload.
+    """
+    return update_legacy_survey_question_order(study_name, question_id, new_sort_id)
+
+
+def delete_survey_from_file(study_name):
+    """
+    Remove the embedded legacy survey payload from a study JSON file.
+    """
+    return delete_legacy_survey(study_name)
 
 
 def duplicate_and_create_new_survey_id(source_survey_id, user, session_key):
@@ -234,3 +277,4 @@ def duplicate_and_create_new_question_id(survey_id, source_question_id):
         context = context_for_create_survey_page(survey_id)
         context[constants.key_name_error_message] = controller_error_message(exc)
         return context
+

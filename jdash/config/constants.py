@@ -113,6 +113,7 @@ session_key_last_name = "last_name"
 ## Json key constants ####
 key_name_app = "app"
 key_name_id = "id"
+key_name_version = "version"
 key_name_type = "type"
 key_name_study_name = "study_name"
 key_name_number_of_subjects = "number_of_subjects"
@@ -184,6 +185,9 @@ key_name_test_list = "test_list"
 key_name_study = "study"
 key_name_collect_subject_id_flag = "collect_subject_id_flag"
 key_name_collect_flag = "collect_flag"
+key_name_categoryTitle = "categoryTitle"
+key_name_categoryValue = "categoryValue"
+key_name_didSubjectAsk = "didSubjectAsk"
 # form data field name
 field_name_name = "name"
 field_name_images = "images"
@@ -209,6 +213,7 @@ field_name_email = "email"
 field_name_reason = "reason"
 field_name_user_email = "user_email"
 field_name_survey_id = "survey_id"
+field_name_id_value = "id_value"
 field_name_json_file = "json_file"
 field_name_timezone= "timezone"
 field_name_test_case_flags= "test_case_flags"
@@ -231,6 +236,25 @@ field_name_activate_question= "activate_question"
 field_name_deactivate_question= "deactivate_question"
 field_name_activation_condition= "activation_condition"
 field_name_deactivation_condition= "deactivation_condition"
+field_name_active = "active"
+field_name_mandatory = "mandatory"
+field_name_answer = "answer"
+field_name_category = "category"
+field_name_title = "title"
+field_name_questionType = "questionType"
+field_name_text = "text"
+field_name_value = "value"
+field_name_defaultValue = "defaultValue"
+field_name_stepSize = "stepSize"
+field_name_minVal = "minVal"
+field_name_maxVal = "maxVal"
+field_name_minValue = "minValue"
+field_name_maxValue = "maxValue"
+field_name_minText = "minText"
+field_name_maxText = "maxText"
+field_name_answerSubText = "answerSubText"
+field_name_answerSortId = "answerSortId"
+field_name_db_id = "db_id"
 # name constants from templates
 button_name_contact_message = "contact_message"
 button_name_send_notification = "send_notification"
@@ -377,7 +401,9 @@ QUESTION_TYPES = (
     (6, 'Time'),
     (7, 'Date'),
     (8, 'Time and Date'),
-    (9, 'Duration')
+    (9, 'Duration'),
+    (10, 'Location'),
+    (11, 'Consent')
 )
 
 LABELLING = [

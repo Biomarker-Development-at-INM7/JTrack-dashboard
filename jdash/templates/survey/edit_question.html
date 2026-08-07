@@ -109,6 +109,12 @@
                           </div>
                       <!-- <span><small><i>{{question_help_text.sortId}}</i></small></span> -->
                       </div>
+                      <div class="col-sm-3 mb-4 d-flex align-items-center">
+                      <div class="form-check form-switch">
+                        {{ question_form.mandatory }}
+                        <label class="form-check-label" for="mandatory">{% trans "Mandatory" %}</label>
+                      </div>
+                    </div>
                       <div  class=" col form-group  required mb-4" >
                       {{question_form.questionType }}
                       <label >{% trans "question_type" %}*</label>
@@ -283,10 +289,12 @@
         </div>
       </div>
         <div  id="slidingAnswer-0" class="row" style="display: none;">
+            {% comment %}
             <div class="col form-group  mb-4" >
             {{answer_form.value }}
             <label > {% trans "answer_sliding_value" %} </label>
             </div>
+            {% endcomment %}
             <div class="form-group col  mb-4" >
             {{answer_form.defaultValue}}
             <label >{% trans "answer_sliding_default_value" %} </label>

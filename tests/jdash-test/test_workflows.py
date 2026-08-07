@@ -45,6 +45,7 @@ def test_controller_exposes_survey_workflow_functions():
     assert controller.upload_survey_json_file is survey_workflows.upload_survey_json_file
     assert controller.upload_survey_file is survey_workflows.upload_survey_file
     assert controller.delete_question_from_survey is survey_workflows.delete_question_from_survey
+    assert controller.delete_questions_from_survey is survey_workflows.delete_questions_from_survey
     assert controller.delete_question_from_file is survey_workflows.delete_question_from_file
     assert controller.duplicate_and_create_new_survey_id is survey_workflows.duplicate_and_create_new_survey_id
     assert controller.duplicate_and_create_new_question_id is survey_workflows.duplicate_and_create_new_question_id
@@ -121,7 +122,7 @@ def test_get_all_survey_details_success(monkeypatch):
     dummy_user = "user_obj"
     dummy_session_key = "abc123"
     dummy_db_surveys = [{"id": 1, "title": "DB Survey"}]
-    dummy_file_surveys = [{"id": "999", "title": "Study JSON"}]
+    dummy_file_surveys = [{"title": "Study JSON"}]
 
     monkeypatch.setattr(
         survey_workflows,

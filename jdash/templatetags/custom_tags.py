@@ -692,6 +692,8 @@ def get_question_category(value):
         7: 'Date',
         8: 'Time and Date',
         9: 'Duration',
+        10: 'Location',
+        11: 'Consent',
     }
     return categories.get(value, "Unknown Category")
 

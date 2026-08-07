@@ -1356,6 +1356,7 @@ def test_retrieve_question_details_success():
     assert details["title"] == "How are you?"
     assert len(details["answer"]) == 1
     assert details["answer"][0]["text"] == "Good"
+    assert details["answer"][0]["answerSubText"] == "Feeling fine"
 
 @pytest.mark.django_db
 def test_retrieve_question_details_invalid_id():
@@ -1401,7 +1402,7 @@ def test_answer_serializer_success():
         question=question,
         answerSortId=1,
         text="Yes",
-        answerSubText="",
+        answerSubText="Answer help",
         value=1,
         defaultValue=True,
         stepSize=1,
@@ -1417,6 +1418,8 @@ def test_answer_serializer_success():
 
     assert isinstance(data, list)
     assert data[0]["text"] == "Yes"
+    assert data[0]["subText"] == "Answer help"
+    assert data[0]["answerSubText"] == "Answer help"
     assert data[0]["defaultValue"] == 1.0
 
 @pytest.mark.django_db

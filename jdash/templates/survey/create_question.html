@@ -95,6 +95,12 @@
                           {{question_form.active }}
                           <label class="form-check-label">Is active question</label>
                       </div>-->  
+                      <div class="col-sm-3 mb-4 d-flex align-items-center">
+                        <div class="form-check form-switch">
+                          {{ question_form.mandatory }}
+                          <label class="form-check-label" for="mandatory">{% trans "Mandatory" %}</label>
+                        </div>
+                      </div>
                       <div  class=" col form-group  required mb-4" >
                       {{question_form.questionType }}
                       <label >{% trans "question_type" %}*</label>
@@ -263,10 +269,12 @@
                             </div>
                   
                             <div  id="slidingAnswer-0" class="row mb-4" style="display: none;">
-                                <div class="col-sm-4 form-group  mb-4" >	
-                                {{answer_form.value }}  	         
+                                {% comment %}
+                                <div class="col-sm-4 form-group  mb-4" >
+                                {{answer_form.value }}
                                 <label > {% trans "answer_sliding_value" %} </label>
                                 </div>
+                                {% endcomment %}
                                 <div class="form-group col-sm-4  mb-4" >
                                 {{answer_form.defaultValue}}
                                 <label >{% trans "answer_sliding_default_value" %} </label>

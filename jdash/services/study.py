@@ -184,9 +184,7 @@ class Study:
             else:
                 self._survey = create_survey_in_db(self.study_name, raw, self.user)
             # store the JSON back into meta
-            self.meta[constants.field_name_survey] = json.dumps(
-                Survey.generate_json_for_study(self._survey.id)
-            )
+            self.meta[constants.field_name_survey] = Survey.generate_json_for_study(self._survey.id)
         return self._survey
 
     @property

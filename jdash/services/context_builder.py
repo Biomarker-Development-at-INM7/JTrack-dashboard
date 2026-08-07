@@ -4,6 +4,7 @@ import logging
 from django.forms.formsets import formset_factory
 
 from jdash.config import constants as constants
+from jdash.audit.services import SurveyAuditService
 from jdash.services.study import get_all_study_details
 from jdash.services.subject import Subject
 from jdash.forms import (
@@ -27,6 +28,7 @@ from jdash.repositories.survey_repository import (
     retrieve_all_categories_for_survey,
     retrieve_all_questions_for_survey,
     retrieve_question_details,
+    retrieve_survey,
     retrieve_survey_details,
 )
 from jdash.utils.utils import modify_questions_list_to_string
@@ -42,6 +44,28 @@ from jdash.models import (
 )
 
 logger = logging.getLogger("django")
+
+
+def _has_condition_question(question):
+    return (
+        bool(question.get("activate_question"))
+        or bool(question.get("deactivate_question"))
+    )
+
+
+def _has_time_windows(question):
+    empty_values = {None, "", "[]", "None", "none", "null"}
+    return (
+        question.get("clockTime_start") not in empty_values
+        or question.get("clockTime_end") not in empty_values
+    )
+
+
+def _get_survey_last_updated(survey):
+    audit_history = SurveyAuditService.get_history(survey)
+    if audit_history:
+        return audit_history[0].timestamp
+    return survey.createdDate
 
 
 def context_for_home_page(user):
@@ -207,6 +231,7 @@ def context_for_create_survey_page(survey_id):
     }
 
     if survey_id != 0:
+        survey = retrieve_survey(survey_id)
         survey_details = retrieve_survey_details(survey_id)
         category_details = retrieve_all_categories_for_survey(survey_id)
         question_details_list = retrieve_all_questions_for_survey(survey_id)
@@ -225,6 +250,16 @@ def context_for_create_survey_page(survey_id):
         context[constants.key_name_survey_title] = survey_details["title"]
         context[constants.key_name_questions] = question_details_list
         context[constants.key_name_categories] = category_details
+        context["survey_summary"] = {
+            "conditional_question_count": sum(
+                1 for question in question_details_list if _has_condition_question(question)
+            ),
+            "has_time_windows": any(
+                _has_time_windows(question) for question in question_details_list
+            ),
+            "category_count": len(category_details),
+            "last_updated": _get_survey_last_updated(survey),
+        }
 
         extra_forms = 1
         if category_details:
@@ -245,4 +280,5 @@ def context_for_survey_list_page():
     context[constants.key_name_question_form] = QuestionForm()
     context[constants.key_name_survey_help_text] = get_help_texts_for_survey_form()
     return context
+
 

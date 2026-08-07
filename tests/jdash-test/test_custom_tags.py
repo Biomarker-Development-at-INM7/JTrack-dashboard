@@ -323,7 +323,8 @@ def test_get_minText_maxText():
     (7, 'Date'),
     (8, 'Time and Date'),
     (9, 'Duration'),
-    (10, 'Unknown Category'),  # unknown
+    (10, 'Location'),
+    (11, 'Consent'),
 ])
 def test_get_question_category(value, expected):
     assert custom_tags.get_question_category(value) == expected

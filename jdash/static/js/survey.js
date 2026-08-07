@@ -10,10 +10,26 @@ var question_types = {
     'Time':  '6',
     'Date':'7',
     'Time and Date': '8',
-    'Duration': '9'
-
+    'Duration': '9',
+    'Location': '10',
+    'Consent': '11'
 
 }
+var choiceQuestionTypes = ['1', '2'];
+var slidingQuestionType = '3';
+
+function normalizeQuestionTypeValue(value) {
+  return String(value === null || value === undefined ? '' : value);
+}
+
+function isChoiceQuestionType(value) {
+  return choiceQuestionTypes.indexOf(normalizeQuestionTypeValue(value)) !== -1;
+}
+
+function isSlidingQuestionType(value) {
+  return normalizeQuestionTypeValue(value) === slidingQuestionType;
+}
+
 ///////////
 ///Survey details table
 //////////////////
@@ -53,99 +69,643 @@ function initTable() {
     })
   }
 
+function parseScheduleInteger(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  var parsed = Number.parseInt(String(value).trim(), 10);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function parseScheduleTimeList(value) {
+  if (value === null || value === undefined) {
+    return [];
+  }
+
+  var raw = String(value).trim();
+  if (!raw || raw === '[]' || raw.toLowerCase() === 'none' || raw.toLowerCase() === 'null') {
+    return [];
+  }
+
+  try {
+    var parsed = JSON.parse(raw.replace(/'/g, '"'));
+    if (Array.isArray(parsed)) {
+      return parsed.map(function (item) { return String(item).trim(); }).filter(Boolean);
+    }
+  } catch (error) {
+    // Fall back to simple comma/semicolon parsing below.
+  }
+
+  return raw
+    .replace(/^\[/, '')
+    .replace(/\]$/, '')
+    .split(/[;,]/)
+    .map(function (item) { return item.replace(/["']/g, '').trim(); })
+    .filter(Boolean);
+}
+
+function formatScheduleTime(value) {
+  var trimmed = String(value || '').trim();
+  if (!trimmed) {
+    return '';
+  }
+  if (trimmed.indexOf(':') !== -1) {
+    return trimmed;
+  }
+
+  var minutes = Number.parseInt(trimmed, 10);
+  if (Number.isNaN(minutes)) {
+    return trimmed;
+  }
+
+  minutes = ((minutes % 1440) + 1440) % 1440;
+  var hours = Math.floor(minutes / 60);
+  var mins = minutes % 60;
+  return String(hours).padStart(2, '0') + ':' + String(mins).padStart(2, '0');
+}
+
+function formatScheduleFrequency(frequency) {
+  var interval = parseScheduleInteger(frequency);
+  if (interval === 1) {
+    return 'Daily';
+  }
+  if (interval && interval > 1) {
+    return 'Every ' + interval + ' days';
+  }
+  return 'Once';
+}
+
+function formatScheduleWindows(starts, ends) {
+  if (starts.length === 0) {
+    return '';
+  }
+
+  return starts.map(function (start, index) {
+    var formattedStart = formatScheduleTime(start);
+    var formattedEnd = formatScheduleTime(ends[index]);
+    if (formattedEnd && formattedEnd !== formattedStart) {
+      return formattedStart + '–' + formattedEnd;
+    }
+    return formattedStart;
+  }).filter(Boolean).join(', ');
+}
+
+function formatNextDayScheduleLabel(nextDayToAnswer) {
+  var nextDay = parseScheduleInteger(nextDayToAnswer);
+  if (nextDay === null) {
+    return '';
+  }
+  if (nextDay === 0) {
+    return 'day of enrollment';
+  }
+  if (nextDay === 1) {
+    return 'next day of enrollment';
+  }
+  return nextDay + ' days after enrollment';
+}
+
+function scheduleIntervalFormatter(value, row, index) {
+  var parts = String(value || '').split('||');
+  var scheduleParts = [
+    formatNextDayScheduleLabel(parts[1] || ''),
+    formatScheduleFrequency(parts[0] || '')
+  ].filter(Boolean);
+
+  return scheduleParts.length > 0 ? scheduleParts.join(' · ') : 'No schedule';
+}
+
+function scheduleTimeWindowsFormatter(value, row, index) {
+  var parts = String(value || '').split('||');
+  var starts = parseScheduleTimeList(parts[0] || '');
+  var ends = parseScheduleTimeList(parts[1] || '');
+  var windows = formatScheduleWindows(starts, ends);
+
+  return windows || 'No time window';
+}
+
+function scheduleFormatter(value, row, index) {
+  var parts = String(value || '').split('||');
+  var frequency = parts[0] || '';
+  var starts = parseScheduleTimeList(parts[1] || '');
+  var ends = parseScheduleTimeList(parts[2] || '');
+  var nextDayToAnswer = parts[3] || '';
+  var scheduleParts = [
+    formatScheduleFrequency(frequency),
+    formatScheduleWindows(starts, ends),
+    formatNextDayScheduleLabel(nextDayToAnswer)
+  ].filter(Boolean);
+
+  return scheduleParts.length > 0 ? scheduleParts.join(' · ') : 'No schedule';
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function parseConditionQuestionIds(value) {
+  if (value === null || value === undefined) {
+    return [];
+  }
+
+  var raw = String(value).trim();
+  if (!raw || raw === '[]' || raw.toLowerCase() === 'none') {
+    return [];
+  }
+
+  try {
+    var parsed = JSON.parse(raw.replace(/'/g, '"'));
+    if (Array.isArray(parsed)) {
+      return parsed.map(function (item) { return String(item).trim(); }).filter(Boolean);
+    }
+  } catch (error) {
+    // Fall back to simple comma/semicolon parsing below.
+  }
+
+  return raw
+    .replace(/^\[/, '')
+    .replace(/\]$/, '')
+    .split(/[;,]/)
+    .map(function (item) { return item.replace(/["']/g, '').trim(); })
+    .filter(Boolean);
+}
+
+function formatConditionQuestionBadge(type, questionIds, answers) {
+  if (questionIds.length === 0) {
+    return '';
+  }
+
+  var label = type === 'activate' ? 'Activate' : 'Deactivate';
+  var answerText = String(answers || '').trim();
+  var title = answerText ? 'Answers: ' + answerText : 'No answer condition set';
+
+  return '<span class="condition-question-badge ' + type + '" title="' + escapeHtml(title) + '">' +
+    escapeHtml(label + ' Q(' + questionIds.join(', ') + ')') +
+    '</span>';
+}
+
+function conditionQuestionFormatter(value, row, index) {
+  var parts = String(value || '').split('||');
+  var activateQuestionIds = parseConditionQuestionIds(parts[0] || '');
+  var activationAnswers = parts[1] || '';
+  var deactivateQuestionIds = parseConditionQuestionIds(parts[2] || '');
+  var deactivationAnswers = parts[3] || '';
+  var badges = [
+    formatConditionQuestionBadge('activate', activateQuestionIds, activationAnswers),
+    formatConditionQuestionBadge('deactivate', deactivateQuestionIds, deactivationAnswers)
+  ].filter(Boolean);
+
+  if (badges.length === 0) {
+    return '';
+  }
+
+  return '<span class="condition-question-badges">' + badges.join('') + '</span>';
+}
+
+/*
+ * edit_survey.html legacy question ordering.
+ * Renders the arrow icon beside the file-based question id and wires the
+ * shared sort modal with the current/new sequence values.
+ */
+function legacyQuestionSortFormatter(value, row, index) {
+  var questionId = String(value || '').trim();
+  var maxSortId = Number.parseInt(window.legacyQuestionCount || 0, 10);
+  var currentSortId = Number.parseInt(questionId, 10);
+
+  if (!window.legacyQuestionCanSort || !questionId) {
+    return escapeHtml(questionId);
+  }
+
+  var iconClass = 'fas fa-arrows-alt-v';
+  if (currentSortId === 1) {
+    iconClass = 'fas fa-long-arrow-alt-down';
+  } else if (currentSortId === maxSortId) {
+    iconClass = 'fas fa-long-arrow-alt-up';
+  }
+
+  return '<div class="question-sort-cell">' +
+    '<span>' + escapeHtml(questionId) + '</span>' +
+    '<button class="btn btn-link btn-sm p-0" type="button" title="Change order" ' +
+      'data-bs-toggle="modal" data-bs-target="#sortIdModal" ' +
+      'data-question-id="' + escapeHtml(questionId) + '" ' +
+      'data-current-sort-id="' + escapeHtml(questionId) + '" ' +
+      'data-max-sort-id="' + escapeHtml(maxSortId) + '">' +
+      '<i class="' + iconClass + '"></i>' +
+    '</button>' +
+  '</div>';
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  var sortModal = document.getElementById('sortIdModal');
+  if (!sortModal || sortModal.dataset.initialized === 'true') {
+    return;
+  }
+
+  sortModal.dataset.initialized = 'true';
+  sortModal.addEventListener('show.bs.modal', function (event) {
+    var trigger = event.relatedTarget;
+    if (!trigger) {
+      return;
+    }
+
+    var questionId = trigger.getAttribute('data-question-id');
+    var currentSortId = trigger.getAttribute('data-current-sort-id');
+    var maxSortId = trigger.getAttribute('data-max-sort-id');
+
+    var questionInput = document.getElementById('sort-question-id');
+    var oldSortInput = document.getElementById('sort-old-id');
+    var newSortInput = document.getElementById('sort-new-id');
+
+    if (questionInput) {
+      questionInput.value = questionId;
+    }
+    if (oldSortInput) {
+      oldSortInput.value = currentSortId;
+    }
+    if (newSortInput) {
+      newSortInput.value = currentSortId;
+      newSortInput.max = maxSortId;
+    }
+  });
+
+  sortModal.addEventListener('shown.bs.modal', function () {
+    var newSortInput = document.getElementById('sort-new-id');
+    if (newSortInput) {
+      newSortInput.focus();
+      newSortInput.select();
+    }
+  });
+});
+
+/*
+ * edit_survey.html legacy question modal.
+ * Bootstrap Table passes row values from #survey_quest_table; these helpers
+ * normalize that row data into the simple two-column edit modal fields.
+ */
+function setLegacyModalField(selector, value) {
+  var element = document.querySelector(selector);
+  if (element) {
+    element.value = value === null || value === undefined ? '' : value;
+  }
+}
+
+function setLegacyModalCheckbox(selector, value, defaultValue) {
+  var element = document.querySelector(selector);
+  if (!element) {
+    return;
+  }
+
+  var normalized = String(value === null || value === undefined ? '' : value).trim().toLowerCase();
+  if (normalized === '') {
+    element.checked = Boolean(defaultValue);
+    return;
+  }
+  element.checked = ['1', 'true', 'yes', 'on'].indexOf(normalized) !== -1;
+}
+
+function getLegacyRowValue(row, fieldName, fallbackIndex) {
+  if (row && !Array.isArray(row) && Object.prototype.hasOwnProperty.call(row, fieldName)) {
+    return row[fieldName];
+  }
+  if (Array.isArray(row) && row.length > fallbackIndex) {
+    return row[fallbackIndex];
+  }
+  return '';
+}
+
 window.operateEvents = {
     'click .edit': function (e, value, row, index) {
+      var questionId = getLegacyRowValue(row, 'id', 0);
+      var questionType = getLegacyRowValue(row, 'questionType', 3);
       $('#questionModalLabel').text("Edit Question Details" );
-      $('#id_value').val(row[0] );
-      $('#questionTitle').val(row[1] );
-      $('#subText').val(row[2] );
-      $('#questionType').val(question_types[row[3]] );
-      $('#category').val(row[4] );
-      $('#frequency').val(row[5]);
-      $('#clockTime').val(row[6] );
-      $('#nextDayToAnswer').val(row[7] );
-      $('#url').val(row[9] );
-      $('#imageURL').val(row[8] );
-      $('#deactivateOnAnswer').val(row[11] );
-      $('#deactivateOnDate').val(row[10] );
-      if ($('#questionType').val() == 1 || $('#questionType').val() == 2  ){
+      $('#id_value').val(questionId);
+      $('#sortId').val(questionId);
+      $('#legacy-sortid-badge').text(questionId);
+      $('#questionTitle').val(getLegacyRowValue(row, 'title', 1));
+      $('#subText').val(getLegacyRowValue(row, 'subText', 2));
+      $('#questionType').val(question_types[questionType] || questionType);
+      $('#category').val(getLegacyRowValue(row, 'categoryValue', 5) || getLegacyRowValue(row, 'category', 4));
+      $('#frequency').val(getLegacyRowValue(row, 'frequency', 8));
+      $('#clockTime').val(getLegacyRowValue(row, 'clockTime', 9));
+      $('#nextDayToAnswer').val(getLegacyRowValue(row, 'nextDayToAnswer', 10));
+      $('#url').val(getLegacyRowValue(row, 'url', 12));
+      $('#imageURL').val(getLegacyRowValue(row, 'imageURL', 11));
+      $('#deactivateOnAnswer').val(getLegacyRowValue(row, 'deactivateOnAnswer', 14));
+      $('#deactivateOnDate').val(getLegacyRowValue(row, 'deactivateOnDate', 13));
+      setLegacyModalCheckbox('#active', getLegacyRowValue(row, 'active', 15), true);
+      setLegacyModalCheckbox('#mandatory', getLegacyRowValue(row, 'mandatory', 16), false);
+      setLegacyModalField(
+        '#clockTime_start',
+        parseScheduleTimeList(getLegacyRowValue(row, 'clockTimeStart', 17) || getLegacyRowValue(row, 'clockTime', 9)).join(', ')
+      );
+      setLegacyModalField('#clockTime_end', parseScheduleTimeList(getLegacyRowValue(row, 'clockTimeEnd', 18)).join(', '));
+      setLegacyModalField('#activate_question', parseConditionQuestionIds(getLegacyRowValue(row, 'activateQuestion', 19)).join(', '));
+      setLegacyModalField('#deactivate_question', parseConditionQuestionIds(getLegacyRowValue(row, 'deactivateQuestion', 20)).join(', '));
+      setLegacyModalField('#activation_condition', getLegacyRowValue(row, 'activationCondition', 21));
+      setLegacyModalField('#deactivation_condition', getLegacyRowValue(row, 'deactivationCondition', 22));
+      $("#answerChoices").css("display", "none");
+      $("#slidingAnswer").css("display", "none");
+      $("#otherTypeAnswer").css("display", "none");
+      $('#answerText').val('');
+      $('#answerValue').val(getLegacyRowValue(row, 'answerValue', 26) || 0.1);
+      $('#defaultValue').val(getLegacyRowValue(row, 'answerDefaultValue', 27) || 0.1);
+      $('#stepSize').val(getLegacyRowValue(row, 'answerStepSize', 28) || 0.1);
+      $('#minValue').val(getLegacyRowValue(row, 'answerMinValue', 29) || 0.1);
+      $('#maxValue').val(getLegacyRowValue(row, 'answerMaxValue', 30) || 0.1);
+      $('#minText').val(getLegacyRowValue(row, 'answerMinText', 31) || '');
+      $('#maxText').val(getLegacyRowValue(row, 'answerMaxText', 32) || '');
+      $('#answerSubText').val(getLegacyRowValue(row, 'answerSubText', 33) || '');
+      $('#answerSortId').val(getLegacyRowValue(row, 'answerSortId', 34) || 1);
+      if (isChoiceQuestionType($('#questionType').val())){
         $("#answerChoices").css("display", "block");
-        $('#answerText').val(row[13] );
+        $('#answerText').val(getLegacyRowValue(row, 'answerText', 25));
       }
-        else if ($('#questionType').val() == 3  ){
+        else if (isSlidingQuestionType($('#questionType').val())){
            $("#slidingAnswer").css("display", "block");
-        $('#answerValue').val(row[14] );
-        $('#defaultValue').val(row[15] );
-        $('#stepSize').val(row[16] );
-        $('#minValue').val(row[17] );
-        $('#maxValue').val(row[18] );
-        $('#minText').val(row[19] );
-        $('#maxText').val(row[20] );
       }else{
         $("#otherTypeAnswer").css("display", "block");
-        $('#answerText').val('');
-        $('#answerSortId').val(row[22] );
-        $('#answerSubText').val(row[21]);
-        $('#answerValue').val(0.1 );
-        $('#defaultValue').val(0.1 );
-        $('#stepSize').val(0.1);
-        $('#minValue').val(0.1);
-        $('#maxValue').val(0.1);
-        $('#minText').val('');
-        $('#maxText').val('' );
+        $('#answerText').css('display', 'none');
       }
+      $('#activate_condition_div').css('display', 'block');
+      $('#deactivate_condition_div').css('display', 'block');
+      $('#activation_condition').css('display', '');
+      $('#deactivation_condition').css('display', '');
 
     },
     'click .delete': function (e, value, row, index) {
-      $("#survey_quest_table").bootstrapTable('remove', {
-        field: 'id',
-        values: [row.id]
-      })
-      var questionTitle = row[1];
-      // Update a hidden input field in the form with the quest ID
-      var input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = 'question_title';
-      input.value = questionTitle;
-      document.getElementById('removeQuestionForm').appendChild(input);
+      e.preventDefault();
+      var questionId = getLegacyRowValue(row, 'id', 0);
+      setDeleteQuestionIds([questionId]);
     }
   }
 
+
+/*
+ * edit_survey.html question deletion.
+ * The selectors include #survey_quest_table for legacy file-backed surveys
+ * and #quest_table for DB-backed surveys, so bulk delete can share one modal.
+ */
+var selectedQuestionIds = new Set();
+var deleteQuestionSubmitting = false;
+
+function showJdashLoading(message) {
+  var overlay = document.getElementById('jdash-loading-overlay');
+  var messageElement = document.getElementById('jdash-loading-message');
+
+  if (!overlay) {
+    return;
+  }
+
+  if (messageElement && message) {
+    messageElement.textContent = message;
+  }
+
+  overlay.style.alignItems = 'center';
+  overlay.style.display = 'flex';
+  overlay.style.inset = '0';
+  overlay.style.justifyContent = 'center';
+  overlay.style.position = 'fixed';
+  overlay.style.zIndex = '2100';
+  overlay.hidden = false;
+  overlay.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('jdash-loading-active');
+}
+
+function hideJdashLoading() {
+  var overlay = document.getElementById('jdash-loading-overlay');
+
+  if (!overlay) {
+    return;
+  }
+
+  overlay.hidden = true;
+  overlay.style.display = 'none';
+  overlay.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('jdash-loading-active');
+}
+
+function ensureDeleteQuestionSubmitValue(form) {
+  var existingInput = form.querySelector('input[type="hidden"][name="delete_question"]');
+
+  if (existingInput) {
+    existingInput.value = '1';
+    return;
+  }
+
+  var input = document.createElement('input');
+  input.type = 'hidden';
+  input.name = 'delete_question';
+  input.value = '1';
+  form.appendChild(input);
+}
+
+function normalizeQuestionIds(questionIds) {
+  return Array.from(new Set(
+    questionIds
+      .map(function (questionId) { return String(questionId || '').trim(); })
+      .filter(function (questionId) { return questionId.length > 0; })
+  ));
+}
+
+function setDeleteQuestionIds(questionIds) {
+  var idsContainer = document.getElementById('delete-question-ids');
+  var summary = document.getElementById('delete-question-summary');
+
+  if (!idsContainer) {
+    return;
+  }
+
+  idsContainer.innerHTML = '';
+  var normalizedIds = normalizeQuestionIds(questionIds);
+
+  normalizedIds.forEach(function (questionId) {
+    var input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'question_id';
+    input.value = questionId;
+    idsContainer.appendChild(input);
+  });
+
+  if (summary) {
+    if (normalizedIds.length === 1) {
+      summary.textContent = '1 question selected.';
+    } else if (normalizedIds.length > 1) {
+      summary.textContent = normalizedIds.length + ' questions selected.';
+    } else {
+      summary.textContent = '';
+    }
+  }
+}
+
+function getVisibleQuestionCheckboxes() {
+  return Array.from(document.querySelectorAll('#quest_table .question-select, #survey_quest_table .question-select'));
+}
+
+function updateBulkQuestionDeleteControls() {
+  var deleteButton = document.getElementById('bulk-delete-questions');
+  var countLabel = document.getElementById('bulk-question-selected-count');
+  var selectAll = document.getElementById('select-all-questions');
+  var selectedCount = selectedQuestionIds.size;
+  var visibleCheckboxes = getVisibleQuestionCheckboxes();
+
+  if (deleteButton) {
+    deleteButton.disabled = selectedCount === 0;
+  }
+
+  if (countLabel) {
+    countLabel.textContent = selectedCount > 0 ? selectedCount + ' selected' : '';
+  }
+
+  if (selectAll) {
+    var visibleCount = visibleCheckboxes.length;
+    var selectedVisibleCount = visibleCheckboxes.filter(function (checkbox) {
+      return selectedQuestionIds.has(checkbox.value);
+    }).length;
+
+    selectAll.checked = visibleCount > 0 && selectedVisibleCount === visibleCount;
+    selectAll.indeterminate = selectedVisibleCount > 0 && selectedVisibleCount < visibleCount;
+  }
+}
+
+function applySelectedQuestionState() {
+  getVisibleQuestionCheckboxes().forEach(function (checkbox) {
+    checkbox.checked = selectedQuestionIds.has(checkbox.value);
+  });
+  updateBulkQuestionDeleteControls();
+}
+
+function initializeQuestionBulkDelete() {
+  var table = document.getElementById('quest_table') || document.getElementById('survey_quest_table');
+  if (!table) {
+    return;
+  }
+
+  table.addEventListener('change', function (event) {
+    if (!event.target.classList.contains('question-select')) {
+      return;
+    }
+
+    if (event.target.checked) {
+      selectedQuestionIds.add(event.target.value);
+    } else {
+      selectedQuestionIds.delete(event.target.value);
+    }
+    updateBulkQuestionDeleteControls();
+  });
+
+  var selectAll = document.getElementById('select-all-questions');
+  if (selectAll) {
+    selectAll.addEventListener('change', function (event) {
+      getVisibleQuestionCheckboxes().forEach(function (checkbox) {
+        checkbox.checked = event.target.checked;
+        if (event.target.checked) {
+          selectedQuestionIds.add(checkbox.value);
+        } else {
+          selectedQuestionIds.delete(checkbox.value);
+        }
+      });
+      updateBulkQuestionDeleteControls();
+    });
+  }
+
+  var bulkDeleteButton = document.getElementById('bulk-delete-questions');
+  if (bulkDeleteButton) {
+    bulkDeleteButton.addEventListener('click', function (event) {
+      if (selectedQuestionIds.size === 0) {
+        event.preventDefault();
+        return;
+      }
+      setDeleteQuestionIds(Array.from(selectedQuestionIds));
+    });
+  }
+
+  $('#quest_table, #survey_quest_table').on('post-body.bs.table page-change.bs.table search.bs.table', applySelectedQuestionState);
+  applySelectedQuestionState();
+}
+
+function initializeQuestionDeleteLoading() {
+  var deleteQuestionForm = document.getElementById('deleteQuestionForm');
+  if (!deleteQuestionForm) {
+    return;
+  }
+
+  deleteQuestionForm.addEventListener('submit', function (event) {
+    if (deleteQuestionSubmitting) {
+      return;
+    }
+
+    event.preventDefault();
+    deleteQuestionSubmitting = true;
+    ensureDeleteQuestionSubmitValue(deleteQuestionForm);
+    showJdashLoading(
+      deleteQuestionForm.getAttribute('data-loading-message') ||
+      'Deleting selected questions and updating order...'
+    );
+
+    window.setTimeout(function () {
+      deleteQuestionForm.submit();
+    }, 80);
+  });
+}
+
+window.showJdashLoading = showJdashLoading;
+window.hideJdashLoading = hideJdashLoading;
+
+$(function() {
+  initializeQuestionBulkDelete();
+  initializeQuestionDeleteLoading();
+});
 
   window.createOperateEvents = {
     'click .edit': function (e, value, row, index) {
     },
     'click .delete': function (e, value, row, index) {
-      $("#quest_table").bootstrapTable('remove', {
-        field: 'id',
-        values: [row.id]
-      })
-      var questionId = row[0];
-      // Update a hidden input field in the form with the quest ID
-      var input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = 'question_id';
-      input.value = questionId;
-      document.getElementById('deleteQuestionForm').appendChild(input);
+      e.preventDefault();
+      var questionId = e.currentTarget.getAttribute('data-question-id') || row[0];
+      setDeleteQuestionIds([questionId]);
     }
   }
 
 
+function prepareSurveyDeleteForm(trigger, row) {
+  const deleteSurveyForm = document.getElementById('deleteSurveyForm');
+  if (!deleteSurveyForm || !trigger) {
+    return;
+  }
+
+  const defaultAction = deleteSurveyForm.getAttribute('data-default-action') || deleteSurveyForm.action;
+  deleteSurveyForm.action = trigger.getAttribute('data-delete-url') || defaultAction;
+  deleteSurveyForm.querySelectorAll('input[name="survey_id"]').forEach(function (input) {
+    input.remove();
+  });
+
+  const surveyId = trigger.getAttribute('data-survey-id') || (row && row.survey_id);
+  if (surveyId && surveyId !== 'file') {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'survey_id';
+    input.value = surveyId;
+    deleteSurveyForm.appendChild(input);
+  }
+}
+
+document.addEventListener('click', function (event) {
+  const trigger = event.target.closest('#survey_table .delete');
+  if (trigger) {
+    prepareSurveyDeleteForm(trigger);
+  }
+});
+
+
 window.survey_operateEvents = {
     'click .delete': function (e, value, row, index) {
-      $("#survey_table").bootstrapTable('remove', {
-        field: 'survey_id',
-        values: [row.survey_id]
-      })
-              // Retrieve the survey ID from the data-id attribute
-              var surveyId = row.survey_id;
-              // Update a hidden input field in the form with the survey ID
-              var input = document.createElement('input');
-              input.type = 'hidden';
-              input.name = 'survey_id';
-              input.value = surveyId;
-              document.getElementById('deleteSurveyForm').appendChild(input);
-
+      e.preventDefault();
+      prepareSurveyDeleteForm(e.currentTarget, row);
     }
   }
 
@@ -155,17 +715,15 @@ function remove_survey(){
     deleteSurveyForm.submit();
 }
 
-
-
 function show_answer_form(){
     const questionType = document.getElementById('questionType');
     if (!questionType) {
       return;
     }
 
-    const selectedValue = questionType.value;
-    const isChoice = selectedValue === '1' || selectedValue === '2';
-    const isSliding = selectedValue === '3';
+    const selectedValue = normalizeQuestionTypeValue(questionType.value);
+    const isChoice = isChoiceQuestionType(selectedValue);
+    const isSliding = isSlidingQuestionType(selectedValue);
     const answerForms = Array.from(document.querySelectorAll('.choice-formset'));
     const slidingRows = Array.from(document.querySelectorAll('[id^="slidingAnswer-"]'));
     const subTextRows = Array.from(document.querySelectorAll('[id="subTextDiv"]'));
@@ -207,21 +765,29 @@ function show_answer_form(){
     });
 
     document.querySelectorAll('#subTextDiv').forEach((element) => {
-      element.style.display = (!isChoice && !isSliding) ? 'block' : 'none';
+      element.style.display = 'none';
     });
   }
+
 function initializeDefaultValueToggle() {
   const toggle = document.getElementById('flexSwitchCheckDefault');
-  const advancedSection = document.getElementById('advanced-values-section');
 
   if (!toggle) return;
 
-  function updateVisibility() {
-    if (toggle.checked && advancedSection) {
-      advancedSection.style.display = 'none';
-    } else if (advancedSection) {
-      advancedSection.style.display = '';
+  const sortIdInput = document.querySelector('input[name="sortId"]');
+  const currentSortId = Number.parseInt(sortIdInput?.value || '', 10);
+  window.current_sort_id = Number.isNaN(currentSortId) ? 1 : currentSortId;
+
+  const previousQuestionScript = document.getElementById('prev-question-data');
+  if (previousQuestionScript) {
+    try {
+      window.previous_question_object = JSON.parse(previousQuestionScript.textContent || '{}');
+    } catch (error) {
+      console.warn('Unable to parse previous question data.', error);
+      window.previous_question_object = {};
     }
+  } else {
+    window.previous_question_object = {};
   }
 
   if (window.current_sort_id === 1) {
@@ -229,9 +795,8 @@ function initializeDefaultValueToggle() {
     toggle.disabled = true;
   }
 
-  updateVisibility();
   toggle.addEventListener('change', () => {
-    updateVisibility();
+    //updateVisibility();
     set_default_values(toggle);
   });
 
@@ -239,37 +804,39 @@ function initializeDefaultValueToggle() {
     set_default_values(toggle);
   }
 }
-function set_default_values(default_switch){
-  const isFirstQuestion = current_sort_id === 1;
 
-  if (default_switch.checked) {
-    if (isFirstQuestion) {
-      // Apply static defaults for question 1
-      $('#category').val(1);
-      $('#nextDayToAnswer').val(1);
-      $('#frequency').val(0);
-      $('#clockTime').val(480);
-      $('#deactivateOnDate').val(0);
-    } else {
-      // Apply values from previous question
-      if (typeof previous_question_object !== 'undefined') {
-        $('#category').val(previous_question_object.category || '');
-        $('#nextDayToAnswer').val(previous_question_object.nextDayToAnswer || '');
-        $('#frequency').val(previous_question_object.frequency || '');
-        $('#clockTime').val(previous_question_object.clockTime || '');
-        $('#deactivateOnDate').val(previous_question_object.deactivateOnDate || '');
-      } else {
-        console.warn("Previous question values are not available.");
-      }
-    }
-  } else {
-    // Clear values
-    $('#category').val('');
-    $('#nextDayToAnswer').val('');
-    $('#frequency').val('');
-    $('#clockTime').val('');
-    $('#deactivateOnDate').val('');
+function serializeQuestionValue(value) {
+  if (Array.isArray(value)) {
+    return value.join(',');
   }
+  if (value === null || value === undefined) {
+    return '';
+  }
+  return value;
+}
+
+function set_default_values(default_switch){
+  const isFirstQuestion = window.current_sort_id === 1;
+
+  if (!default_switch.checked) {
+    return;
+  }
+
+    // Apply values from previous question
+    const previousQuestion = window.previous_question_object || {};
+    if (Object.keys(previousQuestion).length > 0) {
+      $('#activate_question').val(serializeQuestionValue(previousQuestion.activate_question));
+      $('#deactivate_question').val(serializeQuestionValue(previousQuestion.deactivate_question));
+      $('#activation_condition').val(previousQuestion.activation_condition ?? '');
+      $('#deactivation_condition').val(previousQuestion.deactivation_condition ?? '');
+      $('#imageURL').val(previousQuestion.imageURL ?? '');
+      $('#url').val(previousQuestion.url ?? '');
+    } else {
+      console.warn("Previous question values are not available.");
+    }
+
+  toggleActivateConditionsField();
+  toggleDeactivateConditionsField();
 }
 
 function makeAllEmptyValues(){
@@ -283,12 +850,12 @@ function makeAllEmptyValues(){
     $('#url').val('' );
     $('#nextDayToAnswer').val(1)
     $('#frequency').val(0)
-    $('#clockTime_start').val('[]')
-    $('#clockTime_end').val('[]')
+    $('#clockTime_start').val('')
+    $('#clockTime_end').val('')
     $('#deactivateOnAnswer').val('')
     $('#deactivateOnDate').val(0)
-    $('#activate_question').val('[]')
-    $('#deactivate_question').val('[]')
+    $('#activate_question').val('')
+    $('#deactivate_question').val('')
     $('#activation_condition').val('')
     $('#deactivation_condition').val('')
     $("#slidingAnswer").css("display", "none");
@@ -324,9 +891,10 @@ function editQuestion(){
 }
 
 function display_info(event){
-    //event.preventDefault();
-    if (validateNecessaryFields() && validateClockTimes() && validateAnswerChoiceSeparators() 
-        && validateConditionQuestionCategories()) {
+  if (event && typeof event.preventDefault === 'function') {
+    event.preventDefault();
+  }
+  if (validateNecessaryFields() && validateClockTimes() && validateAnswerChoiceSeparators() && validateConditionQuestionCategories()) {
     $('#updateModal').modal('show');
   }
 
@@ -541,6 +1109,36 @@ function validateConditionQuestionCategories() {
   return false;
 }
 
+function validateAnswerChoiceSeparators() {
+  const answerInputs = Array.from(document.querySelectorAll('.choice-formset input[name$="-text"]'));
+  const questionType = document.getElementById('questionType');
+  if (!isChoiceQuestionType(questionType ? questionType.value : '')) {
+    answerInputs.forEach((input) => input.setCustomValidity(''));
+    return true;
+  }
+
+  const invalidInput = answerInputs.find((input) => /[,;]/.test(input.value || ''));
+
+  answerInputs.forEach((input) => input.setCustomValidity(''));
+
+  if (!invalidInput) {
+    return true;
+  }
+
+  invalidInput.setCustomValidity('Answer choices cannot contain commas or semicolons.');
+  invalidInput.reportValidity();
+  return false;
+}
+
+function clearAnswerChoiceSeparatorValidity(input) {
+  if (!input) {
+    return;
+  }
+  input.setCustomValidity(/[,;]/.test(input.value || '')
+    ? 'Answer choices cannot contain commas or semicolons.'
+    : '');
+}
+
 
 function delete_quest(){
   const deleteQuestionForm = document.getElementById("deleteQuestionForm");
@@ -628,6 +1226,7 @@ function renumberChoices() {
       sortInput.value = index + 1;
     }
   });
+  refreshConditionOptionGroups();
 }
 
 

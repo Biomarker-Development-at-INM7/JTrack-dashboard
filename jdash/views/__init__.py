@@ -9,7 +9,6 @@ from jdash.views.core_views import (
     password_reset_done,
     password_reset_request,
     server_error,
-    server_error,
     session_check,
 )
 from jdash.views.study_views import (
@@ -17,8 +16,8 @@ from jdash.views.study_views import (
     close,
     download_dataset_from_link,
     edit_study,
-    qc_study,
     notify_qc_comment,
+    qc_study,
     study_audit,
     study_details,
 )
@@ -28,9 +27,12 @@ from jdash.views.subject_views import (
 )
 from jdash.views.survey_views import (
     create_survey,
+    delete_legacy_survey,
     delete_survey,
+    download_legacy_survey_json,
     download_survey_json,
     duplicate_question,
+    duplicate_legacy_survey,
     duplicate_survey,
     edit_survey,
     manage_category_for_survey,
@@ -39,3 +41,4 @@ from jdash.views.survey_views import (
     survey_list,
 )
 from jdash.views.analytics_views import analytics
+

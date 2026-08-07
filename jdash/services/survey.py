@@ -34,7 +34,7 @@ from jdash.repositories.survey_repository import (
     delete_answer_in_db,
 )
 from jdash.utils.fileutils import open_study_json, save_study_json
-from jdash.utils.utils import normalize_question_data_defaults
+from jdash.utils.utils import normalize_question_data_defaults,coerce_bool
 from jdash.utils.surveyFileToJSON import SurveyFileToJSONConverter
 from jdash.models import Question, Category
 logger = logging.getLogger("django")
@@ -94,6 +94,7 @@ class Survey:
             'id': question_id,
             'title': question_dict.get('title') or question_dict.get('text'),
             'questionType': question_dict.get('questionType') or question_dict.get('type'),
+            'mandatory': coerce_bool(question_dict.get('mandatory'), default=False),
             'subText': question_dict.get('subText', ''),
             'category': question_dict.get('category'),
             'frequency': question_dict.get('frequency'),
@@ -157,7 +158,7 @@ class Survey:
         for key in [
             'title', 'questionType', 'subText', 'category', 'frequency',
             'clockTime', 'nextDayToAnswer', 'imageURL', 'url',
-            'deactivateOnAnswer', 'deactivateOnDate', 'answers'
+            'deactivateOnAnswer', 'deactivateOnDate', 'mandatory', 'answers'
         ]:
             if key in question_dict and question_dict[key] is not None:
                 question[key] = question_dict[key]
@@ -444,7 +445,7 @@ class Survey:
     @classmethod
     def delete_question(cls, question_id, survey_id):
         """
-        Delete a question from a survey and reorder following questions when needed.
+        Delete one question from a survey.
 
         Args:
             question_id (int): Identifier of the question to delete.
@@ -454,13 +455,157 @@ class Survey:
             int: Identifier of the parent survey.
         """
         logger.info("Survey.delete_question called for survey_id=%s question_id=%s", survey_id, question_id)
-        question = retrieve_question_details(question_id)
-        next_question = get_question_by_sortid(survey_id, question["sortId"] + 1)
-        delete_question_from_db(question_id, survey_id)
-        if next_question:
-            cls.update_question_order(next_question["db_id"], question["sortId"])
+        survey_id = cls.delete_questions([question_id], survey_id)
         logger.info("Survey.delete_question finished for survey_id=%s question_id=%s", survey_id, question_id)
         logger.debug("Survey.delete_question return_value=%s", survey_id)
+        return survey_id
+
+    @staticmethod
+    def _normalize_question_id(question_id):
+        try:
+            return int(question_id)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _normalize_condition_question_refs(value):
+        if value in (None, "", []):
+            return set()
+
+        if isinstance(value, str):
+            raw_value = value.strip()
+            if not raw_value:
+                return set()
+            try:
+                parsed_value = json.loads(raw_value)
+            except ValueError:
+                parsed_value = raw_value.replace(";", ",").split(",")
+            value = parsed_value
+
+        if not isinstance(value, (list, tuple, set)):
+            value = [value]
+
+        question_refs = set()
+        for item in value:
+            normalized_id = Survey._normalize_question_id(item)
+            if normalized_id is not None:
+                question_refs.add(normalized_id)
+        return question_refs
+
+    @classmethod
+    def _questions_selected_for_delete(cls, question_ids, all_questions):
+        normalized_ids = []
+        for question_id in question_ids:
+            normalized_id = cls._normalize_question_id(question_id)
+            if normalized_id is not None and normalized_id not in normalized_ids:
+                normalized_ids.append(normalized_id)
+
+        question_lookup = {
+            cls._normalize_question_id(question.get("db_id")): question
+            for question in all_questions
+        }
+        selected_questions = [
+            question_lookup[question_id]
+            for question_id in normalized_ids
+            if question_id in question_lookup
+        ]
+        return sorted(
+            selected_questions,
+            key=lambda question: cls._normalize_question_id(question.get("sortId")) or 0,
+            reverse=True,
+        )
+
+    @classmethod
+    def _assert_questions_can_be_deleted(cls, selected_questions, all_questions):
+        selected_db_ids = {
+            cls._normalize_question_id(question.get("db_id"))
+            for question in selected_questions
+        }
+        selected_sort_ids = {
+            cls._normalize_question_id(question.get("sortId"))
+            for question in selected_questions
+        }
+        selected_db_ids.discard(None)
+        selected_sort_ids.discard(None)
+
+        blockers = []
+        for question in all_questions:
+            question_db_id = cls._normalize_question_id(question.get("db_id"))
+            if question_db_id in selected_db_ids:
+                continue
+
+            question_sort_id = cls._normalize_question_id(question.get("sortId"))
+            for field_name in ("activate_question", "deactivate_question"):
+                linked_sort_ids = cls._normalize_condition_question_refs(question.get(field_name))
+                blocked_sort_ids = sorted(selected_sort_ids.intersection(linked_sort_ids))
+                for blocked_sort_id in blocked_sort_ids:
+                    blockers.append(
+                        "Q%s %s -> Q%s" % (question_sort_id, field_name, blocked_sort_id)
+                    )
+
+        if blockers:
+            raise ValueError(
+                "Cannot delete selected questions. Remove condition links first: %s"
+                % ", ".join(blockers)
+            )
+
+    @classmethod
+    def _compact_question_order_after_delete(cls, survey_id, removed_sort_id):
+        following_question_ids = list(
+            Question.objects.filter(
+                survey_id=survey_id,
+                sortId__gt=removed_sort_id,
+            ).order_by("sortId", "id").values_list("id", flat=True)
+        )
+
+        next_sort_id = removed_sort_id
+        for following_question_id in following_question_ids:
+            cls.update_question_order(following_question_id, next_sort_id)
+            next_sort_id += 1
+
+    @classmethod
+    def _delete_question_without_dependency_check(cls, question_id, survey_id):
+        question_id = cls._normalize_question_id(question_id)
+        if question_id is None:
+            return survey_id
+
+        question = (
+            Question.objects.select_for_update()
+            .filter(id=question_id, survey_id=survey_id)
+            .first()
+        )
+        if not question:
+            return survey_id
+
+        removed_sort_id = question.sortId
+        deleted = delete_question_from_db(question_id, survey_id)
+        if deleted:
+            cls._compact_question_order_after_delete(survey_id, removed_sort_id)
+        return survey_id
+
+    @classmethod
+    def delete_questions(cls, question_ids, survey_id):
+        """
+        Delete multiple questions from a survey and keep the remaining sort order compact.
+
+        Args:
+            question_ids (list): Question database IDs to delete.
+            survey_id (int): Identifier of the parent survey.
+
+        Returns:
+            int: Identifier of the parent survey.
+        """
+        logger.info("Survey.delete_questions called for survey_id=%s question_ids=%s", survey_id, question_ids)
+        all_questions = retrieve_all_questions_for_survey(survey_id)
+        selected_questions = cls._questions_selected_for_delete(question_ids, all_questions)
+        if not selected_questions:
+            return survey_id
+
+        cls._assert_questions_can_be_deleted(selected_questions, all_questions)
+
+        with transaction.atomic():
+            for question in selected_questions:
+                cls._delete_question_without_dependency_check(question["db_id"], survey_id)
         return survey_id
 
     @staticmethod
@@ -643,6 +788,7 @@ def update_survey_details(study_name, values_obj, is_question):
                 question['imageURL'] = values_obj['imageURL']
                 question['url'] = values_obj['url']
                 question['questionType'] = values_obj['questionType']
+                question['mandatory'] = coerce_bool(values_obj.get('mandatory'), default=False)
                 question['deactivateOnAnswer'] = values_obj['deactivateOnAnswer']
                 question['deactivateOnDate'] = values_obj['deactivateOnDate']
     else:
@@ -655,3 +801,4 @@ def update_survey_details(study_name, values_obj, is_question):
     logger.info("update_survey_details finished for study_name=%s", study_name)
     logger.debug("update_survey_details return_value=%s", True)
     return True
+
