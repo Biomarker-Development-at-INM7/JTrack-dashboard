@@ -1,10 +1,10 @@
 import json
 import logging
-from operator import itemgetter
 import re
-from django.contrib.auth.models import User
+from operator import itemgetter
+from django.db.models import Q
+from django.contrib.auth.models import Group, User
 from django.db import transaction
-from django.db.models import F
 
 from jdash.config import constants as constants
 from jdash.interface.session_manager import SessionManager
@@ -19,6 +19,7 @@ from jdash.utils.utils import (
     answer_download_serializer,
     answer_serializer,
     category_serializer,
+    coerce_bool,
     custom_serializer,
     question_db_serializer,
     question_serializer,
@@ -55,87 +56,201 @@ def update_survey_info_in_db(form, survey_id):
     return survey
 
 
+def _normalize_import_value(value):
+    if value in (None, "", [], {}):
+        return []
+
+    if isinstance(value, list):
+        raw_items = value
+    elif isinstance(value, str):
+        raw_value = value.strip()
+        if raw_value.lower() in ("", "[]", "none", "null"):
+            return []
+        try:
+            parsed_value = json.loads(raw_value.replace("'", '"'))
+            raw_items = parsed_value if isinstance(parsed_value, list) else [parsed_value]
+        except ValueError:
+            raw_items = re.split(r"[,;]", raw_value)
+    else:
+        raw_items = [value]
+
+    normalized_items = []
+    for item in raw_items:
+        if item in (None, ""):
+            continue
+        try:
+            normalized_items.append(int(str(item).strip()))
+        except (TypeError, ValueError):
+            logger.warning("Skipping non-integer survey import reference: %s", item)
+    return normalized_items
+
+
+def _normalize_import_int(value, default=0):
+    if value in (None, ""):
+        return default
+    raw_value = str(value).strip()
+    if raw_value.lower() in ("", "none", "null"):
+        return default
+    if ":" in raw_value:
+        try:
+            hours, minutes = raw_value.split(":", 1)
+            return int(hours) * 60 + int(minutes)
+        except (TypeError, ValueError):
+            return default
+    try:
+        return int(float(raw_value))
+    except (TypeError, ValueError):
+        return default
+
+
+def _normalize_import_float(value, default=0.1):
+    if value in (None, ""):
+        return default
+    raw_value = str(value).strip()
+    if raw_value.lower() in ("", "none", "null"):
+        return default
+    try:
+        return float(raw_value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _normalize_import_bool(value, default=False):
+    if value in (None, ""):
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return str(value).strip().lower() in ("1", "true", "yes", "y", "on")
+
+
+def _normalize_import_text(value, default=""):
+    if value is None:
+        return default
+    raw_value = str(value)
+    if raw_value.strip().lower() in ("none", "null"):
+        return default
+    return raw_value
+
+
+def _normalize_import_answer(answer_data, answer_index):
+    answer_data = answer_data or {}
+    min_value = answer_data.get("minVal", answer_data.get("minValue", 0.1))
+    max_value = answer_data.get("maxVal", answer_data.get("maxValue", 0.1))
+    return {
+        "id": _normalize_import_int(
+            answer_data.get("id", answer_data.get("answerSortId")),
+            default=answer_index,
+        ),
+        "text": _normalize_import_text(answer_data.get("text"), "N"),
+        "answerSubText": _normalize_import_text(
+            answer_data.get("subText", answer_data.get("answerSubText")),
+            "N",
+        ),
+        "value": _normalize_import_float(answer_data.get("value"), default=0.1),
+        "defaultValue": _normalize_import_float(answer_data.get("defaultValue"), default=0.1),
+        "stepSize": _normalize_import_float(answer_data.get("stepSize"), default=0.1),
+        "minVal": _normalize_import_float(min_value, default=0.1),
+        "maxVal": _normalize_import_float(max_value, default=0.1),
+        "minText": _normalize_import_text(answer_data.get("minText")),
+        "maxText": _normalize_import_text(answer_data.get("maxText")),
+    }
+
+
+def _normalize_import_question(question_data, question_index):
+    question_data = question_data or {}
+    clock_time_start = _normalize_import_value(question_data.get("clockTime_start"))
+    clock_time_end = _normalize_import_value(question_data.get("clockTime_end"))
+    clock_time = _normalize_import_int(
+        question_data.get(constants.field_name_clockTime),
+        default=0,
+    )
+
+    if clock_time > 0 and len(clock_time_start) == 0 and len(clock_time_end) == 0:
+        clock_time_start = [clock_time]
+
+    answers = [
+        _normalize_import_answer(answer, index)
+        for index, answer in enumerate(question_data.get("answer", []) or [], start=1)
+        if isinstance(answer, dict)
+    ]
+
+    return {
+        "id": _normalize_import_int(question_data.get("id"), default=question_index),
+        "title": _normalize_import_text(question_data.get("title"), f"Question {question_index}"),
+        "mandatory": _normalize_import_bool(question_data.get("mandatory"), default=False),
+        "subText": _normalize_import_text(question_data.get("subText")),
+        "frequency": _normalize_import_int(question_data.get("frequency"), default=0),
+        "clockTime": clock_time,
+        "clockTime_start": clock_time_start,
+        "clockTime_end": clock_time_end,
+        "nextDayToAnswer": _normalize_import_int(question_data.get("nextDayToAnswer"), default=0),
+        "category": _normalize_import_int(question_data.get("category"), default=0),
+        "imageURL": _normalize_import_text(question_data.get("imageURL")),
+        "url": _normalize_import_text(question_data.get("url")),
+        "questionType": _normalize_import_int(question_data.get("questionType"), default=0),
+        "deactivateOnAnswer": _normalize_import_text(question_data.get("deactivateOnAnswer")),
+        "deactivateOnDate": _normalize_import_int(question_data.get("deactivateOnDate"), default=0),
+        "activate_question": _normalize_import_value(question_data.get("activate_question")),
+        "deactivate_question": _normalize_import_value(
+            question_data.get("deactivate_question", question_data.get("deActivate_question"))
+        ),
+        "activation_condition": _normalize_import_text(question_data.get("activation_condition")),
+        "deactivation_condition": _normalize_import_text(
+            question_data.get("deactivation_condition", question_data.get("deActivation_condition"))
+        ),
+        "answer": answers,
+    }
+
+
 def create_survey_in_db(study_name, survey_dict, user):
     """Create a survey and its questions/answers from imported JSON data."""
-    def _normalize_import_value(value):
-        if value in (None, "", []):
-            return []
-        if isinstance(value, list):
-            raw_items = value
-        elif isinstance(value, str):
-            raw_items = re.split(r"[,;]", value)
-        else:
-            raw_items = [value]
-        return [int(str(item).strip()) for item in raw_items if str(item).strip()]
 
     if constants.key_name_survey in survey_dict:
         survey_dict = survey_dict[constants.key_name_survey]
 
-    survey = surveyModel.objects.create(
-        title=study_name,
-        description="",
-        topN=survey_dict[constants.key_name_topN]
-        if constants.key_name_topN in survey_dict
-        else -1,
-        splitbyCategory=survey_dict["splitbyCategory"] if "splitbyCategory" in survey_dict else 0,
-        scrolling=survey_dict["scrolling"] if "scrolling" in survey_dict else "H",
-        owner=user,
-    )
-    logger.info("create_survey_in_db::start::%s", survey)
-
-    if "categories" in survey_dict:
-        create_categories_in_db_from_data(survey.id, survey_dict["categories"])
-
-    for question_data in survey_dict["questions"]:
-        if question_data["clockTime_start"].strip():
-            question_data["clockTime_start"] = [
-                int(x) for x in question_data["clockTime_start"].split(";")
-            ]
-        if question_data["clockTime_end"].strip():
-            question_data["clockTime_end"] = [
-                int(x) for x in question_data["clockTime_end"].split(";")
-            ]
-        question_data["activate_question"] = _normalize_import_value(
-            question_data.get("activate_question")
+    with transaction.atomic():
+        survey = surveyModel.objects.create(
+            title=study_name,
+            description=_normalize_import_text(survey_dict.get("description")),
+            topN=_normalize_import_int(survey_dict.get(constants.key_name_topN), default=-1),
+            splitbyCategory=_normalize_import_bool(survey_dict.get("splitbyCategory"), default=False),
+            scrolling=_normalize_import_text(survey_dict.get("scrolling"), "H")[:1] or "H",
+            owner=user,
         )
-        question_data["deactivate_question"] = _normalize_import_value(
-            question_data.get("deactivate_question")
-        )
+        logger.info("create_survey_in_db::start::%s", survey)
 
-        if (
-            question_data[constants.field_name_clockTime] > 0
-            and question_data[constants.field_name_clockTime_start] == ""
-            and question_data[constants.field_name_clockTime_end] == ""
-        ):
-            question_data[constants.field_name_clockTime_start] = [
-                int(question_data[constants.field_name_clockTime])
-            ]
+        if "categories" in survey_dict:
+            create_categories_in_db_from_data(survey.id, survey_dict["categories"] or [])
 
-        question = questionModel.objects.create(
-            survey=survey,
-            title=question_data["title"],
-            active=1,
-            sortId=question_data["id"],
-            subText=question_data["subText"],
-            frequency=question_data["frequency"],
-            clockTime=question_data["clockTime"],
-            clockTime_start=question_data["clockTime_start"],
-            clockTime_end=question_data["clockTime_end"],
-            nextDayToAnswer=question_data["nextDayToAnswer"],
-            category=question_data["category"],
-            imageURL=question_data["imageURL"],
-            url=question_data["url"],
-            questionType=question_data["questionType"],
-            deactivateOnAnswer=question_data["deactivateOnAnswer"],
-            deactivateOnDate=question_data["deactivateOnDate"],
-            activate_question=question_data["activate_question"],
-            deactivate_question=question_data["deactivate_question"],
-            activation_condition=question_data["activation_condition"],
-            deactivation_condition=question_data["deactivation_condition"],
-            clockTime_timezone="Europe/Berlin",
-        )
-        logger.info("create_question_in_db::done::%s", question.id)
-        if "answer" in question_data:
+        for index, raw_question_data in enumerate(survey_dict.get("questions", []) or [], start=1):
+            question_data = _normalize_import_question(raw_question_data, index)
+            question = questionModel.objects.create(
+                survey=survey,
+                title=question_data["title"],
+                active=1,
+                mandatory=question_data["mandatory"],
+                sortId=question_data["id"],
+                subText=question_data["subText"],
+                frequency=question_data["frequency"],
+                clockTime=question_data["clockTime"],
+                clockTime_start=question_data["clockTime_start"],
+                clockTime_end=question_data["clockTime_end"],
+                nextDayToAnswer=question_data["nextDayToAnswer"],
+                category=question_data["category"],
+                imageURL=question_data["imageURL"],
+                url=question_data["url"],
+                questionType=question_data["questionType"],
+                deactivateOnAnswer=question_data["deactivateOnAnswer"],
+                deactivateOnDate=question_data["deactivateOnDate"],
+                activate_question=question_data["activate_question"],
+                deactivate_question=question_data["deactivate_question"],
+                activation_condition=question_data["activation_condition"],
+                deactivation_condition=question_data["deactivation_condition"],
+                clockTime_timezone="Europe/Berlin",
+            )
+            logger.info("create_question_in_db::done::%s", question.id)
             for answer_data in question_data["answer"]:
                 create_answer_from_file_in_db(question.id, answer_data)
 
@@ -148,16 +263,16 @@ def create_answer_from_file_in_db(question_id, answer_data):
     logger.info("creating answer %s", answer_data)
     answerModel.objects.create(
         question_id=question_id,
-        answerSortId=answer_data["id"],
-        text=answer_data["text"],
-        answerSubText=answer_data["subText"] if "subText" in answer_data else "N",
-        value=answer_data["value"],
-        defaultValue=answer_data["defaultValue"],
-        stepSize=answer_data["stepSize"],
-        minValue=answer_data["minVal"],
-        maxValue=answer_data["maxVal"],
-        minText=answer_data["minText"],
-        maxText=answer_data["maxText"],
+        answerSortId=answer_data.get("id", answer_data.get("answerSortId", 1)),
+        text=answer_data.get("text", "N"),
+        answerSubText=answer_data.get("subText", answer_data.get("answerSubText", "N")),
+        value=answer_data.get("value", 1),
+        defaultValue=answer_data.get("defaultValue", 1),
+        stepSize=answer_data.get("stepSize", 1),
+        minValue=answer_data.get("minVal", answer_data.get("minValue", 0)),
+        maxValue=answer_data.get("maxVal", answer_data.get("maxValue", 1)),
+        minText=answer_data.get("minText", ""),
+        maxText=answer_data.get("maxText", ""),
     )
     logger.info("create_answer_in_db::successful:end")
 
@@ -168,7 +283,10 @@ def create_answer_in_db(question_id, answer_data):
     answer_data["answerSortId"] = (
         answer_data["id"] if "id" in answer_data else answer_data["answerSortId"]
     )
-    answer_data["answerSubText"] = answer_data["subText"] if "subText" in answer_data else "N"
+    answer_data["answerSubText"] = answer_data.get(
+        "subText",
+        answer_data.get("answerSubText", "N"),
+    )
     answer_data["minValue"] = (
         answer_data["minVal"] if "minVal" in answer_data else answer_data["minValue"]
     )
@@ -197,6 +315,7 @@ def create_question_answers_in_db(survey_id, question_data):
         survey_id=survey_id,
         title=question_data["title"],
         active=1,
+        mandatory=coerce_bool(question_data.get("mandatory"), default=False),
         sortId=question_data["id"],
         subText=question_data["subText"],
         frequency=question_data["frequency"],
@@ -265,6 +384,7 @@ def update_question_in_db(question_id, question_data):
     question.title = question_data["title"]
     question.subText = question_data["subText"]
     question.active = 1 if question_data["active"] else 0
+    question.mandatory = 1 if coerce_bool(question_data.get("mandatory"), default=False) else 0
     question.sortId = question_data["sortId"]
     question.frequency = question_data["frequency"]
     question.clockTime = question_data["clockTime"]
@@ -296,7 +416,7 @@ def delete_survey_for_user(group_name, user, survey_id):
 
 
 def delete_question_from_db(question_id: int, survey_id: int) -> bool:
-    """Delete a question and compact subsequent sort ids."""
+    """Delete a question from a survey."""
     with transaction.atomic():
         try:
             question = (
@@ -308,12 +428,7 @@ def delete_question_from_db(question_id: int, survey_id: int) -> bool:
         except questionModel.DoesNotExist:
             return False
 
-        removed_pos = question.sortId
         question.delete()
-        questionModel.objects.filter(
-            survey_id=survey_id,
-            sortId__gt=removed_pos,
-        ).update(sortId=F("sortId") - 1)
 
     return True
 
@@ -377,6 +492,7 @@ def retrieve_question_details(question_id):
     question_json["answer"] = retrieve_all_answers_for_questions(question_id)
     for answer in question_json["answer"]:
         answer["answerSortId"] = answer["id"]
+        answer["answerSubText"] = answer.get("answerSubText", answer.get("subText", ""))
     return question_json
 
 
@@ -419,6 +535,87 @@ def retrieve_all_survey_for_user(user, session_key):
 
     return get_list_surveys_for_user(user, ema_studies)
 
+def _add_survey_metadata(survey):
+    study_details = studymodel.objects.filter(survey=survey["id"], closed=False).values()
+    if study_details:
+        survey["study_name"] = ", ".join([study["title"] for study in study_details])
+    category_titles = list(
+        categoryModel.objects.filter(survey_id=survey["id"])
+        .order_by("categoryValue")
+        .values_list("categoryTitle", flat=True)
+    )
+    survey["category_names"] = ", ".join(category_titles)
+    return survey
+
+
+def retrieve_all_survey_for_study_members(study_name, survey_id=None):
+    """Return surveys created by members of a study group."""
+    member_ids = []
+    try:
+        study_group = Group.objects.get(name=f"{study_name}_group")
+        member_ids = list(study_group.user_set.values_list("id", flat=True))
+    except Group.DoesNotExist:
+        logger.warning("retrieve_all_survey_for_study_members:: group missing for %s", study_name)
+
+    queryset = surveyModel.objects.filter(owner_id__in=member_ids)
+    if survey_id:
+        queryset = queryset | surveyModel.objects.filter(id=survey_id)
+
+    survey_list = json.loads(
+        survey_serializer(queryset.distinct().order_by("title", "id").values())
+    )
+    for survey in survey_list:
+        _add_survey_metadata(survey)
+    return survey_list
+
+def retrieve_surveys_visible_to_study_editor(user, survey_id=None):
+    """
+    Return surveys the user can choose while editing a study.
+
+    A survey is visible if the user created it, or if it is linked to a study
+    whose study-specific group the user belongs to. The currently linked survey
+    is kept in the list so existing study edits do not lose their selection.
+    Administrators can choose from all surveys.
+    """
+    if user.groups.filter(name=constants.group_name_administrator).exists():
+        survey_list = json.loads(
+            survey_serializer(
+                surveyModel.objects.all().distinct().order_by("title", "id").values()
+            )
+        )
+        for survey in survey_list:
+            _add_survey_metadata(survey)
+        return survey_list
+
+    study_group_titles = []
+    for group_name in user.groups.values_list("name", flat=True):
+        if group_name.endswith("_group"):
+            study_group_titles.append(group_name[:-len("_group")])
+
+    linked_survey_ids = []
+    if study_group_titles:
+        linked_survey_ids = list(
+            studymodel.objects.filter(
+                title__in=study_group_titles,
+                closed=False,
+                survey__isnull=False,
+            ).values_list("survey_id", flat=True)
+        )
+
+    query = Q(owner=user)
+    if linked_survey_ids:
+        query |= Q(id__in=linked_survey_ids)
+    if survey_id:
+        query |= Q(id=survey_id)
+
+    survey_list = json.loads(
+        survey_serializer(
+            surveyModel.objects.filter(query).distinct().order_by("title", "id").values()
+        )
+    )
+    for survey in survey_list:
+        _add_survey_metadata(survey)
+    return survey_list
 
 def get_list_surveys_for_user(user, ema_studies):
     """Return visible surveys for a non-admin user."""
@@ -443,6 +640,8 @@ def get_list_surveys_for_user(user, ema_studies):
 
     for studyname in ema_studies:
         data = studymodel.objects.filter(title=studyname, closed=False).values()
+        if not data:
+            continue
         jsondata = json.loads(custom_serializer(data))[0]
         survey_queryset = surveyModel.objects.filter(id=jsondata["survey"]).values()
         if survey_queryset:
@@ -483,12 +682,16 @@ def create_categories_in_db(survey_id, category_data):
 
 def create_categories_in_db_from_data(survey_id, category_data):
     """Create survey categories from JSON/import data."""
-    for data in category_data:
+    for index, data in enumerate(category_data or [], start=1):
+        data = data if isinstance(data, dict) else {}
+        title = _normalize_import_text(data.get("categoryTitle"))
+        if not title:
+            continue
         categoryModel.objects.create(
             survey_id=survey_id,
-            categoryValue=int(data["categoryValue"]),
-            categoryTitle=data["categoryTitle"],
-            didSubjectAsk=data["didSubjectAsk"],
+            categoryValue=_normalize_import_int(data.get("categoryValue"), default=index),
+            categoryTitle=title,
+            didSubjectAsk=_normalize_import_bool(data.get("didSubjectAsk"), default=False),
         )
     logger.info("create_categories_in_db::successful:end")
 
@@ -501,3 +704,4 @@ def get_question_by_sortid(survey_id, sort_id):
         logger.info("get_question_by_sortid::question: %s", result)
         return result
     return None
+

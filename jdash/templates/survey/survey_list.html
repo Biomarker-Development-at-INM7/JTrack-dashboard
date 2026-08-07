@@ -56,13 +56,13 @@
 		  <h5 class="modal-title" id="deleteModalLabel">Delete Survey</h5>
 		  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
 		</div>
-		<form id = "deleteSurveyForm" action="{%url 'delete_survey' %}" method="POST" >
+		<form id="deleteSurveyForm" action="{% url 'delete_survey' %}" data-default-action="{% url 'delete_survey' %}" method="POST" >
 			{% csrf_token %}
 			<div class="modal-body">
 			Confirm to delete survey 
 		</div>
 		<div class="modal-footer">
-		  <input name="delete_survey" value="Confirm" type="submit" class="btn btn-primary" onclick="remove_survey()" >
+		  <input name="delete_survey" value="Confirm" type="submit" class="btn btn-danger">
 		</div>
 		</form>
 	  </div>
@@ -161,18 +161,35 @@
 			<tbody>
 				{% for survey in survey_list %}
 				<tr>
-				<td id="survey_id">{{survey.id}}</td>
+					<td id="survey_id">{% if survey.id %}{{survey.id}}{% else %}file{% endif %}</td>
 				<td id='survey_title'>{{survey.title}}</td>
 				<td id='category_names'>{{survey.category_names}}</td>
 				<td id='study_name'>{{survey.study_name}}</td>
 				<td id='created_date'>{{survey.createdDate}}</td>
-					{% if survey.id == '999' %}
+						{% if not survey.id %}
 					<td>
 					  <a class="view"
 						 href="{% url 'edit_survey' study_name=survey.study_name %}"
 						 title="{% trans 'global_edit' %}">
 						<i class="fa fa-edit fa-lg"></i>
 					  </a>
+					  {% if request.user|can_manage_survey %}
+						  <a class="copy"
+							 href="{% url 'duplicate_legacy_survey' study_name=survey.study_name %}"
+							 title="{% trans 'global_copy' %}">
+							<i class="fa fa-copy fa-lg"></i>
+						  </a>
+					  {% endif %}
+					  {% if request.user|can_manage_survey %}
+						  <a class="delete text-danger"
+							 href="#"
+							 title="{% trans 'global_delete' %}"
+							 data-delete-url="{% url 'delete_legacy_survey' study_name=survey.study_name %}"
+							 data-bs-toggle="modal"
+							 data-bs-target="#deleteModal">
+							<i class="fa fa-trash fa-lg"></i>
+						  </a>
+					  {% endif %}
 					</td>
 					{% else %}
 						
@@ -182,28 +199,32 @@
 						 title="{% trans 'global_edit' %}">
 						<i class="fa fa-edit fa-lg"></i>
 					  </a>
-                        {% if request.user|can_manage_survey %}
-					  <a class="copy"
-						 href="{% url 'duplicate_survey' survey_id=survey.id %}"
-						 title="{% trans 'global_copy' %}">
-						<i class="fa fa-copy fa-lg"></i>
-					  </a>
-                      {% endif %}
+
+					  {% if request.user|can_manage_survey %}
+						  <a class="copy"
+							 href="{% url 'duplicate_survey' survey_id=survey.id %}"
+							 title="{% trans 'global_copy' %}">
+							<i class="fa fa-copy fa-lg"></i>
+						  </a>
+					  {% endif %}
 					  <a class="log"
 						 href="{% url 'survey_audit' survey_id=survey.id %}"
 						 title="{% trans 'global_history' %}">
 						<i class="fa fa-history fa-lg"></i>
 					  </a>
-                    {% if request.user|can_manage_survey %}
-					  <a class="delete"
-						 href="#"
-						 title="{% trans 'global_delete' %}"
-						 data-id="{{ survey }}"
-						 data-bs-toggle="modal"
-						 data-bs-target="#deleteModal">
-						<i class="fa fa-trash fa-lg"></i>
-					  </a>
-                        {% endif %}
+
+					  {% if request.user|can_manage_survey %}
+						  <a class="delete"
+							 href="#"
+							 title="{% trans 'global_delete' %}"
+							 data-id="{{ survey }}"
+							 data-delete-url="{% url 'delete_survey' %}"
+							 data-survey-id="{{ survey.id }}"
+							 data-bs-toggle="modal"
+							 data-bs-target="#deleteModal">
+							<i class="fa fa-trash fa-lg"></i>
+						  </a>
+					  {% endif %}
 					</td>
 					{% endif %}
 
@@ -214,3 +235,4 @@
 	</div>
 	
 {% endblock %}
+

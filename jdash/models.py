@@ -66,6 +66,7 @@ class Question(models.Model):
     sortId = models.IntegerField(default=1)
     title = models.TextField(max_length=10000)
     active = models.BooleanField(default=True)
+    mandatory = models.BooleanField(default=False)
     subText = models.TextField(max_length=1000,blank=True,null=True) 
     questionType = models.IntegerField(default= 0,choices= constants.QUESTION_TYPES)
     category = models.IntegerField(default=1)
@@ -81,8 +82,8 @@ class Question(models.Model):
     deactivateOnDate = models.IntegerField(default=0)
     activate_question = models.JSONField(default=list,blank=True, null=True)
     deactivate_question = models.JSONField(default=list,blank=True, null=True)
-    activation_condition = models.CharField(max_length=100,blank=True,null=True) 
-    deactivation_condition = models.CharField(max_length=100,blank=True,null=True)
+    activation_condition = models.CharField(max_length=10000,blank=True,null=True) 
+    deactivation_condition = models.CharField(max_length=10000,blank=True,null=True)
     survey = models.ForeignKey(Survey, on_delete=models.CASCADE,blank=True, null=True)
 
     
@@ -407,3 +408,4 @@ class QualityControlComment(models.Model):
 
     def __str__(self):
         return f"QCComment({self.test_case_id}, {self.username})"
+

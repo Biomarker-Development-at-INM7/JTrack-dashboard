@@ -234,10 +234,11 @@ class TestCreateSurveyInDB:
 @patch("jdash.models.Answer.objects.create")
 def test_create_answer_in_db(mock_create):
     question_id = 10
+    expected_answer_subtext = 'Optional subtext'
     answer_data = {
         'answerSortId': 5,
         'text': 'Answer text',
-        'answerSubText': 'Optional subtext',
+        'answerSubText': expected_answer_subtext,
         'value': 5,
         'defaultValue': False,
         'stepSize': 1,
@@ -255,7 +256,7 @@ def test_create_answer_in_db(mock_create):
         question_id=question_id,
         answerSortId=answer_data['answerSortId'],
         text=answer_data['text'],
-        answerSubText=answer_data['answerSubText'],
+        answerSubText=expected_answer_subtext,
         value=answer_data['value'],
         defaultValue=answer_data['defaultValue'],
         stepSize=answer_data['stepSize'],

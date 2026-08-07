@@ -11,6 +11,15 @@ from jdash.services.subject import Subject
 current_date = timezone.now().strftime('%Y-%m-%d')
 logger = logging.getLogger("django")
 
+def coerce_bool(value, default=False):
+    if value in (None, ""):
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return str(value).strip().lower() in ("1", "true", "yes", "y", "on")
+
 def _get_qc_survey_question_identifier(question, fallback_index):
     """Return a stable identifier for EMA QC cases."""
     for key in ("db_id", "question_db_id"):
@@ -375,6 +384,7 @@ def question_db_serializer(queryset):
             "sortId": question_data['sortId'],
             "title": question_data['title'],
             "active": 1 if question_data['active'] else 0,
+            "mandatory": 1 if coerce_bool(question_data.get('mandatory'), default=False) else 0,
             "subText" : question_data['subText'],
             "frequency" : question_data['frequency'],
             "clockTime" : question_data['clockTime'] if question_data['clockTime'] is not None else 0,
@@ -453,7 +463,7 @@ def question_serializer(queryset):
     '''
     result = []
     for question_data in queryset:
-        logger.info("question_serializer::question_data: %s", question_data)
+        logger.debug("question_serializer::question_data: %s", question_data)
         clocktime_str = question_data['clockTime']        
         clocktime_start_str = ""
         clocktime_end_str = ""
@@ -619,6 +629,7 @@ def normalize_question_data_defaults(question_data):
     if question_data[constants.field_name_deactivation_condition] is None:
         question_data[constants.field_name_deactivation_condition] = ""
 
+    question_data["mandatory"] = coerce_bool(question_data.get("mandatory"), default=False)
     # Legacy compatibility:
     # if an older survey only has clockTime filled, convert it into a single
     # activation time when no explicit start/end windows are present.

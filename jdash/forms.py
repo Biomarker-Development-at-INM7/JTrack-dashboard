@@ -13,6 +13,17 @@ from jdash.models import (Answer, Question, Study,
 from jdash.config import constants as constants
 import json
 
+
+def _coerce_checkbox_initial(value, default=False):
+    if value in (None, ""):
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return str(value).strip().lower() in ("1", "true", "yes", "y", "on")
+
+
 class StrictValidationMixin:
     """
     Mixin that raises an exception with detailed debug info when form validation fails.
@@ -132,6 +143,7 @@ class StudyDeviceSensorForm(forms.ModelForm):
         if device is not None:
             qs = qs.filter(device=device)
         self.fields["device_sensor"].queryset = qs
+        self.fields["device_sensor"].empty_label = None
 
         # self.fields["resolution"].queryset = ResolutionCatalog.objects.none()
         self.fields["sampling_rate"].queryset = SamplingRateCatalog.objects.none()
@@ -331,7 +343,7 @@ class CreateStudyForm(StrictValidationMixin, forms.Form):
             self.fields['ema_checkbox'].initial = bool(ema_enabled)
 
             if survey_data and self.fields['ema_checkbox'].initial:
-                if "id" in json_data["survey"]:
+                if "id" in survey_data:
                     self.fields['survey'].initial = initial_survey_id
                 else:
                     self.fields['survey'].choices = [('', 'Select survey')] + [(data['id'], data['title']) for data in survey]
@@ -688,6 +700,13 @@ class QuestionForm(forms.ModelForm):
              'id' :"active"
         }
     ), label = False)
+    mandatory = forms.BooleanField(widget=forms.CheckboxInput(
+        attrs={
+            'id': 'mandatory',
+            'class': 'form-check-input',
+            'role': 'switch',
+        }
+    ), label=False, required=False)
     category = forms.IntegerField(widget=forms.NumberInput(
         attrs={
             'id' : 'category'
@@ -767,6 +786,10 @@ class QuestionForm(forms.ModelForm):
         json_data = kwargs.pop('json_data', None)
         super(QuestionForm, self).__init__(*args, **kwargs)
 
+        for field_name in ("active", "mandatory"):
+            if field_name in self.initial:
+                self.initial[field_name] = _coerce_checkbox_initial(self.initial[field_name])
+
         if json_data is not None:
             # Required fields
             if "title" not in json_data or "questionType" not in json_data:
@@ -776,7 +799,8 @@ class QuestionForm(forms.ModelForm):
             self.fields['questionType'].initial = json_data["questionType"]
 
             # Optional fields\
-            self.fields['active'].initial = json_data["active"]
+            self.fields['active'].initial = _coerce_checkbox_initial(json_data.get("active", True), default=True)
+            self.fields['mandatory'].initial = _coerce_checkbox_initial(json_data.get("mandatory", False))
             self.fields['subText'].initial = json_data.get("subText", "")
             self.fields['category'].initial = json_data.get("category", "")
             self.fields['imageURL'].initial = json_data.get("imageURL", "")
@@ -794,6 +818,7 @@ class QuestionForm(forms.ModelForm):
             
         self.fields['title'].required = False
         self.fields['active'].required = False
+        self.fields['mandatory'].required = False
         self.fields['subText'].required = False
         self.fields['questionType'].required = False
         self.fields['category'].required = False
@@ -845,6 +870,16 @@ class QuestionForm(forms.ModelForm):
                     'class': 'form-control'
                 }
             )
+            if self.fields['category'].initial in (None, "", 0, "0"):
+                first_real_category = next(
+                    (
+                        category['categoryValue']
+                        for category in categories
+                        if category['categoryValue'] != self.UNCATEGORIZED_VALUE
+                    ),
+                    1,
+                )
+                self.fields['category'].initial = first_real_category
         else:
             self.fields['category'].initial = 1
             self.fields['category'].widget = forms.NumberInput(
@@ -920,3 +955,4 @@ class DateForm(forms.Form):
 
     class Meta:
         fields = '__all__'
+

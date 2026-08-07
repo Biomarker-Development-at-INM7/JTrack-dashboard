@@ -49,7 +49,10 @@ from jdash.services.datahelper import (
 )
 from jdash.utils.fileutils import get_json_data
 from jdash.repositories.study_repository import update_test_case_flags,append_qc_note
-from jdash.repositories.survey_repository import retrieve_all_survey_for_user
+from jdash.repositories.survey_repository import (
+        retrieve_all_survey_for_user,
+        retrieve_surveys_visible_to_study_editor,
+        )
 from jdash.models import FileDownloadToken, Study as studymodel,StudyDeviceSensor,QualityControlTests
 from jdash.config.textmessages import TextMessages as textmessages
 
@@ -369,14 +372,30 @@ def edit_study(request, study_name):
     """
     context = {}
     error = context.get(constants.key_name_error_message, "")
-    survey_list_obj = retrieve_all_survey_for_user(request.user, request.session.session_key)
     json_meta = get_json_data(study_name)
+
     try:
         study = studymodel.objects.get(title=study_name)
     except studymodel.DoesNotExist:
-        context[constants.key_name_error_message] = "Study not found."
+        messages.error(request, "Study not found.")
         return render(request, constants.home_page, context=context)
 
+    survey_data = json_meta.get("survey")
+    if survey_data and not isinstance(survey_data, dict):
+        try:
+            survey_data = json.loads(survey_data) if isinstance(survey_data, str) else {}
+        except json.JSONDecodeError:
+            logger.warning("edit_study:: survey metadata is not valid JSON for %s", study_name)
+            survey_data = {}
+    json_meta["survey"] = survey_data or {}
+
+    current_survey_id = study.survey_id
+    if survey_data and survey_data.get("id"):
+        current_survey_id = survey_data["id"]
+    survey_list_obj = retrieve_surveys_visible_to_study_editor(
+        request.user,
+        survey_id=current_survey_id,
+    )
     TaskFormSet = formset_factory(TaskForm, extra=1)
     form = CreateStudyForm(request.POST, survey=survey_list_obj)
     if request.method == constants.post_method:

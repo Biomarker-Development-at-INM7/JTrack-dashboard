@@ -1,4 +1,5 @@
 import pytest
+from contextlib import nullcontext
 from unittest.mock import MagicMock, patch
 from jdash.services import survey
 from jdash.models import Category
@@ -224,6 +225,46 @@ def test_update_sortid_of_questions(mock_filter, mock_get):
     assert result is True
     mock_get.assert_called_once()
     mock_filter.assert_called()
+
+
+def test_delete_questions_deletes_selected_questions_highest_sort_first(monkeypatch):
+    questions = [
+        {"db_id": 10, "sortId": 1, "activate_question": [], "deactivate_question": []},
+        {"db_id": 20, "sortId": 2, "activate_question": [], "deactivate_question": []},
+        {"db_id": 30, "sortId": 3, "activate_question": [], "deactivate_question": []},
+        {"db_id": 40, "sortId": 4, "activate_question": [], "deactivate_question": []},
+    ]
+    deleted_questions = []
+
+    monkeypatch.setattr(survey, "retrieve_all_questions_for_survey", lambda survey_id: questions)
+    monkeypatch.setattr(survey.transaction, "atomic", lambda: nullcontext())
+
+    def fake_delete_question(cls, question_id, survey_id):
+        deleted_questions.append((question_id, survey_id))
+
+    monkeypatch.setattr(
+        survey.Survey,
+        "_delete_question_without_dependency_check",
+        classmethod(fake_delete_question),
+    )
+
+    result = survey.Survey.delete_questions(["20", "40", "not-an-id"], 123)
+
+    assert result == 123
+    assert deleted_questions == [(40, 123), (20, 123)]
+
+
+def test_delete_questions_blocks_questions_used_by_conditions(monkeypatch):
+    questions = [
+        {"db_id": 10, "sortId": 1, "activate_question": [], "deactivate_question": []},
+        {"db_id": 20, "sortId": 2, "activate_question": [], "deactivate_question": []},
+        {"db_id": 30, "sortId": 3, "activate_question": [2], "deactivate_question": []},
+    ]
+
+    monkeypatch.setattr(survey, "retrieve_all_questions_for_survey", lambda survey_id: questions)
+
+    with pytest.raises(ValueError, match="Q3 activate_question -> Q2"):
+        survey.Survey.delete_questions(["20"], 123)
 
 
 @patch('django.db.transaction.atomic')

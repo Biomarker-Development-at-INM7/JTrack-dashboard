@@ -482,7 +482,7 @@ function parseDashboardSensorList(rawValue) {
 
 function getDevicePlatformMeta(deviceId) {
   const normalizedDeviceId = String(deviceId || '').trim();
-  const isAndroid = /[a-z]/.test(normalizedDeviceId);
+  const isAndroid = normalizedDeviceId == 'Android' 
   return {
     label: isAndroid ? 'Android' : 'iOS',
     iconClass: isAndroid ? 'fab fa-android' : 'fab fa-apple',

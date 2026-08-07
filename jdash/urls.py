@@ -42,7 +42,10 @@ urlpatterns = [
     path('createsurvey/<int:survey_id>/copy' ,views.duplicate_survey , name=constants.url_name_for_duplicate_survey ),
     path('createsurvey/<int:survey_id>/copy/<int:question_id>' ,views.duplicate_question , name=constants.url_name_for_duplicate_question ),
     path('edit/<str:study_name>/editsurvey' ,views.edit_survey , name=constants.url_name_for_edit_survey ),
-    path('survey/', views.survey_list , name=constants.url_name_for_survey),    
+    path('edit/<str:study_name>/editsurvey/copy' ,views.duplicate_legacy_survey , name='duplicate_legacy_survey' ),
+    path('edit/<str:study_name>/editsurvey/delete' ,views.delete_legacy_survey , name='delete_legacy_survey' ),
+    path('edit/<str:study_name>/editsurvey/download_json/' ,views.download_legacy_survey_json , name='download_legacy_survey_json' ),
+    path('survey/', views.survey_list , name=constants.url_name_for_survey),
     path('survey/audit/<int:survey_id>' ,views.survey_audit , name=constants.url_name_for_survey_audit ),
     path('close/<str:study_name>', views.close , name=constants.url_name_for_close),
     path('download_dataset/<str:arg>/', views.download_dataset_from_link , name=constants.url_name_for_download_dataset),
@@ -57,3 +60,4 @@ urlpatterns = [
 from django.conf.urls import handler500
 
 handler500 = 'jdash.views.server_error'
+

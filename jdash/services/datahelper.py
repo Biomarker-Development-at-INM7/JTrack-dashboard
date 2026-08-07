@@ -241,6 +241,7 @@ def get_question_form_data(form):
     form_data["title"]= form.cleaned_data.get('title')
     form_data["active"]= True
     form_data["sortId"]= form.cleaned_data.get('sortId')
+    form_data["mandatory"]= form.cleaned_data.get('mandatory')
     form_data['subText'] = form.cleaned_data.get('subText')
     form_data['frequency'] = form.cleaned_data.get('frequency')
     form_data['clockTime'] = form.cleaned_data.get('clockTime')

@@ -586,7 +586,7 @@
                                 <td data-field="duration" data-filter-control="input">{{i.time_in_study}}</td>
                                 <td data-field="sensor_info" id="sensors_info" >{{ i | get_sensor_tag:meta_data|safe }}</td>
                                 <td data-field="status" data-filter-control="select" >{{ i | get_subject_status_tag:meta_data|safe}} </td>
-                                <td data-field="device_id" data-visible="false">{{i.device_id}}</td>
+                                <td data-field="device_id" data-visible="false">{{i.device_brand}}</td>
                                 <td data-field="date_registered" data-visible="false"> {{i.date_registered}} </td>
                                 <td data-field="date_left_study" data-visible="false">{{i.date_left_study}}</td>
                                 <td data-field="n_batches_ema" data-visible="false">{{i | get_n_batches:"ema"|safe}}</td>
