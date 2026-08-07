@@ -882,7 +882,6 @@ function editQuestion(){
   if (!validateAnswerChoiceSeparators() || !validateConditionQuestionCategories()) {
     return;
   }
-
   const questionForm = document.getElementById("questionForm");
   var input = document.createElement('input');
   input.type = 'hidden';
@@ -1152,6 +1151,30 @@ function remove_question(){
 }
 
 ///////// Answers /////
+
+function validateAnswerChoiceSeparators() {
+  const answerInputs = Array.from(document.querySelectorAll('.choice-formset input[name$="-text"]'));
+  const invalidInput = answerInputs.find((input) => /[,;]/.test(input.value || ''));
+
+  answerInputs.forEach((input) => input.setCustomValidity(''));
+
+  if (!invalidInput) {
+    return true;
+  }
+
+  invalidInput.setCustomValidity('Answer choices cannot contain commas or semicolons.');
+  invalidInput.reportValidity();
+  return false;
+}
+
+function clearAnswerChoiceSeparatorValidity(input) {
+  if (!input) {
+    return;
+  }
+  input.setCustomValidity(/[,;]/.test(input.value || '')
+    ? 'Answer choices cannot contain commas or semicolons.'
+    : '');
+}
 
 function addAnswer() {
   const answerForm = document.getElementById("answerForm");
@@ -1470,24 +1493,14 @@ function getAnswerChoiceTexts() {
 
 function shouldUseConditionRadioOptions() {
   const questionType = document.getElementById('questionType');
-  return isChoiceQuestionType(questionType ? questionType.value : '');
+  const selectedValue = questionType ? String(questionType.value || '') : '';
+  return selectedValue === '1' || selectedValue === '2';
 }
 
 function parseConditionSelectionValue(rawValue) {
   const value = String(rawValue ?? '').trim();
   if (!value) {
     return [];
-  }
-
-  try {
-    const parsed = JSON.parse(value);
-    if (Array.isArray(parsed)) {
-      return parsed
-        .map((item) => String(item).trim())
-        .filter((item, index, values) => item !== '' && values.indexOf(item) === index);
-    }
-  } catch (error) {
-    // Fall back to legacy comma/semicolon separated values.
   }
 
   return value
@@ -1690,169 +1703,3 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
-
-
-   document.addEventListener('DOMContentLoaded', function () {
-    const modal = document.getElementById('categoryModal');
-    if (!modal) return;
-
-    const form = modal.querySelector('form');
-    if (!form) return;
-
-    const originalFormHTML = form.innerHTML; // Store original HTML when DOM is loaded
-
-    modal.addEventListener('hidden.bs.modal', function () {
-      form.innerHTML = originalFormHTML; // Reset form content
-    });
-  });
-    let initialCategoryCount = 0;
-
-document.addEventListener("DOMContentLoaded", function () {
-  const modal = document.getElementById("categoryModal");
-
-  if (!modal) return;
-
-  // On modal open: record the number of existing category forms
-  modal.addEventListener("show.bs.modal", () => {
-    const forms = document.getElementsByClassName("category-formset mb-4");
-    initialCategoryCount = forms.length;
-  });
-
-  // On modal close: remove any added forms beyond the original count
-  modal.addEventListener("hidden.bs.modal", () => {
-    const allForms = document.getElementsByClassName("category-formset mb-4");
-    const totalForms = document.getElementById("id_form-TOTAL_FORMS");
-
-    for (let i = allForms.length - 1; i >= initialCategoryCount; i--) {
-      allForms[i].remove();
-    }
-
-    // Reset form fields in the initial form(s)
-    for (let i = 0; i < initialCategoryCount; i++) {
-      const titleField = document.getElementById(`id_form-${i}-categoryTitle`);
-      const valueField = document.getElementById(`id_form-${i}-categoryValue`);
-      const checkbox = document.getElementById(`id_form-${i}-didSubjectAsk`);
-
-      if (titleField) titleField.value = titleField.defaultValue || "";
-      if (valueField) valueField.value = valueField.defaultValue || Math.max(i + 1, 1);
-      if (checkbox) checkbox.checked = checkbox.defaultChecked;
-    }
-
-    if (totalForms) {
-      totalForms.value = initialCategoryCount;
-    }
-
-    update_remove_buttons();
-  });
-});
-// function ensureChoiceFormCount(minCount) {
-//   let currentCount = document.querySelectorAll('.choice-formset').length;
-//   while (currentCount < minCount) {
-//     add_choices_form();
-//     currentCount = document.querySelectorAll('.choice-formset').length;
-//   }
-// }
-
-// function setChoiceTexts(values) {
-//   ensureChoiceFormCount(values.length);
-//   values.forEach((value, index) => {
-//     const input = document.querySelector(`[name="form-${index}-text"]`);
-//     if (input) {
-//       input.value = value;
-//     }
-//   });
-// }
-
-// function setSlidingDefaults(values) {
-//   const defaults = {
-//     value: 1,
-//     defaultValue: 3,
-//     stepSize: 1,
-//     minValue: 1,
-//     maxValue: 5,
-//     minText: 'Low',
-//     maxText: 'High',
-//   };
-//   const finalValues = { ...defaults, ...values };
-//   Object.entries(finalValues).forEach(([field, value]) => {
-//     const input = document.querySelector(`[name="form-0-${field}"]`);
-//     if (input) {
-//       input.value = value;
-//     }
-//   });
-// }
-
-// function applyQuestionTemplate(templateName) {
-//   const templates = {
-//     weekly_duration: {
-//       questionType: '9',
-//       frequency: 7,
-//       nextDayToAnswer: 1,
-//       deactivateOnDate: 0,
-//       choices: [],
-//     },
-//     daily_single_choice: {
-//       questionType: '1',
-//       frequency: 1,
-//       nextDayToAnswer: 1,
-//       deactivateOnDate: 0,
-//       choices: ['Yes', 'No'],
-//     },
-//     monthly_multiple_choice: {
-//       questionType: '2',
-//       frequency: 30,
-//       nextDayToAnswer: 1,
-//       deactivateOnDate: 0,
-//       choices: ['Option 1', 'Option 2', 'Option 3'],
-//     },
-//     weekly_sliding_choice: {
-//       questionType: '3',
-//       frequency: 7,
-//       nextDayToAnswer: 1,
-//       deactivateOnDate: 0,
-//       sliding: {
-//         value: 1,
-//         defaultValue: 3,
-//         stepSize: 1,
-//         minValue: 1,
-//         maxValue: 5,
-//         minText: 'Very low',
-//         maxText: 'Very high',
-//       },
-//       choices: [],
-//     },
-//     weekly_free_text: {
-//       questionType: '4',
-//       frequency: 7,
-//       nextDayToAnswer: 1,
-//       deactivateOnDate: 0,
-//       choices: [],
-//     }
-//   };
-
-//   const template = templates[templateName];
-//   if (!template) {
-//     return;
-//   }
-
-//   const defaultToggle = document.getElementById('flexSwitchCheckDefault');
-//   if (defaultToggle) {
-//     defaultToggle.checked = false;
-//   }
-
-//   $('#questionType').val(template.questionType);
-//   $('#frequency').val(template.frequency);
-//   $('#nextDayToAnswer').val(template.nextDayToAnswer);
-//   $('#deactivateOnDate').val(template.deactivateOnDate);
-
-//   show_answer_form();
-
-//   if (template.questionType === '1' || template.questionType === '2') {
-//     setChoiceTexts(template.choices);
-//   }
-//   if (template.questionType === '3' && template.sliding) {
-//     setSlidingDefaults(template.sliding);
-//   }
-// }
-
-

@@ -206,18 +206,82 @@ def _normalize_import_question(question_data, question_index):
 
 def create_survey_in_db(study_name, survey_dict, user):
     """Create a survey and its questions/answers from imported JSON data."""
+    def _normalize_import_value(value):
+        if value in (None, "", []):
+            return []
+        if isinstance(value, list):
+            raw_items = value
+        elif isinstance(value, str):
+            raw_items = re.split(r"[,;]", value)
+        else:
+            raw_items = [value]
+        return [int(str(item).strip()) for item in raw_items if str(item).strip()]
 
     if constants.key_name_survey in survey_dict:
         survey_dict = survey_dict[constants.key_name_survey]
 
-    with transaction.atomic():
-        survey = surveyModel.objects.create(
-            title=study_name,
-            description=_normalize_import_text(survey_dict.get("description")),
-            topN=_normalize_import_int(survey_dict.get(constants.key_name_topN), default=-1),
-            splitbyCategory=_normalize_import_bool(survey_dict.get("splitbyCategory"), default=False),
-            scrolling=_normalize_import_text(survey_dict.get("scrolling"), "H")[:1] or "H",
-            owner=user,
+    survey = surveyModel.objects.create(
+        title=study_name,
+        description="",
+        topN=survey_dict[constants.key_name_topN]
+        if constants.key_name_topN in survey_dict
+        else -1,
+        splitbyCategory=survey_dict["splitbyCategory"] if "splitbyCategory" in survey_dict else 0,
+        scrolling=survey_dict["scrolling"] if "scrolling" in survey_dict else "H",
+        owner=user,
+    )
+    logger.info("create_survey_in_db::start::%s", survey)
+
+    if "categories" in survey_dict:
+        create_categories_in_db_from_data(survey.id, survey_dict["categories"])
+
+    for question_data in survey_dict["questions"]:
+        if question_data["clockTime_start"].strip():
+            question_data["clockTime_start"] = [
+                int(x) for x in question_data["clockTime_start"].split(";")
+            ]
+        if question_data["clockTime_end"].strip():
+            question_data["clockTime_end"] = [
+                int(x) for x in question_data["clockTime_end"].split(";")
+            ]
+        question_data["activate_question"] = _normalize_import_value(
+            question_data.get("activate_question")
+        )
+        question_data["deactivate_question"] = _normalize_import_value(
+            question_data.get("deactivate_question")
+        )
+
+        if (
+            question_data[constants.field_name_clockTime] > 0
+            and question_data[constants.field_name_clockTime_start] == ""
+            and question_data[constants.field_name_clockTime_end] == ""
+        ):
+            question_data[constants.field_name_clockTime_start] = [
+                int(question_data[constants.field_name_clockTime])
+            ]
+
+        question = questionModel.objects.create(
+            survey=survey,
+            title=question_data["title"],
+            active=1,
+            sortId=question_data["id"],
+            subText=question_data["subText"],
+            frequency=question_data["frequency"],
+            clockTime=question_data["clockTime"],
+            clockTime_start=question_data["clockTime_start"],
+            clockTime_end=question_data["clockTime_end"],
+            nextDayToAnswer=question_data["nextDayToAnswer"],
+            category=question_data["category"],
+            imageURL=question_data["imageURL"],
+            url=question_data["url"],
+            questionType=question_data["questionType"],
+            deactivateOnAnswer=question_data["deactivateOnAnswer"],
+            deactivateOnDate=question_data["deactivateOnDate"],
+            activate_question=question_data["activate_question"],
+            deactivate_question=question_data["deactivate_question"],
+            activation_condition=question_data["activation_condition"],
+            deactivation_condition=question_data["deactivation_condition"],
+            clockTime_timezone="Europe/Berlin",
         )
         logger.info("create_survey_in_db::start::%s", survey)
 

@@ -18,6 +18,96 @@
 
 
 
+document.addEventListener("DOMContentLoaded", function () {
+  const modal = document.getElementById("categoryModal");
+
+  if (!modal) return;
+
+  // On modal open: record the number of existing category forms
+  modal.addEventListener("show.bs.modal", () => {
+    const forms = document.getElementsByClassName("category-formset mb-4");
+    initialCategoryCount = forms.length;
+  });
+
+  // On modal close: remove any added forms beyond the original count
+  modal.addEventListener("hidden.bs.modal", () => {
+    const allForms = document.getElementsByClassName("category-formset mb-4");
+    const totalForms = document.getElementById("id_form-TOTAL_FORMS");
+
+    for (let i = allForms.length - 1; i >= initialCategoryCount; i--) {
+      allForms[i].remove();
+    }
+
+    // Reset form fields in the initial form(s)
+    for (let i = 0; i < initialCategoryCount; i++) {
+      const titleField = document.getElementById(`id_form-${i}-categoryTitle`);
+      const valueField = document.getElementById(`id_form-${i}-categoryValue`);
+      const checkbox = document.getElementById(`id_form-${i}-didSubjectAsk`);
+
+      if (titleField) titleField.value = titleField.defaultValue || "";
+      if (valueField) valueField.value = valueField.defaultValue || Math.max(i + 1, 1);
+      if (checkbox) checkbox.checked = checkbox.defaultChecked;
+    }
+
+    if (totalForms) {
+      totalForms.value = initialCategoryCount;
+    }
+
+    update_remove_buttons();
+  });
+});
+
+</script>
+
+<style>
+  input[type="checkbox"] {
+      transform: scale(1.5); /* Increase the scale value to make it larger */
+      margin-right: 10px; /* Adjust spacing as needed */
+  }
+  .question-sort-cell {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+  }
+</style>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const modal = document.getElementById('categoryModal');
+    const form = modal.querySelector('form');
+    const originalFormHTML = form.innerHTML; // Store original HTML when DOM is loaded
+  
+    modal.addEventListener('hidden.bs.modal', function () {
+      form.innerHTML = originalFormHTML; // Reset form content
+    });
+  });
+</script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const sortModal = document.getElementById('sortIdModal');
+    if (!sortModal) return;
+
+    sortModal.addEventListener('show.bs.modal', function (event) {
+      const trigger = event.relatedTarget;
+      if (!trigger) return;
+
+      const questionId = trigger.getAttribute('data-question-id');
+      const currentSortId = trigger.getAttribute('data-current-sort-id');
+      const maxSortId = trigger.getAttribute('data-max-sort-id');
+
+      document.getElementById('sort-question-id').value = questionId;
+      document.getElementById('sort-old-id').value = currentSortId;
+      const newSortInput = document.getElementById('sort-new-id');
+      newSortInput.value = currentSortId;
+      newSortInput.max = maxSortId;
+    });
+
+    sortModal.addEventListener('shown.bs.modal', function () {
+      const newSortInput = document.getElementById('sort-new-id');
+      newSortInput.focus();
+      newSortInput.select();
+    });
+  });
+</script>
 <div class="modal fade" id="categoryModal" tabindex="-1" aria-labelledby="categoryModalLabel">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
@@ -148,7 +238,6 @@
   </div>
 </div>
 
-
 <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -213,9 +302,8 @@
 
 
         <div class="col-lg-4">
-          {% if request.user|can_manage_survey %}
-          <h3>  <a class="edit"  href="" data-id="{{survey}}" data-bs-toggle="modal" data-bs-target="#updateSurveyModal" >
-            <i class="fas fa-pencil-alt "></i></a>{{survey_title}} </h3> 
+             {% if request.user|can_manage_survey %}
+          <h3>  <a class="edit"  href="" data-id="" data-bs-toggle="modal" data-bs-target="#updateSurveyModal" ><i class="fas fa-pencil-alt "></i></a>{{survey_title}} </h3> 
           {% else %}
           <h3>{{survey_title}}</h3>
           {% endif %}
@@ -306,7 +394,7 @@
         <th  >Id</th>
         <th  >title</th>
         <th  >subText</th>
-        <th  >questionType</th>
+        <th  >question type</th>
         <th  >category</th>
         <th data-formatter="scheduleIntervalFormatter">day of first ask/repetition interval</th>
         <th data-formatter="scheduleTimeWindowsFormatter">activation -
