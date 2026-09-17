@@ -602,6 +602,73 @@ def retrieve_surveys_visible_to_study_editor(user, survey_id=None):
             ).values_list("survey_id", flat=True)
         )
 
+def _add_survey_metadata(survey):
+    study_details = studymodel.objects.filter(survey=survey["id"], closed=False).values()
+    if study_details:
+        survey["study_name"] = ", ".join([study["title"] for study in study_details])
+    category_titles = list(
+        categoryModel.objects.filter(survey_id=survey["id"])
+        .order_by("categoryValue")
+        .values_list("categoryTitle", flat=True)
+    )
+    survey["category_names"] = ", ".join(category_titles)
+    return survey
+
+
+def retrieve_all_survey_for_study_members(study_name, survey_id=None):
+    """Return surveys created by members of a study group."""
+    member_ids = []
+    try:
+        study_group = Group.objects.get(name=f"{study_name}_group")
+        member_ids = list(study_group.user_set.values_list("id", flat=True))
+    except Group.DoesNotExist:
+        logger.warning("retrieve_all_survey_for_study_members:: group missing for %s", study_name)
+
+    queryset = surveyModel.objects.filter(owner_id__in=member_ids)
+    if survey_id:
+        queryset = queryset | surveyModel.objects.filter(id=survey_id)
+
+    survey_list = json.loads(
+        survey_serializer(queryset.distinct().order_by("title", "id").values())
+    )
+    for survey in survey_list:
+        _add_survey_metadata(survey)
+    return survey_list
+
+def retrieve_surveys_visible_to_study_editor(user, survey_id=None):
+    """
+    Return surveys the user can choose while editing a study.
+
+    A survey is visible if the user created it, or if it is linked to a study
+    whose study-specific group the user belongs to. The currently linked survey
+    is kept in the list so existing study edits do not lose their selection.
+    Administrators can choose from all surveys.
+    """
+    if user.groups.filter(name=constants.group_name_administrator).exists():
+        survey_list = json.loads(
+            survey_serializer(
+                surveyModel.objects.all().distinct().order_by("title", "id").values()
+            )
+        )
+        for survey in survey_list:
+            _add_survey_metadata(survey)
+        return survey_list
+
+    study_group_titles = []
+    for group_name in user.groups.values_list("name", flat=True):
+        if group_name.endswith("_group"):
+            study_group_titles.append(group_name[:-len("_group")])
+
+    linked_survey_ids = []
+    if study_group_titles:
+        linked_survey_ids = list(
+            studymodel.objects.filter(
+                title__in=study_group_titles,
+                closed=False,
+                survey__isnull=False,
+            ).values_list("survey_id", flat=True)
+        )
+
     query = Q(owner=user)
     if linked_survey_ids:
         query |= Q(id__in=linked_survey_ids)

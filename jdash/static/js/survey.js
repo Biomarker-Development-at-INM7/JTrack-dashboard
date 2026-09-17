@@ -1149,6 +1149,49 @@ function remove_question(){
 
 ///////// Answers /////
 
+function validateAnswerChoiceSeparators() {
+  const answerInputs = Array.from(document.querySelectorAll('.choice-formset input[name$="-text"]'));
+  const questionType = document.getElementById('questionType');
+  if (!isChoiceQuestionType(questionType ? questionType.value : '')) {
+    answerInputs.forEach((input) => input.setCustomValidity(''));
+    return true;
+  }
+
+  const invalidInput = answerInputs.find((input) => /[,;]/.test(input.value || ''));
+
+  answerInputs.forEach((input) => input.setCustomValidity(''));
+
+  if (!invalidInput) {
+    return true;
+  }
+
+  invalidInput.setCustomValidity('Answer choices cannot contain commas or semicolons.');
+  invalidInput.reportValidity();
+  return false;
+}
+
+function clearAnswerChoiceSeparatorValidity(input) {
+  if (!input) {
+    return;
+  }
+  input.setCustomValidity(/[,;]/.test(input.value || '')
+    ? 'Answer choices cannot contain commas or semicolons.'
+    : '');
+}
+
+
+function delete_quest(){
+  const deleteQuestionForm = document.getElementById("deleteQuestionForm");
+  deleteQuestionForm.submit();
+}
+
+function remove_question(){
+  const removeQuestionForm = document.getElementById("removeQuestionForm");
+  removeQuestionForm.submit();
+}
+
+///////// Answers /////
+
 function addAnswer() {
   const answerForm = document.getElementById("answerForm");
   const addInput = document.getElementsByName('add_answer')[0];

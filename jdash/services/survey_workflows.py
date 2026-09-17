@@ -81,9 +81,7 @@ def create_question_answer_for_survey(survey_id, form, answer_formset):
         raise ValueError("Answer form data is invalid.")
     form_data = get_answer_form_data(answer_formset, int(question_obj["questionType"]))
     answers = form_data["answers"]
-    with transaction.atomic():
-        question_obj[constants.key_name_sortId] = _next_question_sort_id_for_update(survey_id)
-        Survey.create_question_with_answers(survey_id, question_obj, answers)
+    Survey.create_question_with_answers(survey_id, question_obj, answers)
     return context_for_create_survey_page(survey_id)
 
 

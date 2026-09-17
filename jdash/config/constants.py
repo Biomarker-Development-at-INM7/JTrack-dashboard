@@ -114,6 +114,7 @@ session_key_last_name = "last_name"
 ## Json key constants ####
 key_name_app = "app"
 key_name_id = "id"
+key_name_version = "version"
 key_name_type = "type"
 key_name_study_name = "study_name"
 key_name_number_of_subjects = "number_of_subjects"

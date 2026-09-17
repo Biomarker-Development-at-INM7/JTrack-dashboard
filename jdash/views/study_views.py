@@ -394,6 +394,7 @@ def edit_study(request, study_name):
 
     context = {}
     json_meta = get_json_data(study_name)
+
     try:
         study = studymodel.objects.get(title=study_name)
     except studymodel.DoesNotExist:
