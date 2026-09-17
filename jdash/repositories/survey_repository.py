@@ -2,12 +2,12 @@ import json
 import logging
 import re
 from operator import itemgetter
-from django.db.models import Q
+
 from django.contrib.auth.models import Group, User
+from django.db.models import Q
 from django.db import transaction
 
 from jdash.config import constants as constants
-from jdash.interface.session_manager import SessionManager
 from jdash.models import (
     Answer as answerModel,
     Category as categoryModel,
@@ -206,82 +206,18 @@ def _normalize_import_question(question_data, question_index):
 
 def create_survey_in_db(study_name, survey_dict, user):
     """Create a survey and its questions/answers from imported JSON data."""
-    def _normalize_import_value(value):
-        if value in (None, "", []):
-            return []
-        if isinstance(value, list):
-            raw_items = value
-        elif isinstance(value, str):
-            raw_items = re.split(r"[,;]", value)
-        else:
-            raw_items = [value]
-        return [int(str(item).strip()) for item in raw_items if str(item).strip()]
 
     if constants.key_name_survey in survey_dict:
         survey_dict = survey_dict[constants.key_name_survey]
 
-    survey = surveyModel.objects.create(
-        title=study_name,
-        description="",
-        topN=survey_dict[constants.key_name_topN]
-        if constants.key_name_topN in survey_dict
-        else -1,
-        splitbyCategory=survey_dict["splitbyCategory"] if "splitbyCategory" in survey_dict else 0,
-        scrolling=survey_dict["scrolling"] if "scrolling" in survey_dict else "H",
-        owner=user,
-    )
-    logger.info("create_survey_in_db::start::%s", survey)
-
-    if "categories" in survey_dict:
-        create_categories_in_db_from_data(survey.id, survey_dict["categories"])
-
-    for question_data in survey_dict["questions"]:
-        if question_data["clockTime_start"].strip():
-            question_data["clockTime_start"] = [
-                int(x) for x in question_data["clockTime_start"].split(";")
-            ]
-        if question_data["clockTime_end"].strip():
-            question_data["clockTime_end"] = [
-                int(x) for x in question_data["clockTime_end"].split(";")
-            ]
-        question_data["activate_question"] = _normalize_import_value(
-            question_data.get("activate_question")
-        )
-        question_data["deactivate_question"] = _normalize_import_value(
-            question_data.get("deactivate_question")
-        )
-
-        if (
-            question_data[constants.field_name_clockTime] > 0
-            and question_data[constants.field_name_clockTime_start] == ""
-            and question_data[constants.field_name_clockTime_end] == ""
-        ):
-            question_data[constants.field_name_clockTime_start] = [
-                int(question_data[constants.field_name_clockTime])
-            ]
-
-        question = questionModel.objects.create(
-            survey=survey,
-            title=question_data["title"],
-            active=1,
-            sortId=question_data["id"],
-            subText=question_data["subText"],
-            frequency=question_data["frequency"],
-            clockTime=question_data["clockTime"],
-            clockTime_start=question_data["clockTime_start"],
-            clockTime_end=question_data["clockTime_end"],
-            nextDayToAnswer=question_data["nextDayToAnswer"],
-            category=question_data["category"],
-            imageURL=question_data["imageURL"],
-            url=question_data["url"],
-            questionType=question_data["questionType"],
-            deactivateOnAnswer=question_data["deactivateOnAnswer"],
-            deactivateOnDate=question_data["deactivateOnDate"],
-            activate_question=question_data["activate_question"],
-            deactivate_question=question_data["deactivate_question"],
-            activation_condition=question_data["activation_condition"],
-            deactivation_condition=question_data["deactivation_condition"],
-            clockTime_timezone="Europe/Berlin",
+    with transaction.atomic():
+        survey = surveyModel.objects.create(
+            title=study_name,
+            description=_normalize_import_text(survey_dict.get("description")),
+            topN=_normalize_import_int(survey_dict.get(constants.key_name_topN), default=-1),
+            splitbyCategory=_normalize_import_bool(survey_dict.get("splitbyCategory"), default=False),
+            scrolling=_normalize_import_text(survey_dict.get("scrolling"), "H")[:1] or "H",
+            owner=user,
         )
         logger.info("create_survey_in_db::start::%s", survey)
 
@@ -569,35 +505,35 @@ def retrieve_questions_greater_than_sortId(survey_id, sort_id):
 
 
 def retrieve_all_survey_for_user(user, session_key):
-    """Return all surveys visible to a user in the current session context."""
-    queryset = surveyModel.objects.none()
-    group_name = SessionManager.get_specific_session_data(
-        session_key,
-        constants.session_key_groupname,
-        None,
-    )
-    ema_studies = SessionManager.get_specific_session_data(
-        session_key,
-        constants.session_key_studies_ema,
-        [],
-    )
+    """Return surveys and current study associations directly from the DB."""
+    del session_key  # Kept in the signature for compatibility with existing callers.
+    group_names = list(user.groups.values_list("name", flat=True))
 
-    if "administrator" in group_name:
-        queryset = surveyModel.objects.values()
-        survey_list = json.loads(survey_serializer(queryset))
-        for obj in survey_list:
-            study_details = studymodel.objects.filter(survey=obj["id"],closed=False).values()
-            if study_details:
-                obj["study_name"] = ", ".join([study["title"] for study in study_details])
-            category_titles = list(
-                categoryModel.objects.filter(survey_id=obj["id"])
-                .order_by("categoryValue")
-                .values_list("categoryTitle", flat=True)
+    if constants.group_name_administrator in group_names:
+        queryset = surveyModel.objects.all()
+    else:
+        study_prefixes = [name.removesuffix("_group") for name in group_names]
+        if study_prefixes:
+            visible_study_query = Q()
+            for prefix in study_prefixes:
+                visible_study_query |= Q(title__startswith=prefix)
+            visible_survey_ids = studymodel.objects.filter(
+                visible_study_query,
+                closed=False,
+                survey__isnull=False,
+            ).values_list("survey_id", flat=True)
+        else:
+            visible_survey_ids = studymodel.objects.none().values_list(
+                "survey_id", flat=True
             )
-            obj["category_names"] = ", ".join(category_titles)
-        return survey_list
+        queryset = surveyModel.objects.filter(
+            Q(owner=user) | Q(id__in=visible_survey_ids)
+        )
 
-    return get_list_surveys_for_user(user, ema_studies)
+    survey_list = json.loads(
+        survey_serializer(queryset.distinct().order_by("title", "id").values())
+    )
+    return [_add_survey_metadata(survey) for survey in survey_list]
 
 def _add_survey_metadata(survey):
     study_details = studymodel.objects.filter(survey=survey["id"], closed=False).values()

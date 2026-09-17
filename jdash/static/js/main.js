@@ -25,43 +25,157 @@ $(document).ready(function() {
 
   $('#index_table').removeClass('table-hover');
 
-    $('#list').click(function(event){
+  function setIndexLayout(layout) {
+    const showList = layout === 'list';
+
+    document.getElementById("index-list").style.display = showList ? "" : "none";
+    document.getElementById("index-grid").style.display = showList ? "none" : "";
+
+    $('#grid').toggleClass('active', !showList).attr('aria-pressed', String(!showList));
+    $('#list').toggleClass('active', showList).attr('aria-pressed', String(showList));
+  }
+
+  $('#list').click(function(event){
     event.preventDefault();
-    document.getElementById("index-list").style.display = "block";
-    document.getElementById("index-grid").style.display = "none";
-    $('#grid').removeClass('active');
-       $('#list').addClass('active');
+    setIndexLayout('list');
   });
 
   $('#grid').click(function(event){
     event.preventDefault();
-
-    document.getElementById("index-list").style.display = "none";
-    document.getElementById("index-grid").style.display = "block";
-    $('#list').removeClass('active');
-      $('#grid').addClass('active');
-
+    setIndexLayout('grid');
   });
-
-
 
 });
 
 function select_all_ids(){
-  var options = document.getElementById('id-choices').options;
+  var select = document.getElementById('id-choices');
+  var options = select.options;
   for (let i = 0; i < options.length; i++) { 
-    options[i].selected = select_all_ids ;
+    options[i].selected = true;
   }
+  select.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
 function select_missing_ids(){
-  var options = document.getElementById('id-choices').options;
+  var select = document.getElementById('id-choices');
+  var options = select.options;
   for (let i = 0; i < options.length; i++) { 
-    missing = options[i].value.split(";")[1]
-    if(missing == "True"){ options[i].selected = select_missing_ids ;}
+    const missing = options[i].value.split(";")[1];
+    options[i].selected = missing == "True";
       
   }
+  select.dispatchEvent(new Event('change', { bubbles: true }));
 }
+
+function initializeSubjectChipMultiSelects() {
+  document.querySelectorAll('.subject-chip-field select[multiple]').forEach(function (select) {
+    if (select.dataset.chipSelectReady === 'true') return;
+    select.dataset.chipSelectReady = 'true';
+    select.classList.add('subject-chip-native-select');
+
+    const field = select.closest('.subject-chip-field');
+    const filterLabel = field.dataset.filterPlaceholder || 'Filter subjects';
+    const clearLabel = field.dataset.clearLabel || 'Clear all selected subjects';
+    const removeLabel = field.dataset.removeLabel || 'Remove selection';
+    const widget = document.createElement('div');
+    widget.className = 'subject-chip-multiselect';
+    const values = document.createElement('div');
+    values.className = 'subject-chip-values';
+    const input = document.createElement('input');
+    input.type = 'search';
+    input.className = 'subject-chip-filter';
+    input.placeholder = filterLabel;
+    input.setAttribute('aria-label', filterLabel);
+    const clearAll = document.createElement('button');
+    clearAll.type = 'button';
+    clearAll.className = 'subject-chip-clear-all';
+    clearAll.textContent = '×';
+    clearAll.title = clearLabel;
+    clearAll.setAttribute('aria-label', clearLabel);
+    const menu = document.createElement('div');
+    menu.className = 'subject-chip-options';
+    widget.appendChild(values);
+    widget.appendChild(input);
+    widget.appendChild(clearAll);
+    widget.appendChild(menu);
+    select.insertAdjacentElement('afterend', widget);
+
+    function selectedOptions() {
+      return Array.from(select.options).filter(function (option) {
+        return option.selected && option.value;
+      });
+    }
+
+    function renderChips() {
+      values.innerHTML = '';
+      const selected = selectedOptions();
+      clearAll.hidden = selected.length === 0;
+      selected.forEach(function (option) {
+        const chip = document.createElement('span');
+        chip.className = 'subject-selection-chip';
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'subject-selection-chip-remove';
+        remove.setAttribute('aria-label', removeLabel);
+        remove.textContent = '×';
+        remove.addEventListener('click', function () {
+          option.selected = false;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          renderChips();
+          renderOptions();
+        });
+        chip.appendChild(remove);
+        chip.appendChild(document.createTextNode(option.textContent));
+        values.appendChild(chip);
+      });
+    }
+
+    function renderOptions() {
+      const query = input.value.trim().toLowerCase();
+      const matches = Array.from(select.options).filter(function (option) {
+        return option.value && !option.selected && option.textContent.toLowerCase().includes(query);
+      }).slice(0, 12);
+      menu.innerHTML = '';
+      matches.forEach(function (option) {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'subject-chip-option';
+        item.textContent = option.textContent;
+        item.addEventListener('mousedown', function (event) {
+          event.preventDefault();
+          option.selected = true;
+          input.value = '';
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          renderChips();
+          renderOptions();
+          input.focus();
+        });
+        menu.appendChild(item);
+      });
+      menu.classList.toggle('is-open', document.activeElement === input && matches.length > 0);
+    }
+
+    input.addEventListener('input', renderOptions);
+    input.addEventListener('focus', renderOptions);
+    input.addEventListener('blur', function () {
+      window.setTimeout(function () { menu.classList.remove('is-open'); }, 100);
+    });
+    select.addEventListener('change', renderChips);
+    clearAll.addEventListener('click', function () {
+      Array.from(select.options).forEach(function (option) {
+        option.selected = false;
+      });
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      input.value = '';
+      renderChips();
+      renderOptions();
+      input.focus();
+    });
+    renderChips();
+  });
+}
+
+document.addEventListener('DOMContentLoaded', initializeSubjectChipMultiSelects);
 
 function change_active_sensors() {
   // Get selected options from the Passive Sensors dropdown
@@ -194,9 +308,116 @@ function preserveMetadataTableScroll() {
   });
 }
 
+function getMetadataTableContainer() {
+  const table = document.getElementById('metadata_table');
+  return table ? table.closest('.bootstrap-table') : null;
+}
+
+function getMetadataDetailRows() {
+  const container = getMetadataTableContainer();
+  if (!container) {
+    return [];
+  }
+
+  return Array.from(
+    container.querySelectorAll('tbody > tr[data-index][data-has-detail-view]')
+  );
+}
+
+function metadataTableHasCollapsedDetailRows() {
+  return getMetadataDetailRows().some((row) => {
+    const nextRow = row.nextElementSibling;
+    return !nextRow || !nextRow.classList.contains('detail-view');
+  });
+}
+
+function getMetadataDetailHeaderCells(container) {
+  const directHeaderCells = Array.from(
+    container.querySelectorAll('thead th.detail, thead th[data-field="detail"]')
+  );
+  if (directHeaderCells.length > 0) {
+    return directHeaderCells;
+  }
+
+  const detailCell = container.querySelector(
+    'tbody > tr[data-index][data-has-detail-view] > td.detail'
+  );
+  if (!detailCell || !detailCell.parentElement) {
+    return [];
+  }
+
+  const detailColumnIndex = Array.from(detailCell.parentElement.children).indexOf(
+    detailCell
+  );
+  if (detailColumnIndex < 0) {
+    return [];
+  }
+
+  return Array.from(container.querySelectorAll('thead tr'))
+    .map((row) => row.children[detailColumnIndex])
+    .filter(Boolean);
+}
+
+function updateMetadataDetailHeaderToggle() {
+  const container = getMetadataTableContainer();
+  if (!container) {
+    return;
+  }
+
+  const rows = getMetadataDetailRows();
+  const shouldExpand = metadataTableHasCollapsedDetailRows();
+  const headerCells = getMetadataDetailHeaderCells(container);
+
+  headerCells.forEach((cell) => {
+    const inner = cell.querySelector('.th-inner') || cell;
+    let button = inner.querySelector('.metadata-detail-toggle');
+    if (!button) {
+      inner.innerHTML = '';
+      button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'metadata-detail-toggle';
+      inner.appendChild(button);
+    }
+
+    button.textContent = shouldExpand ? '+' : '-';
+    button.disabled = rows.length === 0;
+    button.setAttribute(
+      'aria-label',
+      shouldExpand ? 'Expand all rows' : 'Collapse all rows'
+    );
+    button.setAttribute(
+      'title',
+      shouldExpand ? 'Expand all rows' : 'Collapse all rows'
+    );
+  });
+}
+
+function toggleMetadataDetailRows(event) {
+  event.preventDefault();
+  event.stopPropagation();
+
+  const $metadataTable = $('#metadata_table');
+  if ($metadataTable.length === 0 || !$metadataTable.data('bootstrap.table')) {
+    return;
+  }
+
+  const shouldExpand = metadataTableHasCollapsedDetailRows();
+  $metadataTable.bootstrapTable(shouldExpand ? 'expandAllRows' : 'collapseAllRows');
+
+  window.setTimeout(() => {
+    updateMetadataDetailHeaderToggle();
+    preserveMetadataTableScroll();
+  }, 0);
+}
+
 document.addEventListener('pointerdown', captureMetadataTableScroll, true);
 document.addEventListener('mousedown', captureMetadataTableScroll, true);
 document.addEventListener('touchstart', captureMetadataTableScroll, true);
+document.addEventListener('click', function(event) {
+  if (event.target.closest('.metadata-detail-toggle')) {
+    toggleMetadataDetailRows(event);
+  }
+}, true);
 document.addEventListener('click', function(event) {
   const metadataTable = event.target.closest('#metadata_table');
   if (!metadataTable) {
@@ -221,11 +442,13 @@ window.addEventListener('scroll', function() {
 }, true);
 
 $(document).on(
-  'expand-row.bs.table collapse-row.bs.table post-body.bs.table reset-view.bs.table',
+  'expand-row.bs.table collapse-row.bs.table post-body.bs.table post-header.bs.table reset-view.bs.table page-change.bs.table search.bs.table column-switch.bs.table',
   '#metadata_table',
-  preserveMetadataTableScroll
+  function() {
+    preserveMetadataTableScroll();
+    window.setTimeout(updateMetadataDetailHeaderToggle, 0);
+  }
 );
-
 
 var filterDefaults = ['Completed', 'Instudy','Left study', 'Removed']
 
@@ -316,6 +539,22 @@ function buildchildtr(table,header,n_batches,last_time_received,row){
   table.appendChild(sensorCard);
 }
 
+function escapeHtml(value) {
+  const div = document.createElement('div');
+  div.textContent = value === null || typeof value === 'undefined' ? '' : String(value);
+  return div.innerHTML;
+}
+
+function getDevicePlatformMeta(deviceId) {
+  const normalizedDeviceId = String(deviceId || '').trim();
+  //const isAndroid = /[A-Z]/.test(normalizedDeviceId);
+  const isAndroid = normalizedDeviceId == 'Android' 
+  return {
+    label: isAndroid ? 'Android' : 'iOS',
+    iconClass: isAndroid ? 'fab fa-android' : 'fab fa-apple',
+  };
+}
+
 function parseStudyDaysValue(value) {
   if (value === null || typeof value === 'undefined') {
     return NaN;
@@ -360,7 +599,7 @@ function getSensorFreshnessMeta(sensorName, last_time_received, row) {
 
   if (statusCode === 1) {
     return {
-      label: 'Left study',
+      label: 'Duration exceeded',
       cardClass: 'study-subject-sensor-card--left',
       badgeClass: 'study-subject-sensor-badge--left',
     };
@@ -381,7 +620,16 @@ function getSensorFreshnessMeta(sensorName, last_time_received, row) {
       badgeClass: 'study-subject-sensor-badge--completed',
     };
   }
-    if (row && row.date_left_study && row.date_left_study !== 'none') {
+
+  if (statusCode === 4) {
+    return {
+      label: 'No data',
+      cardClass: 'study-subject-sensor-card--stale',
+      badgeClass: 'study-subject-sensor-badge--stale',
+    };
+  }
+
+  if (row && row.date_left_study && row.date_left_study !== 'none') {
     return {
       label: 'Left study',
       cardClass: 'study-subject-sensor-card--completed',
@@ -391,7 +639,7 @@ function getSensorFreshnessMeta(sensorName, last_time_received, row) {
 
   if (!last_time_received || last_time_received === 'none') {
     return {
-        label: 'Stale',
+      label: 'No data',
       cardClass: 'study-subject-sensor-card--stale',
       badgeClass: 'study-subject-sensor-badge--stale',
     };
@@ -411,8 +659,8 @@ function getSensorFreshnessMeta(sensorName, last_time_received, row) {
   if (daysSince >= 2) {
     return {
       label: 'Stale',
-      cardClass: 'study-subject-sensor-card--stale',
-      badgeClass: 'study-subject-sensor-badge--stale',
+      cardClass: 'study-subject-sensor-card--missing',
+      badgeClass: 'study-subject-sensor-badge--missing',
     };
   }
 
@@ -422,7 +670,6 @@ function getSensorFreshnessMeta(sensorName, last_time_received, row) {
     badgeClass: 'study-subject-sensor-badge--active',
   };
 }
-
 
 function formatDetailLabel(value) {
   if (!value) {
@@ -478,15 +725,6 @@ function parseDashboardSensorList(rawValue) {
     .split(',')
     .map((item) => item.replaceAll("'", "").trim())
     .filter((item) => item !== '');
-}
-
-function getDevicePlatformMeta(deviceId) {
-  const normalizedDeviceId = String(deviceId || '').trim();
-  const isAndroid = /[a-z]/.test(normalizedDeviceId);
-  return {
-    label: isAndroid ? 'Android' : 'iOS',
-    iconClass: isAndroid ? 'fab fa-android' : 'fab fa-apple',
-  };
 }
 
 function detailFormatter(index, row, element){ 
@@ -555,6 +793,7 @@ function initTable() {
     detailViewAlign : 'right',
     paginationParts: ['pageInfoshort', 'pageSize', 'pageList']
   })
+  updateMetadataDetailHeaderToggle();
   $('#index_table').bootstrapTable({
     detailViewAlign : 'right',
     paginationParts: ['pageInfoshort', 'pageSize', 'pageList']
@@ -563,7 +802,7 @@ function initTable() {
     detailViewAlign : 'right',
     paginationParts: ['pageInfoshort', 'pageSize', 'pageList']
   })
-    $('#study_audit_table').bootstrapTable({
+  $('#study_audit_table').bootstrapTable({
     paginationParts: ['pageInfoshort', 'pageSize', 'pageList']
   })
 }
@@ -644,6 +883,7 @@ window.sensorInfoFilterSearch = function(filterValue, cellValue) {
   const tokens = extractSensorInfoTokens(cellValue);
   return tokens.includes(target);
 }
+
 //create study related functions
 
 
@@ -741,6 +981,7 @@ function add_task_form(){
  
   const currentTaskForms = document.getElementsByClassName("task-formset")
   const currentFormCount = currentTaskForms.length //+ 1
+
   //add new task form
   const templateTaskForm = currentTaskForms[0]
   if (!templateTaskForm) {
@@ -758,7 +999,7 @@ function add_task_form(){
   taskFormEl.innerHTML  = taskFormEl.innerHTML.replace(regex,"form-"+currentFormCount+"-")
   taskFormEl.innerHTML  = taskFormEl.innerHTML.replace("id_"+sourceFormIndex+"_remove_btn","id_"+currentFormCount+"_remove_btn")
   totalTaskForms.setAttribute('value', currentFormCount + 1)
-
+  
   main.appendChild(taskFormEl)
   const initialTaskForms = document.getElementById("id_form-INITIAL_FORMS")
   if (initialTaskForms.value != 0 ){
@@ -769,7 +1010,7 @@ function add_task_form(){
     
   }
   if (currentFormCount> 0){
-      const removeBtn = document.getElementById("id_"+currentFormCount+"_remove_btn")
+    const removeBtn = document.getElementById("id_"+currentFormCount+"_remove_btn")
     if (removeBtn) {
       removeBtn.disabled = false
       removeBtn.style.display = ""
@@ -850,7 +1091,6 @@ function toggleSelectAll(type, button) {
     button.textContent = shouldSelectAll ? "Unselect All" : "Select All";
 }
 
-
 function sendCheckedFlagsToServer(study_name) {
     // Get all rows in the table
     const rows = document.querySelectorAll('tbody tr');
@@ -878,7 +1118,6 @@ function sendCheckedFlagsToServer(study_name) {
     document.getElementById('testCaseFlagsInput').value = testCaseFlagsJSON;
     document.getElementById('testcaseForm').submit();
 }
-
 
 let activeQcNotesRow = null;
 
@@ -1073,6 +1312,7 @@ document.addEventListener('keydown', (event) => {
 
 
 
+
 /***********************
  *  STUDY DEVICE + SENSOR CONFIG JS (NEW SCHEMA)
  *
@@ -1082,7 +1322,6 @@ document.addEventListener('keydown', (event) => {
  *
  *  Reads JSON from template:
  *   - {{ device_sensors_json|json_script:"device-sensors-json" }}
- *   - {{ resolution_json|json_script:"resolution-json" }}
  *   - {{ sampling_json|json_script:"sampling-json" }}
  *   - {{ unit_json|json_script:"unit-json" }}
  *
@@ -1090,7 +1329,6 @@ document.addEventListener('keydown', (event) => {
  *   - Multi-select shows available sensors for selected device using DeviceSensor mapping rows.
  *   - Each table row posts:
  *       sensors-{i}-{row}-device_sensor   (DeviceSensor.id)
- *       sensors-{i}-{row}-resolution      (ResolutionCatalog.id) [override; can be blank if you allow]
  *       sensors-{i}-{row}-sampling_rate   (SamplingRateCatalog.id)
  *       sensors-{i}-{row}-unit            (UnitCatalog.id)
  ***********************/
@@ -1155,6 +1393,7 @@ function formatWearableSensorDisplayLabel(value) {
 
   return String(value).trim().toLowerCase();
 }
+
 /** Map device_id -> DeviceSensor[] */
 function deviceSensorsByDeviceMap(deviceSensors) {
   const map = new Map();
@@ -1246,8 +1485,8 @@ function filterCatalogById(options, selectedId) {
 
 /**
  * Add selected DeviceSensor(s) as rows in the table.
- * Each row posts device_sensor (mapping id) + resolution/sampling/unit (override ids).
- * Defaults are pulled from mapping: default_resolution_id, default_sampling_rate_id, default_unit_id
+ * Each row posts device_sensor (mapping id) + sampling/unit override ids.
+ * Defaults are pulled from mapping: default_sampling_rate_id, default_unit_id
  */
 function addSelectedSensorsToTable(block) {
   const prefix = block.dataset.sensorPrefix; // e.g. "sensors-0"
@@ -1304,18 +1543,11 @@ function addSelectedSensorsToTable(block) {
     deviceSensorHidden.name = `${prefix}-${idx}-device_sensor`;
     deviceSensorHidden.value = deviceSensorId;
   
-    // const resolutionOptions = filterCatalogBySensor(catalogs.resolutions, sensorId);
     const samplingOptions = filterCatalogBySensor(catalogs.samplings, sensorId);
     const mappedUnitOptions = filterCatalogById(catalogs.units, dsRow.default_unit_id);
     const unitOptions = mappedUnitOptions.length
       ? mappedUnitOptions
       : filterCatalogBySensor(catalogs.units, sensorId);
-  
-    // const resSelect = buildSelect(
-    //   `${prefix}-${idx}-resolution`,
-    //   resolutionOptions,
-    //   dsRow.default_resolution_id ?? null
-    // );
   
     const srSelect = buildSelect(
       `${prefix}-${idx}-sampling_rate`,
@@ -1344,9 +1576,6 @@ function addSelectedSensorsToTable(block) {
     tdSensor.appendChild(sensorInput);
     tdSensor.appendChild(deviceSensorHidden);
   
-    // const tdRes = document.createElement("td");
-    // tdRes.appendChild(resSelect);
-  
     const tdSR = document.createElement("td");
     tdSR.appendChild(srSelect);
   
@@ -1369,7 +1598,6 @@ function addSelectedSensorsToTable(block) {
     tdActions.appendChild(deleteLink);
   
     tr.appendChild(tdSensor);
-    //tr.appendChild(tdRes);
     tr.appendChild(tdSR);
     tr.appendChild(tdUnit);
     tr.appendChild(tdActions);
@@ -1381,7 +1609,7 @@ function addSelectedSensorsToTable(block) {
   });
 
   totalEl.value = String(idx);
-     syncSensorMultiAvailability(block);
+  syncSensorMultiAvailability(block);
 }
 
 /**
@@ -1508,9 +1736,10 @@ function addDeviceBlock() {
     <div class="col-12 col-lg-2 d-flex align-items-start pt-lg-4">
       <button type="button" class="btn btn-success add-selected-sensors-btn" >
         Add
-      </button></div>
-    
-        <div class="col-12 col-lg-5">
+      </button>
+    </div>
+
+    <div class="col-12 col-lg-5">
       <div class="table-responsive">
         <table class="table table-striped sensor-table mb-0">
           <thead>
@@ -1525,8 +1754,7 @@ function addDeviceBlock() {
         </table>
       </div>
     </div>
-    </div>
-  `;
+  </div>`;
 
   block.querySelector(".device-select").appendChild(deviceSelect);
   block.querySelector(".device-select").appendChild(label);
@@ -1574,11 +1802,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!dev || !multi) return;
     if (!dev.value) return;
     fillSensorMulti(multi, byDevice.get(String(dev.value)) || []);
-       syncSensorMultiAvailability(block);
+    syncSensorMultiAvailability(block);
     makeExistingUnitReadOnly(block);
-
   });
-    refilterAllDeviceSelects();
+
+  refilterAllDeviceSelects();
 
   const deviceBlocks = document.querySelectorAll("#device-blocks .device-block");
   deviceBlocks.forEach((block, index) => {
@@ -1614,7 +1842,8 @@ document.addEventListener("click", (e) => {
   } else {
     tr.remove();
   }
-    const block = tr.closest(".device-block");
+
+  const block = tr.closest(".device-block");
   if (block) {
     syncSensorMultiAvailability(block);
   }
@@ -1669,4 +1898,3 @@ document.addEventListener("change", (e) => {
     refilterAllDeviceSelects();
   }
 });
-

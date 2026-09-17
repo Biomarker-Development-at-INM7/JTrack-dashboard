@@ -172,7 +172,7 @@ def _legacy_category_post_data(post_data):
 
 
 def _clear_survey_list_cache(request):
-    request.session[constants.session_key_survey_details] = None
+    request.session.pop(constants.session_key_survey_details, None)
     request.session.modified = True
 
 
@@ -261,7 +261,7 @@ def create_survey(request, survey_id=0, question_id=0):
                 SurveyService.update_question_order(question_id, new_sort_id)
                 messages.success(request, _("create_survey_question_order_success"))
             context = context_for_create_survey_page(survey_id)
-        request.session[constants.session_key_survey_details] = None
+        _clear_survey_list_cache(request)
     except TypeError as e:
         logger.info("TypeError: %s", e)
         messages.error(request, f"{e} : Please write to support email for assistance.")
@@ -569,7 +569,7 @@ def delete_survey(request):
             )
             logger.info("delete_survey:: id from request %s", request.POST['survey_id'])
             result = delete_survey_for_user(groupname, request.user, request.POST['survey_id'])
-            request.session[constants.session_key_survey_details] = None
+            _clear_survey_list_cache(request)
             if result:
                 return render(
                     request,

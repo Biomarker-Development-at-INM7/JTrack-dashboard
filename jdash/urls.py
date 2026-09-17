@@ -32,6 +32,7 @@ urlpatterns = [
     path('qc/<str:study_name>/comment-notify/', views.notify_qc_comment, name='qc_comment_notify'),
     path('audit/<str:study_name>', views.study_audit , name=constants.url_name_for_study_audit),
     path('details/<str:study_name>', views.study_details , name=constants.url_name_for_details),
+    path('details/<str:study_name>/export.csv', views.export_study_dashboard_csv, name=constants.url_name_for_export_study_csv),
     #path('details/<str:study_name>/<str:id_type>', views.study_details , name=constants.url_name_for_details),
     path('deletesurvey/' ,views.delete_survey , name=constants.url_name_for_delete_survey ),
     path('deletequest/' ,views.create_survey , name=constants.url_name_for_delete_question ),

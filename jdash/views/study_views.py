@@ -18,14 +18,18 @@ from jdash.services.controller import (
     create_new_study,
     create_subjects_for_study,
     download_dataset,
+    download_study_dashboard_csv,
+    mark_subject_as_left,
     delete_subjects_from_server,
     remove_subjects_from_study,
     update_study_meta_data,
 )
-from jdash.services.notification import send_email, send_push_notification,send_qc_comment_email
+from jdash.services.notification import send_email, send_push_notification, send_qc_comment_email
+from jdash.services import permissions
 from jdash.services.study import Study
 from jdash.forms import (
     CreateStudyForm,
+    ChangeSubjectStatusForm,
     CreateSubjectForm,
     QuestionForm,
     RemoveSubjectsForm,
@@ -48,17 +52,20 @@ from jdash.services.datahelper import (
     normalize_survey_data,
 )
 from jdash.utils.fileutils import get_json_data
-from jdash.repositories.study_repository import update_test_case_flags,append_qc_note
+from jdash.repositories.study_repository import append_qc_note, update_test_case_flags
 from jdash.repositories.survey_repository import (
-        retrieve_all_survey_for_user,
-        retrieve_surveys_visible_to_study_editor,
-        )
-from jdash.models import FileDownloadToken, Study as studymodel,StudyDeviceSensor,QualityControlTests
+    retrieve_all_survey_for_user,
+    retrieve_surveys_visible_to_study_editor,
+)
+from jdash.models import FileDownloadToken, Study as studymodel, StudyDeviceSensor, QualityControlTests
 from jdash.config.textmessages import TextMessages as textmessages
-
-from django.http import HttpResponse
+from jdash.services.csv_refresh import request_study_csv_refresh
 
 logger = logging.getLogger("django")
+
+
+def _forbidden(message="You do not have permission to perform this action."):
+    return HttpResponseForbidden(message)
 
 
 @login_required
@@ -76,7 +83,37 @@ def study_details(request, study_name):
     Returns:
         HttpResponse: Rendered study details or home page on error.
     """
+    try:
+        csv_ready = request_study_csv_refresh(study_name)
+
+        if not csv_ready:
+            messages.warning(
+                request,
+                "Refreshing the study data is taking longer than expected. "
+                "The latest available data is displayed."
+            )
+    except (FileNotFoundError, TimeoutError, RuntimeError, OSError):
+        logger.exception(
+            "Could not refresh dashboard CSV for study %s",
+            study_name,
+        )
+        messages.warning(
+            request,
+            "The study data could not be refreshed. "
+            "The latest available data will be displayed."
+        )
     context = Study(study_name, request.user).display_context()
+
+    study_management_posts = {
+        constants.button_name_send_notification,
+        constants.button_name_create_subjects,
+        constants.button_name_remove_subjects,
+        constants.button_name_change_subject_status,
+        constants.button_name_delete_subject_data,
+    }
+    if request.method == constants.post_method and any(name in request.POST for name in study_management_posts):
+        if not permissions.can_manage_study(request.user):
+            return _forbidden()
 
     if constants.button_name_send_notification in request.POST:
         form = SendNotificationForm(
@@ -89,16 +126,12 @@ def study_details(request, study_name):
     elif constants.button_name_create_subjects in request.POST:
         form = CreateSubjectForm(request.POST)
         if form.is_valid():
-            result_context = create_subjects_for_study(
+            context = create_subjects_for_study(
                 study_name,
                 form.cleaned_data.get(constants.field_name_number_of_subjects),
             )
-
-            if constants.key_name_error_message in result_context:
-                context.update(result_context)
-            else:
-                return redirect("details", study_name=study_name)
     elif constants.button_name_remove_subjects in request.POST:
+        dropout_reason = request.POST.get(constants.field_name_dropout_reason, "")
         form = RemoveSubjectsForm(
             request.POST,
             receivers=context[constants.key_name_subject_details][constants.key_name_ids_to_be_removed],
@@ -108,17 +141,35 @@ def study_details(request, study_name):
                 study_name,
                 form.cleaned_data.get(constants.field_name_subject_to_remove),
                 context,
+                actor=request.user,
+                dropout_reason=dropout_reason,
+            )
+    elif constants.button_name_change_subject_status in request.POST:
+        form = ChangeSubjectStatusForm(
+            request.POST,
+            subjects=context[constants.key_name_subject_details][constants.key_name_ids_to_be_removed],
+        )
+        if form.is_valid():
+            context = mark_subject_as_left(
+                study_name,
+                form.cleaned_data["subject_to_change"],
+                context,
             )
     elif constants.button_name_delete_subject_data in request.POST:
         selected_ids = request.POST[constants.field_name_subjectId]
-        delete_subjects_from_server(study_name, selected_ids)
+        delete_subjects_from_server(
+            study_name,
+            selected_ids,
+            actor=request.user,
+            dropout_reason=request.POST.get(constants.field_name_dropout_reason, ""),
+        )
         LogEntry.objects.select_related('actor', 'content_type').order_by('-timestamp')[:200]
 
     if constants.key_name_error_message in context:
         context.update(context_for_home_page(request.user))
         messages.error(request, context[constants.key_name_error_message])
         return render(request, constants.home_page, context)
-    
+
     context.update(
         context_for_study_detail_page(
             study_name,
@@ -127,6 +178,12 @@ def study_details(request, study_name):
         )
     )
     return render(request, constants.details_page, context)
+
+
+@login_required
+def export_study_dashboard_csv(request, study_name):
+    """Download the generated dashboard CSV for a study."""
+    return download_study_dashboard_csv(study_name)
 
 
 @login_required
@@ -141,6 +198,9 @@ def close(request, study_name):
     Returns:
         HttpResponse: Home page or error page.
     """
+    if not permissions.can_manage_study(request.user):
+        return _forbidden()
+
     context = {}
     (
         context[constants.key_name_study_meta],
@@ -148,21 +208,6 @@ def close(request, study_name):
         context[constants.key_name_error_message],
     ) = close_study(study_name, request.user)
     if not context[constants.key_name_error_message]:
-        study_meta = context[constants.key_name_study_meta]
-        request.session[constants.session_key_studies] = study_meta
-        request.session[constants.session_key_studies_stats] = context[constants.key_name_stats]
-        request.session[constants.session_key_studies_ema] = list({
-            study[constants.key_name_study_title]
-            for study in study_meta
-            if constants.ema in (study.get(constants.key_name_sensor_list) or [])
-        })
-        request.session[constants.session_key_old_ema] = [
-            study[constants.key_name_study_title]
-            for study in study_meta
-            if "old_ema" in study
-        ]
-        request.session[constants.session_key_survey_details] = None
-        request.session.modified = True
         return render(request, constants.home_page, context=context)
     return render(request, constants.error_page, context=context)
 
@@ -190,6 +235,14 @@ def download_dataset_from_link(request, arg):
         logger.warning("Invalid or expired download token: %s", arg)
         return render(request, constants.error_page, context={})
 
+    if download_token.status == "downloaded":
+        logger.info("Download token has already been used: %s", arg)
+        return render(
+            request,
+            constants.download_confirm,
+            context={"arg": arg, "download_complete": True},
+        )
+
     if constants.button_name_download_data_confirm in request.GET:
         logger.info("Download confirmation requested for token: %s", arg)
         verify_code = request.GET.get('verifyCode', '')
@@ -199,10 +252,11 @@ def download_dataset_from_link(request, arg):
 
         study_name = download_token.file_name
         logger.info("download_dataset_from_link::download request for %s data", study_name)
+        response = download_dataset(study_name)
         download_token.status = "downloaded"
         download_token.downloaded = timezone.now()
         download_token.save()
-        return download_dataset(study_name)
+        return response
 
     logger.info("Sending confirmation email for download token: %s", arg)
     send_email("", download_token.email, arg, "confirm")
@@ -220,6 +274,9 @@ def add_study(request):
     Returns:
         HttpResponse: Create page, home page, or error page.
     """
+    if not permissions.can_manage_study(request.user):
+        return _forbidden()
+
     context = {}
     error = ""
     survey_list_obj = retrieve_all_survey_for_user(request.user, request.session.session_key)
@@ -265,60 +322,22 @@ def add_study(request):
         all_valid = form.is_valid() and task_formset.is_valid() and devices_valid and sensors_valid
 
         if all_valid:
-            logger.warning("BEFORE create_new_study")
+            with transaction.atomic():
+                context = create_new_study(
+                    form,
+                    task_formset,
+                    request,
+                    study_device_formset,
+                    sensor_formsets,
+                )
 
-            try:
-                with transaction.atomic():
-                    context = create_new_study(
-                        form,
-                        task_formset,
-                        request,
-                        study_device_formset,
-                        sensor_formsets,
-                    )
-
-                logger.warning("AFTER create_new_study context=%s", context)
-
-            except Exception as e:
-                logger.exception("create_new_study failed")
-                return HttpResponse(f"ERROR: {e}")
-
-            logger.warning(
-                "USER AUTH AFTER CREATE: %s",
-                request.user.is_authenticated
-            )
+            request.session[constants.session_key_studies] = None
 
             if not context.get(constants.key_name_error_message):
                 messages.success(request, context[constants.key_name_success_message])
+                return render(request, constants.home_page, context=context)
 
-                request.session.pop(constants.session_key_studies, None)
-                request.session.pop(constants.session_key_studies_stats, None)
-                request.session.pop(constants.session_key_studies_ema, None)
-                request.session.pop(constants.session_key_old_ema, None)
-                request.session.modified = True
-                messages.success(request, "Study created")
-
-                return redirect(constants.url_name_for_home)
-
-        #if all_valid:
-        #    with transaction.atomic():
-        #        context = create_new_study(
-        #            form,
-        #            task_formset,
-        #            request,
-        #            study_device_formset,
-        #            sensor_formsets,
-        #        )
-
-        #    request.session[constants.session_key_studies] = None
-        #    request.session[constants.session_key_studies_stats] = None
-        #    request.session[constants.session_key_studies_ema] = []
-
-        #    if not context.get(constants.key_name_error_message):
-        #        messages.success(request, context[constants.key_name_success_message])
-        #        return render(request, constants.home_page, context=context)
-
-        #    error = context.get(constants.key_name_error_message, "")
+            error = context.get(constants.key_name_error_message, "")
 
         else:
             logger.warning("add_study:: validation failed")
@@ -370,14 +389,33 @@ def edit_study(request, study_name):
     Returns:
         HttpResponse: Rendered study edit page or home page on success.
     """
-    context = {}
-    error = context.get(constants.key_name_error_message, "")
-    json_meta = get_json_data(study_name)
+    if not permissions.can_manage_study(request.user):
+        return _forbidden()
 
+    context = {}
+    json_meta = get_json_data(study_name)
     try:
         study = studymodel.objects.get(title=study_name)
     except studymodel.DoesNotExist:
         messages.error(request, "Study not found.")
+        return render(request, constants.home_page, context=context)
+    except studymodel.MultipleObjectsReturned:
+        duplicate_ids = list(
+            studymodel.objects.filter(title=study_name)
+            .order_by("id")
+            .values_list("id", flat=True)
+        )
+        logger.error(
+            "Cannot edit study %s because duplicate rows exist: ids=%s",
+            study_name,
+            duplicate_ids,
+        )
+        messages.error(
+            request,
+            "This study has duplicate database records and cannot be edited safely. "
+            "Please remove the duplicates and try again.",
+        )
+        context.update(context_for_home_page(request.user))
         return render(request, constants.home_page, context=context)
 
     survey_data = json_meta.get("survey")
@@ -422,12 +460,6 @@ def edit_study(request, study_name):
                     study_device_formset,
                     sensor_formsets,
                 )
-
-                #if study_name == "Test":
-                #    json_meta = get_json_data(study_name)
-                #    number_of_subjects = json_meta.get("number_of_subjects") or json_meta.get("number-of-subjects") or 350
-                #    Subject.create_pdfs_for_study(study_name, int(number_of_subjects))
-
                 context[constants.key_name_survey_form] = SurveyForm()
                 context[constants.key_name_question_form] = QuestionForm()
                 messages.success(request, textmessages.success_study_updated)
@@ -440,22 +472,17 @@ def edit_study(request, study_name):
             for i, sf in enumerate(sensor_formsets):
                 logger.warning("Sensor formset %s errors: %s", i, sf.errors)
 
-    if json_meta.get("survey"):
-        survey = normalize_survey_data(json_meta)
-
-        if not survey.get("id"):
+    if survey_data:
+        if  survey_data not in (None, {}) and not survey_data.get("id"):
             context["is_file"] = True
-            context[constants.key_name_study_form] = CreateStudyForm(
-                json_data=json_meta,
-                survey=survey_list_obj,
-            )
+            context[constants.key_name_study_form] = CreateStudyForm(json_data=json_meta, survey=survey_list_obj)
         else:
             logger.debug("json in the attached study file %s", json_meta)
             context["is_file"] = False
             context[constants.key_name_study_form] = CreateStudyForm(
                 json_data=json_meta,
                 survey=survey_list_obj,
-                initial_survey_id=survey.get("id", ""),
+                initial_survey_id=survey_data["id"],
             )
     else:
         context[constants.key_name_study_form] = CreateStudyForm(
@@ -491,7 +518,6 @@ def edit_study(request, study_name):
         )
     )
 
-    messages.error(request, error)
     logger.debug("edit_study:: context study name %s", context)
     return render(request, constants.edit_study_page, context=context)
 
@@ -508,6 +534,9 @@ def qc_study(request, study_name):
     Returns:
         HttpResponse: Rendered QC/SOP page.
     """
+    if not permissions.can_qc_study(request.user):
+        return _forbidden()
+
     if constants.button_name_update_test_flags in request.POST:
         test_flags_list = request.POST.get(constants.field_name_test_case_flags, "").strip()
         if test_flags_list:

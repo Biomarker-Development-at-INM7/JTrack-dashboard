@@ -5,6 +5,7 @@ import os
 import shlex
 import subprocess
 import threading
+import zipfile
 from datetime import datetime, timedelta
 from django.utils import timezone
 from django.conf import settings
@@ -19,15 +20,26 @@ from jdash.config.textmessages import TextMessages as textmessages
 from jdash.exceptions.controllerexceptions import controller_error_message
 from jdash.models import FileDownloadToken
 from jdash.repositories.study_repository import (
+    is_test_study,
     retrieve_study_details_by_title,
     retrieve_test_cases_for_study,
 )
 from jdash.services.context_builder import context_for_home_page
 from jdash.services.datahelper import get_study_form_data
-from jdash.services.notification import send_push_notification as send_push_notification_impl
+from jdash.services.notification import (
+    send_email,
+    send_push_notification as send_push_notification_impl,
+)
 from jdash.services.study import Study, get_all_study_details
 from jdash.services.subject import Subject
-from jdash.utils.fileutils import change_permissions, handle_uploaded_file, open_study_json, save_study_json
+from jdash.utils.fileutils import (
+    change_permissions,
+    delete_download_dataset_zip,
+    handle_uploaded_file,
+    open_study_json,
+    save_study_json,
+    set_download_file_permissions,
+)
 from jdash.utils.utils import study_name_user_id
 
 logger = logging.getLogger("django")
@@ -88,6 +100,9 @@ def download_dataset(study_dataset_name):
         config.storage_folder,
         os.path.join(config.download_folder, study_dataset_name + constants.zip_extension),
     )
+    if not os.path.exists(filepath):
+        raise Http404("Requested dataset ZIP is no longer available.")
+
     response = FileResponse(
         open(filepath, "rb"),
         content_type=constants.zip_content_type,
@@ -104,25 +119,95 @@ def download_dataset(study_dataset_name):
         max_age=60,
         samesite="Lax",
     )
+    response_close = response.close
+    cleanup_done = False
+    cleanup_remote = True
+    filename_parts = study_dataset_name.rsplit("_", 2)
+    if len(filename_parts) == 3 and filename_parts[1] in {"raw", "processed"}:
+        try:
+            cleanup_remote = not is_test_study(filename_parts[0])
+        except Exception:
+            logger.exception(
+                "Could not determine dataset cleanup source for %s",
+                study_dataset_name,
+            )
+
+    def close_with_zip_cleanup():
+        nonlocal cleanup_done
+        try:
+            response_close()
+        finally:
+            if cleanup_done:
+                return
+            cleanup_done = True
+            delete_download_dataset_zip(
+                filepath,
+                study_dataset_name,
+                delete_remote=cleanup_remote,
+            )
+
+    response.close = close_with_zip_cleanup
     logger.info(response)
     return response
+
+
+def download_study_dashboard_csv(study_name):
+    """Stream the generated dashboard CSV for a study."""
+    filename = f"{config.csv_prefix}{study_name}.csv"
+    filepath = os.path.join(config.storage_folder, filename)
+    if not os.path.isfile(filepath):
+        raise Http404("Dashboard CSV is not available for this study.")
+
+    return FileResponse(
+        open(filepath, "rb"),
+        content_type="text/csv; charset=utf-8",
+        as_attachment=True,
+        filename=filename,
+    )
 
 
 def initiate_download_study_dataset(study_name, data_type, user_details):
     """
     Start asynchronous dataset generation and follow-up email delivery.
     """
-    logger.info("initiate_download_study_dataset::start %s %s", study_name,data_type)
-    file_date_identifier = timezone.now().strftime("%Y-%m-%dT%H:%M:%S")
-    # Build the SSH command to execute the remote script
-    ssh_command = f"ssh {settings.REMOTE_USERNAME}@{settings.JUSELESS_SERVER} 'python3 {config.juseless_download_script_path} {study_name} {data_type} {file_date_identifier}'"
-    executable_filepath = os.path.join(config.storage_folder, config.download_folder, "download_dataset.sh")
     try:
+        test_study = is_test_study(study_name)
+        if test_study:
+            data_type = "raw"
+
+        logger.info(
+            "initiate_download_study_dataset::start %s %s",
+            study_name,
+            data_type,
+        )
+        if data_type not in {"raw", "processed"}:
+            logger.warning("Unsupported study dataset type: %s", data_type)
+            return False
+
+        file_date_identifier = timezone.now().strftime("%Y-%m-%dT%H:%M:%S")
+        filename = study_name + "_" + data_type + "_" + file_date_identifier
+        if test_study:
+            thread = threading.Thread(
+                target=create_local_test_study_dataset,
+                args=(study_name, data_type, filename, user_details),
+            )
+            thread.start()
+            logger.info(
+                "Queued local dataset generation for test study %s", study_name
+            )
+            return True
+
+        # Non-test studies continue through the remote JUsless exporter.
+        ssh_command = f"ssh {settings.REMOTE_USERNAME}@{settings.JUSELESS_SERVER} 'python3 {config.juseless_download_script_path} {study_name} {data_type} {file_date_identifier}'"
+        executable_filepath = os.path.join(
+            config.storage_folder,
+            config.download_folder,
+            "download_dataset.sh",
+        )
         with open(executable_filepath, 'a',encoding='utf-8') as jf:
                 jf.write(ssh_command)
                 jf.write("\n")
 
-        filename = study_name + "_" + data_type + "_" + file_date_identifier
         logger.info("initiate_download_study_dataset::end %s", study_name)
         thread = threading.Thread(target=check_file_and_send_email, args=(user_details, filename))
         thread.start()
@@ -131,11 +216,131 @@ def initiate_download_study_dataset(study_name, data_type, user_details):
         logger.info("An error occurred: %s", exc)
         return False
 
-def check_file_and_send_email(user_details, filename):
+
+def create_local_test_study_dataset(study_name, data_type, filename, user_details):
+    """Create a test-study dataset ZIP locally and register its email link."""
+    study_root = os.path.realpath(os.path.join(config.studies_folder, study_name))
+    studies_root = os.path.realpath(config.studies_folder)
+    download_root = os.path.join(config.storage_folder, config.download_folder)
+    zip_path = os.path.join(download_root, filename + constants.zip_extension)
+    partial_zip_path = zip_path + ".part"
+
+    try:
+        if os.path.commonpath([studies_root, study_root]) != studies_root:
+            raise ValueError("Study name resolves outside the local studies folder.")
+        if not os.path.isdir(study_root):
+            raise FileNotFoundError(f"Local study folder not found: {study_root}")
+
+        os.makedirs(download_root, exist_ok=True)
+        files_added = 0
+        with zipfile.ZipFile(partial_zip_path, "w", zipfile.ZIP_DEFLATED) as archive:
+            def add_tree(source_folder, archive_root):
+                nonlocal files_added
+                for root, directories, files in os.walk(source_folder):
+                    directories[:] = [
+                        directory
+                        for directory in directories
+                        if not os.path.islink(os.path.join(root, directory))
+                    ]
+                    if data_type == "raw":
+                        directories[:] = [
+                            directory
+                            for directory in directories
+                            if directory not in {"processed", "combined"}
+                        ]
+                    for file_name in files:
+                        source_path = os.path.join(root, file_name)
+                        if os.path.islink(source_path):
+                            continue
+                        relative_path = os.path.relpath(source_path, source_folder)
+                        archive.write(
+                            source_path,
+                            os.path.join(archive_root, relative_path),
+                        )
+                        files_added += 1
+
+            canonical_inputs = os.path.join(study_root, "inputs")
+            canonical_metadata = os.path.join(study_root, "metadata")
+            if os.path.isdir(canonical_inputs):
+                add_tree(canonical_inputs, "inputs")
+            if os.path.isdir(canonical_metadata):
+                add_tree(canonical_metadata, "metadata")
+
+            if not os.path.isdir(canonical_inputs):
+                subject_prefix = study_name + "_"
+
+                # Older test studies store subject-activation folders directly
+                # below the study directory.
+                for entry in sorted(os.scandir(study_root), key=lambda item: item.name):
+                    if (
+                        entry.is_dir(follow_symlinks=False)
+                        and entry.name.startswith(subject_prefix)
+                    ):
+                        add_tree(entry.path, os.path.join("inputs", entry.name))
+
+                # Some local ingestion setups use one shared studies/inputs
+                # directory instead of studies/<study>/inputs.
+                shared_inputs = os.path.join(studies_root, "inputs")
+                if os.path.isdir(shared_inputs):
+                    for entry in sorted(
+                        os.scandir(shared_inputs), key=lambda item: item.name
+                    ):
+                        if (
+                            entry.is_dir(follow_symlinks=False)
+                            and entry.name.startswith(subject_prefix)
+                        ):
+                            add_tree(entry.path, os.path.join("inputs", entry.name))
+
+            if not os.path.isdir(canonical_metadata):
+                # Normalize legacy root-level study metadata to the same
+                # metadata/... archive layout produced by the remote exporter.
+                for entry in sorted(os.scandir(study_root), key=lambda item: item.name):
+                    if (
+                        entry.is_file(follow_symlinks=False)
+                        and not entry.name.startswith(".")
+                    ):
+                        archive.write(entry.path, os.path.join("metadata", entry.name))
+                        files_added += 1
+
+        if files_added == 0:
+            raise RuntimeError(f"No files found to archive under: {study_root}")
+        with zipfile.ZipFile(partial_zip_path, "r") as archive:
+            invalid_member = archive.testzip()
+            if invalid_member:
+                raise RuntimeError(
+                    f"ZIP integrity check failed for member: {invalid_member}"
+                )
+        os.replace(partial_zip_path, zip_path)
+        set_download_file_permissions(zip_path)
+        logger.info("Created local test-study dataset ZIP: %s", zip_path)
+        check_file_and_send_email(
+            user_details,
+            filename,
+            send_link_email=True,
+        )
+    except Exception:
+        logger.exception(
+            "Local dataset generation failed for test study %s", study_name
+        )
+        if os.path.exists(partial_zip_path):
+            try:
+                os.remove(partial_zip_path)
+            except OSError:
+                logger.warning("Could not remove partial ZIP: %s", partial_zip_path)
+
+def check_file_and_send_email(user_details, filename, send_link_email=False):
     """
-    Generate a tokenized download link and log the request metadata.
+    Register a dataset download and optionally email its link immediately.
+
+    Normal remote-study downloads retain their existing token-registration
+    behavior. Test-study ZIPs call this only after local generation succeeds
+    and explicitly request immediate email delivery.
     """
-    _zip_filepath = os.path.join(config.storage_folder, config.download_folder, filename + ".zip")
+    zip_filepath = os.path.join(
+        config.storage_folder,
+        config.download_folder,
+        filename + constants.zip_extension,
+    )
     token_instance = FileDownloadToken.objects.create(
         first_name=user_details.get("first_name"),
         email=user_details.get("email"),
@@ -143,9 +348,29 @@ def check_file_and_send_email(user_details, filename):
         status="initiated",
         expiration_date=timezone.now() + timedelta(days=7),
     )
-    link = "https://jdash.inm7.de" + reverse("download_dataset", args=[token_instance.token])
+    link = config.site_url + reverse("download_dataset", args=[token_instance.token])
     token_instance.link = link
     token_instance.save()
+
+    if not send_link_email:
+        return True
+
+    if not os.path.isfile(zip_filepath):
+        token_instance.status = "file missing"
+        token_instance.save(update_fields=["status"])
+        logger.error("Test-study dataset ZIP is missing: %s", zip_filepath)
+        return False
+
+    email_sent = send_email(
+        "",
+        user_details.get("email", ""),
+        "",
+        link,
+    )
+    status = "sent email" if email_sent else "email failed"
+    token_instance.status = status
+    token_instance.save(update_fields=["status"])
+    return email_sent
 
 
 def create_new_study(form, task_formset, request, study_device_formset, sensor_formsets):
@@ -217,7 +442,30 @@ def update_study_meta_data(study_name, form, formset, request, study_device_form
     return context
 
 
-def remove_subjects_from_study(study_name, subject_to_remove, context):
+def _log_subject_removal_audit(study_name, actor, subject_ids, dropout_reason, delete_data):
+    try:
+        StudyAuditService.log_subject_removal(
+            study_name,
+            actor,
+            subject_ids,
+            reason=dropout_reason,
+            delete_data=delete_data,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to write subject-removal audit entry for study=%s subject_ids=%s",
+            study_name,
+            subject_ids,
+        )
+
+
+def remove_subjects_from_study(
+    study_name,
+    subject_to_remove,
+    context,
+    actor=None,
+    dropout_reason="",
+):
     """
     Mark a selected subject as removed within the in-memory study detail context.
     """
@@ -246,6 +494,13 @@ def remove_subjects_from_study(study_name, subject_to_remove, context):
                     )
                     context["error_message"] = controller_error_message(exc)
                     break
+                _log_subject_removal_audit(
+                    study_name,
+                    actor,
+                    subject_id_with_modality,
+                    dropout_reason,
+                    delete_data=False,
+                )
                 context["success_message"] = f"{subject_id} has been succesfully removed"
                 break
     else:
@@ -259,6 +514,41 @@ def remove_subjects_from_study(study_name, subject_to_remove, context):
     logger.info("remove_subjects_from_study:end")
     if "success_message" not in context:
         context["success_message"] = f"{subject_id} not found but marked processed"
+    return context
+
+
+def mark_subject_as_left(study_name, subject_to_change, context):
+    """Set selected subject modalities to Left while retaining their data."""
+    selected_values = (
+        subject_to_change
+        if isinstance(subject_to_change, (list, tuple, set))
+        else [subject_to_change]
+    )
+    updated_subject_ids = []
+    for selected_value in selected_values:
+        try:
+            subject_with_modality = str(selected_value).split(constants.value_sep, 1)[0]
+            subject_id, app = subject_with_modality.split(constants.sep, 1)
+            Subject.mark_as_left(study_name, subject_with_modality)
+
+            group_id = subject_id[:-2]
+            for subject_row in context.get("d", {}).get(group_id, []):
+                if subject_row.get("subject_name") == subject_id and subject_row.get("app") == app:
+                    subject_row["status_code"] = constants.left_status_code
+                    break
+            updated_subject_ids.append(subject_id)
+        except Exception as exc:
+            logger.exception(
+                "Failed to mark subject as left: study=%s subject=%s",
+                study_name,
+                selected_value,
+            )
+            context[constants.key_name_error_message] = controller_error_message(exc)
+
+    if updated_subject_ids:
+        context[constants.key_name_success_message] = (
+            f"{len(updated_subject_ids)} subject activation(s) have been marked as left"
+        )
     return context
 
 def create_subjects_for_study(study_name, count):
@@ -361,13 +651,14 @@ def close_study(study_name, user):
         return [], {}, controller_error_message(exc)
 
 
-def delete_subjects_from_server(study_name, subject_ids):
+def delete_subjects_from_server(study_name, subject_ids, actor=None, dropout_reason=""):
     """
     Delete generated files for the selected subject ids from local storage.
     """
     from jdash.utils.fileutils import delete_user_files
 
     logger.info("delete_subjects_from_server subject  :start")
+    deleted_subject_ids = []
     for subject_id in subject_ids.split(constants.value_sep):
         subject_id = subject_id.strip()
         if not subject_id:
@@ -375,4 +666,13 @@ def delete_subjects_from_server(study_name, subject_ids):
             continue
         logger.info("delete_subjects_from_server subject_id %s", subject_id)
         delete_user_files(study_name, subject_id)
+        deleted_subject_ids.append(subject_id)
+    if deleted_subject_ids:
+        _log_subject_removal_audit(
+            study_name,
+            actor,
+            deleted_subject_ids,
+            dropout_reason,
+            delete_data=True,
+        )
     logger.info("delete_subjects_from_server subject  :end")

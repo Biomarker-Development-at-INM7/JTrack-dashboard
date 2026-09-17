@@ -54,6 +54,20 @@
 </script>
 <div class="row justify-content-center mt-5">
     <div class="col-xl-10 col-lg-6 col-md-6">
+    {% if download_complete %}
+    <div class="card">
+        <div class="card-header text-white" style="background-color: #198754;">
+            <h2 class="h4 text-center mb-0">
+                <i class="fas fa-check-circle"></i> Download complete
+            </h2>
+        </div>
+        <div class="card-body text-center">
+            <p class="card-text mb-0">
+              The download has already been completed with this link. To download the data again, please request and use another link.
+            </p>
+        </div>
+    </div>
+    {% else %}
     <div id="success" class="card" style="display: none;">
         <div class="card-header text-white" style="background-color: #198754;">
             <h2 class="h4 text-center mb-0">
@@ -114,5 +128,6 @@
         </div>
       </div>    
       <iframe name="download_frame" style="display: none;"></iframe>
+    {% endif %}
   </div> 
 {% endblock %}

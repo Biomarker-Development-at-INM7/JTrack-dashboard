@@ -27,7 +27,6 @@ import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 from jdash.config import runtime_config as config
 from jdash.config import constants as constants
-from jdash.analytics.pipeline import trigger_pipeline_if_needed
 from .layouts.main_layout import main_layout
 from .layouts.ema_layout import ema_layout
 from .callbacks.default_callbacks import default_callbacks
@@ -51,7 +50,6 @@ app = DjangoDash('janalytica',suppress_callback_exceptions=True, external_styles
 
 app.layout = dbc.Container(
     [
-        dbc.Row(html.Label(" Daily Sensor Overview"), className="h3 "),
         # Row 1: Left controls (3) + Right data area (9)
         dbc.Row(
             [
@@ -277,136 +275,6 @@ app.layout = dbc.Container(
             ],
             className="g-3",
         ),
-        dbc.Row(html.Label("Detailed Sensor Data"), className="h3 "),
-        dbc.Row(html.Hr(), className="my-2"),  # Separator line
-        #Row 2: Full-width graphs
-        dbc.Row(
-            [
-                dbc.Col(
-                    [
-                
-                        # Dynamic controls container
-                        html.Div(
-                            [
-                                dcc.Store(id='csv-options-store', data={}),
-                                html.Div(id='dynamic-layout'),
-                            ],
-                            style={'margin-bottom': '20px'},
-                        ),
-                    ],
-                    md=3, lg=3,
-                ),
-
-                dbc.Col(
-                    [
-                        dcc.Tabs(
-                            id='selected-csv-view-tabs',
-                            value='graph',
-                            parent_style={
-                                'display': 'flex',
-                                'justifyContent': 'center',
-                                'marginBottom': '16px',
-                            },
-                            style={
-                                'display': 'inline-flex',
-                                'width': 'fit-content',
-                                'margin': '0 auto',
-                                'height': 'auto',
-                                'border': 'none',
-                                'backgroundColor': 'transparent',
-                            },
-                            children=[
-                                dcc.Tab(
-                                    label='Graph',
-                                    value='graph',
-                                    style={
-                                        'display': 'inline-flex',
-                                        'flex': '0 0 auto',
-                                        'width': 'auto',
-                                        'alignItems': 'center',
-                                        'justifyContent': 'center',
-                                        'padding': '8px 18px',
-                                        'borderRadius': '999px',
-                                        'border': '1px solid #cfd6dd',
-                                        'backgroundColor': '#ffffff',
-                                        'fontWeight': '600',
-                                        'marginRight': '10px',
-                                    },
-                                    selected_style={
-                                        'display': 'inline-flex',
-                                        'flex': '0 0 auto',
-                                        'width': 'auto',
-                                        'alignItems': 'center',
-                                        'justifyContent': 'center',
-                                        'padding': '8px 18px',
-                                        'borderRadius': '999px',
-                                        'border': '1px solid #0d6efd',
-                                        'backgroundColor': '#0d6efd',
-                                        'color': '#ffffff',
-                                        'fontWeight': '600',
-                                        'marginRight': '10px',
-                                    },
-                                    children=[
-                                        html.Div(id='graphs-container'),
-                                    ],
-                                ),
-                                dcc.Tab(
-                                    label='Table',
-                                    value='table',
-                                    style={
-                                        'display': 'inline-flex',
-                                        'flex': '0 0 auto',
-                                        'width': 'auto',
-                                        'alignItems': 'center',
-                                        'justifyContent': 'center',
-                                        'padding': '8px 18px',
-                                        'borderRadius': '999px',
-                                        'border': '1px solid #cfd6dd',
-                                        'backgroundColor': '#ffffff',
-                                        'fontWeight': '600',
-                                    },
-                                    selected_style={
-                                        'display': 'inline-flex',
-                                        'flex': '0 0 auto',
-                                        'width': 'auto',
-                                        'alignItems': 'center',
-                                        'justifyContent': 'center',
-                                        'padding': '8px 18px',
-                                        'borderRadius': '999px',
-                                        'border': '1px solid #0d6efd',
-                                        'backgroundColor': '#0d6efd',
-                                        'color': '#ffffff',
-                                        'fontWeight': '600',
-                                    },
-                                    children=[
-                                        dcc.Loading(
-                                            dash_table.DataTable(
-                                                id='selected-csv-table',
-                                                columns=[],
-                                                data=[],
-                                                page_size=20,
-                                                sort_action='native',
-                                                filter_action='native',
-                                                style_table={'overflowX': 'auto'},
-                                                style_cell={
-                                                    'textAlign': 'left',
-                                                    'minWidth': '120px',
-                                                    'maxWidth': '280px',
-                                                    'whiteSpace': 'normal',
-                                                },
-                                            ),
-                                            type='graph',
-                                        )
-                                    ],
-                                ),
-                            ],
-                        ),
-                    ],
-                    md=9, lg=9,
-                )
-            ],
-            className="g-3",
-        ),
     ],
     fluid=True,
 )
@@ -495,8 +363,7 @@ def update_selector(selected_value):
         return []
 
     data_dir = os.path.join(config.analytics_storage_folder, selected_value, "outputs")
-    if not os.path.isdir(data_dir):
-        trigger_pipeline_if_needed(selected_value)
+    if not data_dir or not os.path.isdir(data_dir):
         return []
 
     csv_files = []
@@ -511,160 +378,7 @@ def update_selector(selected_value):
             continue
 
         csv_files.append(os.path.join(data_dir, filename))
-    if not csv_files:
-        trigger_pipeline_if_needed(selected_value)
     return csv_files
     
 
-@app.callback(
-    Output('dynamic-layout', 'children'),
-    Input('csv-options-store', 'data'),
-    prevent_initial_call=True,
-)
-def render_layout(csv_files):
-    """
-    Render the CSV selector area for group-level analytics.
-
-    Args:
-        csv_files (list[str] | None): CSV files discovered for the study.
-
-    Returns:
-        dash.development.base_component.Component: Informational empty state or
-        the dropdown used to select a CSV file.
-    """
-    if not csv_files:  # None or empty list
-        return html.Div([
-            html.H3("No CSV files found."),
-            html.P("Please upload files or check your outputs directory.")
-        ], style={"padding": "20px", "color": "red"})
-    # Normal layout when CSV files exist
-    return html.Div([
-            html.Label("Select CSV file"),
-            dcc.Dropdown(
-                id='csv-dropdown',
-                options=[{'label': os.path.basename(file), 'value': file} for file in csv_files],
-                placeholder="Select a CSV file"
-            ),
-            html.Div(
-                [
-                    html.Div(main_layout(), id='main-controls-container'),
-                    html.Div(ema_layout(), id='ema-controls-container', style={'display': 'none'}),
-                ],
-                id='conditional-layout'
-            )
-        ],
-        style={}
-        )
-
-
-# File upload handler
-# @app.callback(
-#     Output('output-data-upload', 'children'),
-#     Input('upload-data', 'contents'),
-#     State('upload-data', 'filename'),
-#     State('studies-dropdown', 'value')
-# )
-# def save_file(contents, filename, study):
-#     if not contents:
-#         return 'Upload a CSV file.'
-#     header, data = contents.split(',')
-#     decoded = base64.b64decode(data)
-#     target = os.path.join(config.analytics_storage_folder, study, 'outputs', filename)
-#     os.makedirs(os.path.dirname(target), exist_ok=True)
-#     try:
-#         with open(target, 'wb') as f:
-#             f.write(decoded)
-#         return f"Saved '{filename}' successfully."
-#     except Exception as e:
-#         return f"Error: {e}"
-    
-#Callback to switch layout
-@app.callback(
-    Output('main-controls-container', 'style'),
-    Output('ema-controls-container', 'style'),
-    Input('csv-dropdown', 'value'),
-    prevent_initial_call=True
-)
-def load_dynamic_layout(filename):
-    """
-    Switch the lower analytics controls between the generic CSV and EMA layouts.
-
-    Args:
-        filename (str | None): Selected CSV filename or full path.
-
-    Returns:
-        dash.development.base_component.Component: The layout matching the file
-        type inferred from the filename.
-    """
-    if not filename:
-        raise PreventUpdate
-
-    filename_lower = filename.lower()
-    
-    if 'ema' in filename_lower:
-        return {'display': 'none'}, {}
-    return {}, {'display': 'none'}
-
-   
-
-# Render graphs based on the same CSV selection
-@app.callback(
-    Output('graphs-container', 'children'),
-    Input('csv-dropdown', 'value'),
-    prevent_initial_call=True
-)
-def render_graphs(filename):
-    """
-    Render the lower graph container for the selected analytics mode.
-
-    Args:
-        filename (str | None): Selected CSV filename or full path.
-
-    Returns:
-        dash.development.base_component.Component: Graph placeholders for EMA,
-        generic CSV analytics, EMA analytics, or an empty div if the file type
-        is unsupported.
-    """
-    if not filename:
-        raise PreventUpdate
-    name = os.path.basename(filename).lower()
-    if 'ema' in name:
-        return html.Div([
-            dcc.Loading(dcc.Graph(id='ema-selected-plot'), type='cube'),
-            dcc.Loading(dcc.Graph(id='ema-mean-plot'), type='graph')
-        ])
-    return html.Div([
-        dcc.Loading(dcc.Graph(id='main-plot'), type='cube'),
-        dcc.Loading(dcc.Graph(id='group-plot'), type='graph')
-    ])
-
-
-@app.callback(
-    Output('selected-csv-table', 'columns'),
-    Output('selected-csv-table', 'data'),
-    Input('csv-dropdown', 'value'),
-    prevent_initial_call=True,
-)
-def update_selected_csv_table(filename):
-    """
-    Show the selected analytics CSV as a sortable/filterable raw table.
-
-    Args:
-        filename (str | None): Selected CSV filename or full path.
-
-    Returns:
-        tuple[list[dict], list[dict]]: DataTable columns and row records.
-    """
-    if not filename:
-        raise PreventUpdate
-
-    try:
-        df = read_csv_flexible(filename)
-    except Exception:
-        return [], []
-
-    df = df.where(pd.notnull(df), "")
-    columns = [{"name": col, "id": col} for col in df.columns]
-    data = df.to_dict("records")
-    return columns, data
 

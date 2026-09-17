@@ -10,6 +10,7 @@ import sys
 import os
 
 from django.core.wsgi import get_wsgi_application
+sys.path.append('/var/www/jdash.inm7.de/www/dashboard')
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'admin.settings')
 
 application = get_wsgi_application()

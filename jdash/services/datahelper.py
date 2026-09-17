@@ -35,7 +35,6 @@ def get_study_form_data(form,formset,request,study_device_formset, sensor_formse
     #form_data['passive_checkbox'] = form.cleaned_data.get('passive_checkbox')
     form_data['frequency'] = form.cleaned_data.get('recording_freq')
     form_data['sensor_list_limited'] = form.cleaned_data.get('sensor_list_limited')
-    form_data['sensor-list'] = form.cleaned_data.get('sensor_list') #need to remove later after mobile changes
     form_data['sensor_list'] = form.cleaned_data.get('sensor_list') 
     if formset.is_valid():
         form_data['task_list'] = [] 

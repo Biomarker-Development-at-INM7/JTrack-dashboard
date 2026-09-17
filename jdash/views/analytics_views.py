@@ -70,5 +70,5 @@ def analytics(request, study_name):
             }
         }
     }
-    logger.info("analytics:: study name %s", context)
+    logger.debug("analytics:: study name %s", context)
     return render(request, constants.analytics_details_page, context=context)

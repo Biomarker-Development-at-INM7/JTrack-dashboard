@@ -386,6 +386,26 @@ class Subject:
         logger.debug("Subject.remove_from_study return_value=%s", None)
 
     @staticmethod
+    def mark_as_left(study_name, subject_to_change):
+        """Mark one subject modality as having left, retaining its data and files."""
+        subject_id, app = str(subject_to_change).split(constants.sep, 1)
+        user_json_path = os.path.join(
+            config.users_folder,
+            study_name + '_' + subject_id + '.json',
+        )
+        status_key = 'status' + constants.suffix_per_modality_dict[app]
+        time_left_key = 'time_left' + constants.suffix_per_modality_dict[app]
+
+        with open(user_json_path, 'r', encoding=constants.encoding) as subject_file:
+            user_data = json.load(subject_file)
+
+        user_data[status_key] = constants.left_status_code
+        user_data[time_left_key] = int(round(time.time() * 1000))
+
+        with open(user_json_path, 'w', encoding=constants.encoding) as subject_file:
+            json.dump(user_data, subject_file, ensure_ascii=False, indent=4)
+
+    @staticmethod
     def create_qr_codes(study_id, subject_name):
         """
         Create QR-code PNGs for all activations of a subject.
@@ -408,7 +428,7 @@ class Subject:
                 box_size=10,
                 border=4,
             )
-            data = 'https://jdash.inm7.de?username=%s&studyid=%s' % (user_activation_number, study_id)
+            data = config.subject_QR_code_url % (user_activation_number, study_id)
 
             qr.add_data(data)
             qr.make(fit=True)

@@ -4,7 +4,7 @@ import logging
 from django.contrib.auth.models import Group, Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Case, IntegerField, Q, Value, When
 from django.shortcuts import get_object_or_404
 from django.utils.encoding import force_str
 from django.utils import timezone
@@ -210,6 +210,7 @@ def create_new_study_in_db(user, form_data, survey, images_url):
     persist_task_list(study, form_data.get("task_list", []))
     persist_study_device_sensors(study, user, form_data.get("device_sensor_rows", []))
     create_new_study_group(user, form_data)
+    return study
 
 
 def create_new_study_group(user, form_data):
@@ -281,7 +282,18 @@ def add_verification_code(code, token):
 def retrieve_test_cases_for_study(study_db_id):
     """Return all quality-control test cases for a study."""
     results = []
-    queryset = qctestsModel.objects.filter(study_id=study_db_id).prefetch_related("comments")
+    queryset = (
+        qctestsModel.objects.filter(study_id=study_db_id)
+        .annotate(
+            qc_sort_priority=Case(
+                When(testcase_id="SUB-01", then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField(),
+            )
+        )
+        .prefetch_related("comments")
+        .order_by("qc_sort_priority", "id")
+    )
     for test_case in queryset:
         item = {
             "id": test_case.id,
@@ -366,3 +378,7 @@ def retrieve_study_details_by_title(study_name):
     study = studymodel.objects.filter(title=study_name).values()
     return json.dumps(study[0], default=str)
 
+
+def is_test_study(study_name):
+    """Return whether the named study is configured as a test study."""
+    return studymodel.objects.filter(title=study_name, is_test=True).exists()

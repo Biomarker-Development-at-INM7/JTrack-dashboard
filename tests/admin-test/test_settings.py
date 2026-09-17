@@ -10,7 +10,7 @@ class SettingsTests(SimpleTestCase):
         self.assertIn(settings.LANGUAGE_CODE, ['en', 'de'])
 
     def test_installed_apps(self):
-        self.assertIn('jdash', settings.INSTALLED_APPS)
+        self.assertIn('jdash.apps.jdashConfig', settings.INSTALLED_APPS)
 
 
 class MaintenanceModeMiddlewareTests(SimpleTestCase):

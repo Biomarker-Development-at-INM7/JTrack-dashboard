@@ -219,7 +219,7 @@ msgstr "By clicking 'Submit', you confirm that you have read and understood this
 #: jdash/templates/footer.html:113
 
 msgid "footer_contactbtn"
-msgstr "GET IN TOUCH"
+msgstr "Get in touch"
 
 #: jdash/templates/footer.html:115
 
@@ -320,6 +320,9 @@ msgstr "Title"
 msgid "global_view"
 msgstr "View"
 
+msgid "loading_please_wait"
+msgstr "Please wait..."
+
 #: jdash/templates/nav.html:16
 
 msgid "header_filler"
@@ -329,9 +332,6 @@ msgstr "by"
 
 msgid "header_group"
 msgstr "Biomarker Development Group, INM-7"
-
-msgid "recording_duration"
-msgstr "Recording duration"
 
 #: jdash/templates/index.html:32
 
@@ -613,7 +613,7 @@ msgstr "App"
 #: jdash/templates/study/details.html:102 jdash/templates/study/details.html:145 jdash/templates/study/details.html:170 jdash/templates/study/details.html:176 jdash/templates/study/details.html:188 jdash/templates/study/details.html:207 jdash/templates/study/details.html:213
 
 msgid "study_details_close"
-msgstr "Close"
+msgstr "Cancel"
 
 #: jdash/templates/study/details.html:206 jdash/templates/study/details.html:392 jdash/templates/study/details.html:395
 
@@ -628,17 +628,70 @@ msgstr "Confirm"
 #: jdash/templates/study/details.html:210
 
 msgid "study_details_confirm_close_study"
-msgstr "Confirm to close study"
+msgstr "Closing this study will archive the study folder and mark the study as closed. Participants will no longer be active in this study."
 
 #: jdash/templates/study/details.html:173
 
 msgid "study_details_confirm_remove_subject"
 msgstr "Confirm to remove subject"
 
+#: jdash/templates/study/details.html:252
+
+msgid "study_details_delete_subject_data_qr_reuse_note"
+msgstr "The subject's data will be permanently deleted from this study. After deletion, the subject's QR code can be reused for a new enrollment."
+
 #: jdash/templates/study/details.html:348
 
 msgid "study_details_create"
-msgstr "Create"
+msgstr "Add subjects"
+
+msgid "study_details_change_status"
+msgstr "Change status"
+
+msgid "study_details_mark_as_left"
+msgstr "Mark as left"
+
+msgid "study_details_change_status_left_info"
+msgstr "The selected subject activations will be marked as left. Their existing data and files will be retained."
+
+msgid "study_details_view_members"
+msgstr "View members"
+
+msgid "study_details_members_assigned"
+msgstr "Assigned Members"
+
+msgid "study_details_member_user"
+msgstr "User"
+
+msgid "study_details_member_email"
+msgstr "Email"
+
+msgid "study_details_member_role"
+msgstr "Role"
+
+msgid "study_details_member_owner"
+msgstr "Owner"
+
+msgid "study_details_no_subjects_available"
+msgstr "No subjects are available."
+
+msgid "study_details_qr_activations_and_status"
+msgstr "QR codes and status"
+
+msgid "study_details_no_qr_activations"
+msgstr "No QR-code activations are available for this subject."
+
+msgid "study_details_filter_subjects"
+msgstr "Filter subjects"
+
+msgid "study_details_remove_selection"
+msgstr "Remove selection"
+
+msgid "study_details_clear_all_subjects"
+msgstr "Clear all selected subjects"
+
+msgid "study_details_create_subject_info"
+msgstr "Use this to add new participants to the study. JDash creates new subject IDs and QR codes for enrollment."
 
 #: jdash/templates/study/details.html:489
 
@@ -656,7 +709,7 @@ msgstr "Please note that the data will be available in the dashboard one day aft
 #: jdash/templates/study/details.html:159
 
 msgid "study_details_delete_data_confirm"
-msgstr "I understand the consequence, delete data"
+msgstr "Delete subject data and remove"
 
 #: jdash/templates/study/details.html:144
 
@@ -681,6 +734,12 @@ msgstr "Download data"
 msgid "study_details_download_failed"
 msgstr "Download failed. Please try again."
 
+msgid "study_details_preparing_download"
+msgstr "Preparing your study data download. Please wait..."
+
+msgid "study_details_preparing_file_download"
+msgstr "Preparing your file download. Please wait..."
+
 #: jdash/templates/study/details.html:101
 
 msgid "study_details_download_study_data"
@@ -689,7 +748,7 @@ msgstr "Download Study Data"
 #: jdash/templates/study/details.html:414
 
 msgid "study_details_download_unused_user_sheets"
-msgstr "Download unused user sheets"
+msgstr "Download unused QR codes"
 
 #: jdash/templates/study/details.html:432
 
@@ -735,6 +794,21 @@ msgstr "Generating ZIP..."
 
 msgid "study_details_information"
 msgstr "Information"
+
+msgid "study_details_subjects_short"
+msgstr "Subjects"
+
+msgid "study_details_enrolled_short"
+msgstr "Enrolled"
+
+msgid "study_details_duration_short"
+msgstr "Duration"
+
+msgid "study_details_show_study_details"
+msgstr "Sensor Details"
+
+msgid "study_details_wearables"
+msgstr "Wearables"
 
 #: jdash/templates/study/details.html:491
 
@@ -789,6 +863,9 @@ msgstr "Processed Data"
 msgid "study_details_raw_data"
 msgstr "Raw Data"
 
+msgid "study_details_test_study_raw_download"
+msgstr "This is a test study. Raw files will be downloaded."
+
 #: jdash/templates/study/details.html:411
 
 msgid "study_details_refresh"
@@ -804,6 +881,87 @@ msgstr "Remove"
 msgid "study_details_remove_subject"
 msgstr "Remove Subject"
 
+msgid "study_details_subject_action_choice_title"
+msgstr "Remove subject"
+
+msgid "study_details_subject_action_choice_question"
+msgstr "How do you want to remove this subject?"
+
+msgid "study_details_subject_action_keep_data_title"
+msgstr "Remove and keep existing data"
+
+msgid "study_details_subject_action_keep_data_copy"
+msgstr "Existing data remains read-only. No new data can be added."
+
+msgid "study_details_subject_action_delete_data_title"
+msgstr "Remove and delete subject data"
+
+msgid "study_details_subject_action_delete_data_copy"
+msgstr "Removes data and file references from the active study dataset."
+
+msgid "study_details_required_fields"
+msgstr "Required fields"
+
+msgid "study_details_select_subject_placeholder"
+msgstr "Select a subject"
+
+msgid "study_details_dropout_date"
+msgstr "Removal date"
+
+msgid "study_details_dropout_reason"
+msgstr "Removal reason"
+
+msgid "study_details_select_reason_placeholder"
+msgstr "Select a reason"
+
+msgid "study_details_dropout_reason_withdrawn"
+msgstr "Participant withdrew"
+
+msgid "study_details_dropout_reason_lost_follow_up"
+msgstr "Lost to follow-up"
+
+msgid "study_details_dropout_reason_technical_issue"
+msgstr "Technical issue"
+
+msgid "study_details_dropout_reason_other"
+msgstr "Other"
+
+msgid "study_details_confirm_dropout"
+msgstr "Confirm removal"
+
+msgid "study_details_remove_subject_confirm_title"
+msgstr "Confirm subject removal"
+
+msgid "study_details_remove_subject_confirm_body"
+msgstr "Please review the selected subject before confirming removal."
+
+msgid "study_details_remove_subject_keep_data_warning"
+msgstr "The subject will be removed from this study. Existing data remains read-only and no new data can be added."
+
+msgid "study_details_confirm_remove_keep_data"
+msgstr "Remove subject and keep data"
+
+msgid "study_details_delete_data_warning_subject_prefix"
+msgstr "Subject"
+
+msgid "study_details_delete_data_warning_subject_suffix"
+msgstr "will be removed and their active study data will be permanently deleted."
+
+msgid "study_details_delete_data_terms"
+msgstr "I understand that the active application data cannot be restored through JDash."
+
+msgid "study_details_delete_data_confirm_missing"
+msgstr "Please accept the confirmation statement and type the subject ID exactly as shown."
+
+msgid "study_details_not_applicable"
+msgstr "Not applicable"
+
+msgid "study_details_back"
+msgstr "Back"
+
+msgid "study_details_cancel"
+msgstr "Cancel"
+
 msgid "study_details_select_subject_to_delete"
 msgstr "Please select subject id to delete"
 
@@ -811,6 +969,9 @@ msgstr "Please select subject id to delete"
 
 msgid "study_details_send_notification"
 msgstr "Send notification"
+
+msgid "study_details_send_notification_info"
+msgstr "Use this to send a message to selected study participants. The notification will be delivered through the participant app."
 
 #: jdash/templates/study/details.html:473
 
@@ -820,12 +981,12 @@ msgstr "Sensor Information"
 #: jdash/templates/study/details.html:492
 
 msgid "study_details_sensor_list"
-msgstr "Sensor List"
+msgstr "Passive Sensors"
 
 #: jdash/templates/study/details.html:493
 
 msgid "study_details_sensor_list_limited"
-msgstr "Active Sensor List"
+msgstr "Active Sensors"
 
 #: jdash/templates/study/details.html:475
 
@@ -867,10 +1028,37 @@ msgstr "Subject IDs to delete"
 msgid "study_details_subjects_information"
 msgstr "Subjects information"
 
+msgid "study_details_subjects_in_study"
+msgstr "In study"
+
+msgid "study_details_subjects_left"
+msgstr "Left"
+
+msgid "study_details_subjects_removed"
+msgstr "Removed"
+
+msgid "study_details_subjects_completed"
+msgstr "Completed"
+
+msgid "study_details_members"
+msgstr "Members"
+
+msgid "study_details_administrators"
+msgstr "Administrators"
+
+msgid "study_details_investigators"
+msgstr "Investigators"
+
+msgid "study_details_viewers"
+msgstr "Viewers"
+
+msgid "study_details_no_members"
+msgstr "No study members"
+
 #: jdash/templates/study/details.html:308 jdash/templates/study/details.html:311
 
 msgid "study_details_survey_info"
-msgstr "Survey Info"
+msgstr "EMA Survey"
 
 #: jdash/templates/study/details.html:225
 
@@ -883,10 +1071,16 @@ msgstr "to confirm"
 #: jdash/templates/study/details.html:325
 
 msgid "study_details_total_number_of_subjects"
-msgstr "Total Number of Subjects"
+msgstr "Total"
 
 msgid "study_details_type_to_confirm"
 msgstr "Please type"
+
+msgid "study_details_tab_table"
+msgstr "Table"
+
+msgid "study_details_tab_metrics"
+msgstr "Metrics"
 
 #: jdash/templates/study/create_study.html:178 jdash/templates/study/create_study.html:186 jdash/templates/study/edit_study.html:185 jdash/templates/study/edit_study.html:193
 
@@ -1184,13 +1378,13 @@ msgid "text_help_study_upload_ema_json"
 msgstr "Upload a JSON file containing the EMA survey definition."
 
 msgid "text_help_survey_category_activate_question"
-msgstr "Enter list of questions to activate. Example entries: 1 or 2, 3."
+msgstr "Enter list of questions to activate. Example entries: [1] or [2, 3]."
 
 msgid "text_help_survey_category_activation_condition"
 msgstr "Describe under what condition questions need to be activated."
 
 msgid "text_help_survey_category_deactivate_question"
-msgstr "Enter list of questions to deactivate. Example entries: 1 or 2, 3."
+msgstr "Enter list of questions to deactivate. Example entries: [1] or [2, 3]."
 
 msgid "text_help_survey_category_deactivation_condition"
 msgstr "Describe under what condition questions need to be deactivated."
@@ -1220,7 +1414,7 @@ msgid "text_help_survey_question_clock_time_end"
 msgstr "Time when the question becomes inactive. If multiple start times are provided, the number of end times must match."
 
 msgid "text_help_survey_question_clock_time_start"
-msgstr "Time when the question becomes active. Example entries: 480 or 480, 700."
+msgstr "Time when the question becomes active. Example entries: [480] or [480, 700]."
 
 msgid "text_help_survey_question_deactivate_on_answer"
 msgstr "If a certain answer is given, the question is no longer asked."
@@ -1232,7 +1426,7 @@ msgid "text_help_survey_question_description"
 msgstr "Additional explanation shown with the question."
 
 msgid "text_help_survey_question_first_day_to_answer"
-msgstr "Day of the study on which the question should be asked for the first time. Day 0 is the day of enrollment"
+msgstr "Day of the study on which the question should be asked for the first time."
 
 msgid "text_help_survey_question_frequency"
 msgstr "How many days before the question is repeated (0 = anytime, 1 = every day, etc.)."
@@ -1310,9 +1504,6 @@ msgstr "Timestamp"
 msgid "Your session will expire in less than a minute due to inactivity."
 msgstr "Your session will expire in less than a minute due to inactivity."
 
-
-
-
 msgid "All selected values"
 msgstr "All selected values"
 
@@ -1376,12 +1567,92 @@ msgstr "Table"
 msgid "Filter X-axis values:"
 msgstr "Filter X-axis values:"
 
+msgid "Select chart type:"
+msgstr "Select chart type:"
+
+msgid "Auto"
+msgstr "Auto"
+
+msgid "Heatmap"
+msgstr "Heatmap"
+
+msgid "Line"
+msgstr "Line"
+
+msgid "Bar"
+msgstr "Bar"
+
+msgid "Box"
+msgstr "Box"
+
+msgid "Scatter"
+msgstr "Scatter"
+
+msgid "Device"
+msgstr "Device"
+
+msgid "Stage"
+msgstr "Stage"
+
+msgid "Data Quality"
+msgstr "Data Quality"
+
+msgid "Filters"
+msgstr "Filters"
+
+msgid "Flag"
+msgstr "Flag"
+
+msgid "Apply Filters"
+msgstr "Apply Filters"
+
+msgid "Clear All"
+msgstr "Clear All"
+
+msgid "Review adherence, coverage, volume, retention, missingness, availability, QC loss, and anomaly outputs."
+msgstr "Review adherence, coverage, volume, retention, missingness, availability, QC loss, and anomaly outputs."
+
+msgid "Adherence Heatmap"
+msgstr "Adherence Heatmap"
+
+msgid "Daily Subject Coverage"
+msgstr "Daily Subject Coverage"
+
+msgid "Daily Data Volume"
+msgstr "Daily Data Volume"
+
+msgid "Subject Retention"
+msgstr "Subject Retention"
+
+msgid "Missingness Summary"
+msgstr "Missingness Summary"
+
+msgid "Sensor Availability Matrix"
+msgstr "Sensor Availability Matrix"
+
+msgid "QC Exclusion Funnel"
+msgstr "QC Exclusion Funnel"
+
+msgid "QC Data Loss by Stage"
+msgstr "QC Data Loss by Stage"
+
+msgid "Subject QC Timeline"
+msgstr "Subject QC Timeline"
+
+msgid "Anomaly Flags"
+msgstr "Anomaly Flags"
+
+msgid "Select CSV file"
+msgstr "Select CSV file"
+
+msgid "Select a CSV file"
+msgstr "Select a CSV file"
 
 msgid "branding_hero_title"
 msgstr "Welcome to JTrack Digital Platform"
 
 msgid "branding_hero_description"
-msgstr "Manage longitudinal studies with EMA surveys, wearable sensors, participant tracking and quality control in one dashboard."
+msgstr "Manage longitudinal studies with EMA surveys, wearable sensors, participant tracking, quality control, and analytics in one dashboard."
 
 msgid "branding_apps_section_title"
 msgstr "Companion apps for participant data collection"
@@ -1440,7 +1711,6 @@ msgstr "JTrack EMA"
 msgid "branding_app_social_name"
 msgstr "JTrack Social"
 
-
 msgid "branding_app_insights_name"
 msgstr "JTrack Insights"
 
@@ -1496,10 +1766,10 @@ msgid "Live Monitoring"
 msgstr "Overview"
 
 msgid "Subject Data"
-msgstr "Subject Overview"
+msgstr "Subject Data"
 
 msgid "Sensor Data"
-msgstr "Sensor Overview"
+msgstr "Sensor Data"
 
 msgid "Live Monitoring Summary"
 msgstr "Study Summary"
@@ -1620,3 +1890,590 @@ msgstr "Question does not belong to this survey."
 
 msgid "create_survey_question_order_range_error"
 msgstr "Question order must be between 1 and %(total)s."
+
+#: jdash/templates/survey/create_question.html:22
+#: jdash/templates/survey/edit_question.html:45
+msgid "question_save_changes_modal_title"
+msgstr "Save question changes"
+
+#: jdash/templates/survey/create_question.html:28
+#: jdash/templates/survey/create_question.html:31
+#: jdash/templates/survey/edit_question.html:51
+#: jdash/templates/survey/edit_question.html:54
+msgid "question_save_changes_modal_body"
+msgstr "This will save your question changes."
+
+#: jdash/templates/survey/create_question.html:29
+#: jdash/templates/survey/edit_question.html:52
+msgid "question_save_changes_commit_notice_linked_study"
+msgstr "Participants will not see these changes until you click Commit on the survey overview."
+
+#: jdash/templates/survey/create_question.html:32
+#: jdash/templates/survey/edit_question.html:55
+msgid "question_save_changes_no_linked_study"
+msgstr "This survey is not linked to a study yet, so there is nothing to commit to participants."
+
+#: jdash/templates/survey/create_question.html:37
+#: jdash/templates/survey/edit_question.html:60
+msgid "Save"
+msgstr "Save"
+
+#: jdash/templates/survey/create_survey.html:257
+msgid "create_survey_commit_linked_studies_title"
+msgstr "Commit to linked studies"
+
+msgid "create_survey_commit_modal_title"
+msgstr "Commit survey"
+
+msgid "create_survey_commit_modal_body"
+msgstr "Choose the studies where participants should receive the latest survey changes."
+
+msgid "create_survey_commit_update_needed_title"
+msgstr "Update linked studies"
+
+msgid "create_survey_commit_update_needed_body"
+msgstr "The studies listed below are not updated with the current survey changes. Do you want to update them now?"
+
+msgid "create_survey_commit_modal_select_all"
+msgstr "select all studies"
+
+msgid "create_survey_commit_modal_no_studies"
+msgstr "This survey is not linked to any studies."
+
+msgid "create_survey_commit_modal_cancel"
+msgstr "Cancel"
+
+msgid "create_survey_commit_study_uncommited"
+msgstr "Uncommited changes"
+
+msgid "create_survey_commit_study_current"
+msgstr "Current"
+
+msgid "create_survey_commit_study_needs_update"
+msgstr "Needs update"
+
+msgid "create_survey_commit_loading_message"
+msgstr "Commiting survey..."
+
+#: jdash/templates/survey/create_survey.html:258
+#: jdash/templates/survey/edit_survey.html:384
+msgid "commit_to_study"
+msgstr "Commit changes to study"
+
+#: jdash/templates/survey/create_survey.html:247
+#: jdash/templates/survey/edit_survey.html:389
+msgid "create_survey_uncommited_changes_badge"
+msgstr "Uncommited changes"
+
+#: jdash/views/survey_views.py:180
+msgid "create_survey_commit_single_success"
+msgstr "Survey commited to study %(study_name)s."
+
+#: jdash/views/survey_views.py:186
+msgid "create_survey_commit_multiple_success"
+msgstr "Survey commited to %(count)s linked studies: %(study_names)s."
+
+#: jdash/views/survey_views.py:196
+msgid "create_survey_commit_partial_failure"
+msgstr "Some linked studies could not be commited. Please check the server log."
+
+#: jdash/views/survey_views.py:202
+msgid "create_survey_commit_no_linked_study"
+msgstr "This survey is not linked to a study, so there is no study JSON to commit."
+
+msgid "create_survey_commit_no_study_selected"
+msgstr "Please select at least one linked study to commit."
+
+msgid "create_survey_commit_failed"
+msgstr "The selected studies could not be commited. Please check the server log."
+
+#: jdash/views/survey_views.py:733
+msgid "survey_commited_versioned_backup_created"
+msgstr "Survey commited. A versioned backup was created."
+
+#: jdash/views/survey_views.py:735
+msgid "No_uncommited_survey_commit"
+msgstr "No uncommited survey changes to commit."
+
+msgid "study_details_export_csv"
+msgstr "Export CSV"
+
+msgid "Subject Compliance Table"
+msgstr "Subject Compliance Table"
+
+msgid "Subject Data Heatmap"
+msgstr "Subject Data Heatmap"
+
+msgid "Cells show total records per subject and study day from Data_per_day files. The current study-day cell is highlighted by subject status."
+msgstr "Cells show total records per subject and study day from Data_per_day files. The current study-day cell is highlighted by subject status."
+
+msgid "Subjects With Data"
+msgstr "Subjects With Data"
+
+msgid "Compliant Subjects"
+msgstr "Compliant Subjects"
+
+msgid "Needs Attention"
+msgstr "Needs Attention"
+
+msgid "Latest Data Date"
+msgstr "Latest Data Date"
+
+msgid "subjects that have entered any data"
+msgstr "subjects that have entered any data"
+
+msgid "data received within 2 study days"
+msgstr "data received within 2 study days"
+
+msgid "subjects with no recent data"
+msgstr "subjects with no recent data"
+
+msgid "latest Data_per_day entry"
+msgstr "latest Data_per_day entry"
+
+msgid "compliant"
+msgstr "compliant"
+
+msgid "needs attention"
+msgstr "needs attention"
+
+msgid "Records"
+msgstr "Records"
+
+msgid "Current status"
+msgstr "Current status"
+
+msgid "Current study day"
+msgstr "Current study day"
+
+msgid "Days since last data"
+msgstr "Days since last data"
+
+msgid "Last data day"
+msgstr "Last data day"
+
+msgid "Last data date"
+msgstr "Last data date"
+
+msgid "Smartphone Sensors"
+msgstr "Smartphone Sensors"
+
+msgid "Wearables"
+msgstr "Wearables"
+
+msgid "Other Sensors"
+msgstr "Other Sensors"
+
+msgid "One row per subject. Sensor dates are grouped as Smartphone Sensors, Wearables, and EMA using the latest received date for each group. The Subject_ID text color reflects the subject status."
+msgstr "One row per subject. Sensor dates are grouped as Smartphone Sensors, Wearables, and EMA using the latest received date for each group. The Subject_ID text color reflects the subject status."
+
+msgid "Each cell shows sum(Data_per_day) for one subject and one study day across all available Data_per_day sensor files. The colored square marks the subject's current study day."
+msgstr "Each cell shows sum(Data_per_day) for one subject and one study day across all available Data_per_day sensor files. The colored square marks the subject's current study day."
+
+msgid "KPIs use Data_per_day files and the subject overview status file. Subjects With Data counts unique Subject_ID values with Data_per_day > 0. Compliant Subjects means data was received within the last 2 study days; Needs Attention means no recent data."
+msgstr "KPIs use Data_per_day files and the subject overview status file. Subjects With Data counts unique Subject_ID values with Data_per_day > 0. Compliant Subjects means data was received within the last 2 study days; Needs Attention means no recent data."
+
+msgid "unique subjects with Data_per_day > 0"
+msgstr "unique subjects with Data_per_day > 0"
+
+msgid "latest date where Data_per_day > 0"
+msgstr "latest date where Data_per_day > 0"
+
+msgid "Included sensors"
+msgstr "Included sensors"
+
+msgid "more"
+msgstr "more"
+
+msgid "Review each subject's latest received date by data stream. Green subject IDs are up to date, yellow are delayed, and red need follow-up."
+msgstr "Review each subject's latest received date by data stream. Green subject IDs are up to date, yellow are delayed, and red need follow-up."
+
+msgid "Study-Day Activity Heatmap"
+msgstr "Study-Day Activity Heatmap"
+
+msgid "Study-day activity by subject across EMA, smartphone sensors, and wearables. Darker cells mean more data was received; colored squares mark each subject's current study day."
+msgstr "Study-day activity by subject across EMA, smartphone sensors, and wearables. Darker cells mean more data was received; colored squares mark each subject's current study day."
+
+msgid "up to date"
+msgstr "up to date"
+
+msgid "delayed"
+msgstr "delayed"
+
+msgid "needs follow-up"
+msgstr "needs follow-up"
+
+msgid "Data streams shown"
+msgstr "Data streams shown"
+
+msgid "Compliance overview for the selected subjects. Up to date means recent data is available; Needs follow-up highlights subjects with missing or delayed data."
+msgstr "Compliance overview for the selected subjects. Up to date means recent data is available; Needs follow-up highlights subjects with missing or delayed data."
+
+msgid "Subjects Monitored"
+msgstr "Subjects Monitored"
+
+msgid "subjects in the current view"
+msgstr "subjects in the current view"
+
+msgid "Up To Date"
+msgstr "Up To Date"
+
+msgid "recent data received"
+msgstr "recent data received"
+
+msgid "Needs Follow-up"
+msgstr "Needs Follow-up"
+
+msgid "missing or delayed data"
+msgstr "missing or delayed data"
+
+msgid "Latest Data Received"
+msgstr "Latest Data Received"
+
+msgid "most recent data in this view"
+msgstr "most recent data in this view"
+
+msgid "Subject Follow-up Table"
+msgstr "Subject Follow-up Table"
+
+msgid "Start here: the subject ID color shows follow-up priority. Green = on track, yellow = check soon, red = follow up. The date columns show the latest EMA, smartphone, and wearable data received."
+msgstr "Start here: the subject ID color shows follow-up priority. Green = on track, yellow = check soon, red = follow up. The date columns show the latest EMA, smartphone, and wearable data received."
+
+msgid "Subject Activity by Study Day"
+msgstr "Subject Activity by Study Day"
+
+msgid "Use this heatmap to see when each subject sent data during the study. Each row is a subject, each column is a study day, and darker cells mean more data was received. The colored square marks the subject's current study day."
+msgstr "Use this heatmap to see when each subject sent data during the study. Each row is a subject, each column is a study day, and darker cells mean more data was received. The colored square marks the subject's current study day."
+
+msgid "on track"
+msgstr "on track"
+
+msgid "check soon"
+msgstr "check soon"
+
+msgid "follow up"
+msgstr "follow up"
+
+msgid "smartphone sensors"
+msgstr "smartphone sensors"
+
+msgid "wearables"
+msgstr "wearables"
+
+msgid "other sources"
+msgstr "other sources"
+
+msgid "Subject activity data is missing subject, study day/date, or data amount columns."
+msgstr "Subject activity data is missing subject, study day/date, or data amount columns."
+
+msgid "Data received"
+msgstr "Data received"
+
+msgid "Follow-up status"
+msgstr "Follow-up status"
+
+msgid "Data included"
+msgstr "Data included"
+
+msgid "Use this page to decide who needs follow-up today. On track means data was received recently; check soon and follow up highlight subjects with delayed or missing data."
+msgstr "Use this page to decide who needs follow-up today. On track means data was received recently; check soon and follow up highlight subjects with delayed or missing data."
+
+msgid "Subjects In View"
+msgstr "Subjects In View"
+
+msgid "subjects included in this overview"
+msgstr "subjects included in this overview"
+
+msgid "On Track"
+msgstr "On Track"
+
+msgid "Subject ID"
+msgstr "Subject ID"
+
+msgid "Date Joined"
+msgstr "Date Joined"
+
+msgid "Days Since Latest Data"
+msgstr "Days Since Latest Data"
+
+msgid "Smartphone Progression"
+msgstr "Smartphone Progression"
+
+msgid "Wearable Progression"
+msgstr "Wearable Progression"
+
+msgid "EMA Progression"
+msgstr "EMA Progression"
+
+msgid "current follow-up status"
+msgstr "current follow-up status"
+
+msgid "study enrollment date"
+msgstr "study enrollment date"
+
+msgid "Current Study Day"
+msgstr "Current Study Day"
+
+msgid "where the subject is in the study"
+msgstr "where the subject is in the study"
+
+msgid "days since latest data"
+msgstr "days since latest data"
+
+msgid "latest smartphone data"
+msgstr "latest smartphone data"
+
+msgid "latest wearable data"
+msgstr "latest wearable data"
+
+msgid "latest EMA response"
+msgstr "latest EMA response"
+
+msgid "Subject Progression"
+msgstr "Subject Progression"
+
+msgid "Select one subject to view their progression."
+msgstr "Select one subject to view their progression."
+
+msgid "No EMA timeline data available."
+msgstr "No EMA timeline data available."
+
+msgid "data received within 1 study day"
+msgstr "data received within 1 study day"
+
+msgid "Check Soon"
+msgstr "Check Soon"
+
+msgid "no data for 2 to 5 study days"
+msgstr "no data for 2 to 5 study days"
+
+msgid "Follow Up"
+msgstr "Follow Up"
+
+msgid "no data for more than 5 study days"
+msgstr "no data for more than 5 study days"
+
+msgid "No Data Received"
+msgstr "No Data Received"
+
+msgid "no data recorded since enrollment"
+msgstr "no data recorded since enrollment"
+
+msgid "Activity Findings"
+msgstr "Activity Findings"
+
+msgid "Current-day Gaps"
+msgstr "Current-day Gaps"
+
+msgid "No data on the current expected study day"
+msgstr "No data on the current expected study day"
+
+msgid "Consecutive Gaps"
+msgstr "Consecutive Gaps"
+
+msgid "No data for three consecutive study days"
+msgstr "No data for three consecutive study days"
+
+msgid "Repeated Gaps"
+msgstr "Repeated Gaps"
+
+msgid "At least three zero-data days in the latest seven study days"
+msgstr "At least three zero-data days in the latest seven study days"
+
+msgid "Activity Decline"
+msgstr "Activity Decline"
+
+msgid "Latest seven-day volume is at least 50% below the previous seven days"
+msgstr "Latest seven-day volume is at least 50% below the previous seven days"
+
+msgid "No subjects identified"
+msgstr "No subjects identified"
+
+msgid "All Streams On Track"
+msgstr "All Streams On Track"
+
+msgid "subjects current across configured data streams"
+msgstr "subjects current across configured data streams"
+
+msgid "Smartphone Needs Attention"
+msgstr "Smartphone Needs Attention"
+
+msgid "Garmin Needs Attention"
+msgstr "Garmin Needs Attention"
+
+msgid "EMA Needs Attention"
+msgstr "EMA Needs Attention"
+
+msgid "all sensors on track"
+msgstr "all sensors on track"
+
+msgid "not configured"
+msgstr "not configured"
+
+msgid "no subject status data"
+msgstr "no subject status data"
+
+msgid "Smartphone"
+msgstr "Smartphone"
+
+msgid "Garmin"
+msgstr "Garmin"
+
+msgid "Most Affected Sensor"
+msgstr "Most Affected Sensor"
+
+msgid "Lowest 7-day Coverage"
+msgstr "Lowest 7-day Coverage"
+
+msgid "Largest Volume Decline"
+msgstr "Largest Volume Decline"
+
+msgid "Healthy Sensors"
+msgstr "Healthy Sensors"
+
+msgid "subjects below 80% recent coverage"
+msgstr "subjects below 80% recent coverage"
+
+msgid "recent coverage"
+msgstr "recent coverage"
+
+msgid "versus previous 7 days"
+msgstr "versus previous 7 days"
+
+msgid "no comparable decline"
+msgstr "no comparable decline"
+
+msgid "sensors at or above 80% coverage"
+msgstr "sensors at or above 80% coverage"
+
+msgid "no sensor timeline data"
+msgstr "no sensor timeline data"
+
+msgid "Current-day Gap"
+msgstr "Current-day Gap"
+
+msgid "Three-day Interruption"
+msgstr "Three-day Interruption"
+
+msgid "Volume Decline"
+msgstr "Volume Decline"
+
+msgid "subjects with no data on their latest expected sensor day"
+msgstr "subjects with no data on their latest expected sensor day"
+
+msgid "subjects with no data for three consecutive expected days"
+msgstr "subjects with no data for three consecutive expected days"
+
+msgid "subjects with at least three gaps in the latest seven days"
+msgstr "subjects with at least three gaps in the latest seven days"
+
+msgid "subjects whose latest seven-day volume fell by at least 50%"
+msgstr "subjects whose latest seven-day volume fell by at least 50%"
+
+msgid "Latest Window Completion"
+msgstr "Latest Window Completion"
+
+msgid "Lowest Completion Window"
+msgstr "Lowest Completion Window"
+
+msgid "Subjects Below 50%"
+msgstr "Subjects Below 50%"
+
+msgid "Completion Trend"
+msgstr "Completion Trend"
+
+msgid "average completion"
+msgstr "average completion"
+
+msgid "overall scheduled-question completion"
+msgstr "overall scheduled-question completion"
+
+msgid "latest versus previous frequency window"
+msgstr "latest versus previous frequency window"
+
+msgid "no EMA window data"
+msgstr "no EMA window data"
+
+msgid "no EMA completion data"
+msgstr "no EMA completion data"
+
+msgid "no comparable EMA windows"
+msgstr "no comparable EMA windows"
+
+msgid "Latest Window Missed"
+msgstr "Latest Window Missed"
+
+msgid "Consecutive Windows Missed"
+msgstr "Consecutive Windows Missed"
+
+msgid "Completion Decline"
+msgstr "Completion Decline"
+
+msgid "No EMA Responses"
+msgstr "No EMA Responses"
+
+msgid "subjects with zero completion in their latest scheduled window"
+msgstr "subjects with zero completion in their latest scheduled window"
+
+msgid "subjects with zero completion in their latest two windows"
+msgstr "subjects with zero completion in their latest two windows"
+
+msgid "subjects whose completion fell by at least 30 percentage points"
+msgstr "subjects whose completion fell by at least 30 percentage points"
+
+msgid "subjects with no recorded EMA response since enrollment"
+msgstr "subjects with no recorded EMA response since enrollment"
+
+msgid "Responding Subjects"
+msgstr "Responding Subjects"
+
+msgid "Response Days"
+msgstr "Response Days"
+
+msgid "Responses Recorded"
+msgstr "Responses Recorded"
+
+msgid "Response Trend"
+msgstr "Response Trend"
+
+msgid "responses during the latest seven study days"
+msgstr "responses during the latest seven study days"
+
+msgid "subject-days with EMA activity in the latest seven days"
+msgstr "subject-days with EMA activity in the latest seven days"
+
+msgid "EMA activity recorded in the latest seven days"
+msgstr "EMA activity recorded in the latest seven days"
+
+msgid "latest seven days versus previous seven days"
+msgstr "latest seven days versus previous seven days"
+
+msgid "no EMA activity data"
+msgstr "no EMA activity data"
+
+msgid "no comparable EMA activity"
+msgstr "no comparable EMA activity"
+
+msgid "Response Activity Stopped"
+msgstr "Response Activity Stopped"
+
+msgid "Response Activity Decline"
+msgstr "Response Activity Decline"
+
+msgid "One Response Day"
+msgstr "One Response Day"
+
+msgid "No EMA Activity"
+msgstr "No EMA Activity"
+
+msgid "previously active subjects with no response in the latest seven days"
+msgstr "previously active subjects with no response in the latest seven days"
+
+msgid "subjects with at least 50% fewer responses than the previous seven days"
+msgstr "subjects with at least 50% fewer responses than the previous seven days"
+
+msgid "subjects active on only one of their latest seven study days"
+msgstr "subjects active on only one of their latest seven study days"
+
+msgid "subjects with no recorded EMA activity"
+msgstr "subjects with no recorded EMA activity"

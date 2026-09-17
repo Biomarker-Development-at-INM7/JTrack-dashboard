@@ -7,12 +7,11 @@ class MaintenanceModeMiddleware:
         self.get_response = get_response
 
     def _normalize_path(self, request):
-        path = request.path or ""
+        path = request.path or "/"
         script_name = (getattr(settings, "FORCE_SCRIPT_NAME", "") or "").rstrip("/")
         language_codes = {code for code, _label in getattr(settings, "LANGUAGES", [])}
         parts = [part for part in path.split("/") if part]
-
-        variants = {path or "/"}
+        variants = {path}
 
         if script_name and path.startswith(script_name):
             variants.add(path[len(script_name):] or "/")
@@ -36,34 +35,52 @@ class MaintenanceModeMiddleware:
 
     def _is_admin_path(self, request):
         return any(
-            candidate.startswith("/admin/") or candidate == "/admin"
+            candidate == "/admin" or candidate.startswith("/admin/")
             for candidate in self._normalize_path(request)
         )
 
     def _is_exempt_path(self, request):
-        candidate_paths = self._normalize_path(request)
         static_url = getattr(settings, "STATIC_URL", "/static/")
         login_url = getattr(settings, "LOGIN_URL", "/login/")
         normalized_login = login_url.rstrip("/")
 
         exempt_paths = {
             login_url,
+            "/password-reset/",
+            "/password-reset/done/",
+            "/reset/done/",
+            "/contactus/",
+            "/delete_subject/",
             "/logout/",
+            "/session_check/",
+            "/keepalive/",
             "/favicon.ico",
             "/admin",
             "/admin/",
             "/admin/login/",
         }
 
-        return any(
-            candidate in exempt_paths
-            or candidate.rstrip("/").endswith(normalized_login)
-            or candidate.rstrip("/").endswith("/logout")
-            or candidate.startswith(static_url)
-            or candidate.startswith("/static/")
-            or candidate.startswith("/__reload__/")
-            for candidate in candidate_paths
-        )
+        for candidate in self._normalize_path(request):
+            candidate_without_slash = candidate.rstrip("/")
+            if (
+                candidate in exempt_paths
+                or candidate_without_slash.endswith(normalized_login)
+                or candidate_without_slash.endswith("/password-reset")
+                or candidate_without_slash.endswith("/password-reset/done")
+                or candidate_without_slash.endswith("/reset/done")
+                or "/reset/" in candidate
+                or candidate_without_slash.endswith("/contactus")
+                or candidate_without_slash.endswith("/delete_subject")
+                or candidate_without_slash.endswith("/logout")
+                or candidate_without_slash.endswith("/session_check")
+                or candidate_without_slash.endswith("/keepalive")
+                or candidate.startswith(static_url)
+                or candidate.startswith("/static/")
+                or "/_dash-component-suites/" in candidate
+                or candidate.startswith("/__reload__/")
+            ):
+                return True
+        return False
 
     def _is_allowed_user(self, request):
         allowed_usernames = set(getattr(settings, "MAINTENANCE_ALLOWED_USERNAMES", []))
@@ -75,11 +92,6 @@ class MaintenanceModeMiddleware:
     def __call__(self, request):
         if not getattr(settings, "MAINTENANCE_MODE", False):
             return self.get_response(request)
-
-        if self._is_admin_path(request):
-            if self._is_exempt_path(request) or self._is_allowed_user(request):
-                return self.get_response(request)
-            return render(request, "maintenance.html", status=503)
 
         if self._is_exempt_path(request) or self._is_allowed_user(request):
             return self.get_response(request)

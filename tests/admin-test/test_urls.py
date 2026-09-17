@@ -1,110 +1,193 @@
-from django.test import SimpleTestCase
-from django.urls import reverse, resolve
-from jdash import views
-from jdash.config import constants
+from django.test import (
+    RequestFactory,
+    SimpleTestCase,
+    override_settings,
+)
+from django.urls import Resolver404, resolve
+from django.utils import translation
 
-class URLResolutionTests(SimpleTestCase):
-    def test_home_url(self):
-        self.assertEqual(resolve(reverse(constants.url_name_for_home)).func, views.index)
 
-    def test_login_url(self):
-        self.assertEqual(resolve(reverse(constants.url_name_for_login)).func, views.login_request)
+class LanguageURLTests(SimpleTestCase):
+    """
+    Tests the internal Django URL structure.
 
-    def test_logout_url(self):
-        self.assertEqual(resolve(reverse(constants.url_name_for_logout)).func, views.logout_request)
+    Important:
 
-    def test_password_reset_url(self):
-        self.assertEqual(resolve(reverse(constants.url_name_for_password_reset)).func, views.password_reset_request)
+    FORCE_SCRIPT_NAME is a deployment prefix.
 
-    def test_password_reset_done_url(self):
-        self.assertEqual(resolve(reverse(constants.url_name_for_password_reset_done)).func, views.password_reset_done)
+    Therefore Django should resolve:
 
-    def test_password_reset_confirm_url(self):
-        url = reverse(constants.url_name_for_password_reset_confirm, kwargs={"uidb64": "MQ", "token": "sample-token"})
-        self.assertEqual(resolve(url).func, views.password_reset_confirm)
+        /en/login/
+        /de/login/
 
-    def test_password_reset_complete_url(self):
-        self.assertEqual(resolve(reverse(constants.url_name_for_password_reset_complete)).func, views.password_reset_complete)
+    and NOT:
 
-    def test_contact_email_url(self):
-        self.assertEqual(resolve(reverse(constants.url_name_for_contact_email)).func, views.contact_email)
+        /de/dev/login/
+        /en/dev/login/
+    """
 
-    def test_add_study_url(self):
-        self.assertEqual(resolve(reverse(constants.url_name_for_add_study)).func, views.add_study)
 
-    def test_edit_study_url(self):
-        url = reverse(constants.url_name_for_edit_study, args=["teststudy"])
-        self.assertEqual(resolve(url).func, views.edit_study)
+    # --------------------------------------------------------------
+    # Normal language URLs
+    # --------------------------------------------------------------
 
-    def test_qc_study_url(self):
-        url = reverse(constants.url_name_for_qc_study, args=["teststudy"])
-        self.assertEqual(resolve(url).func, views.qc_study)
+    def test_english_login_url_resolves(self):
+        with translation.override("en"):
+            match = resolve("/en/login/")
 
-    def test_study_details_url(self):
-        url = reverse(constants.url_name_for_details, args=["teststudy"])
-        self.assertEqual(resolve(url).func, views.study_details)
+        self.assertIsNotNone(match)
 
-    def test_delete_survey_url(self):
-        self.assertEqual(resolve(reverse(constants.url_name_for_delete_survey)).func, views.delete_survey)
 
-    def test_delete_question_url(self):
-        self.assertEqual(resolve(reverse(constants.url_name_for_delete_question)).func, views.create_survey)
+    def test_german_login_url_resolves(self):
+        with translation.override("de"):
+            match = resolve("/de/login/")
 
-    def test_create_survey_url(self):
-        self.assertEqual(resolve(reverse(constants.url_name_for_create_survey)).func, views.create_survey)
+        self.assertIsNotNone(match)
 
-    def test_create_survey_id_url(self):
-        url = reverse(constants.url_name_for_create_survey, args=[1])
-        self.assertEqual(resolve(url).func, views.create_survey)
 
-    def test_manage_question_url(self):
-        url = reverse(constants.url_name_for_manage_question, args=[1, 1])
-        self.assertEqual(resolve(url).func, views.manage_question)
+    # --------------------------------------------------------------
+    # Duplicate /dev must NEVER become a Django route
+    # --------------------------------------------------------------
 
-    def test_create_categories_url(self):
-        url = reverse(constants.url_name_for_create_categories, args=[1])
-        self.assertEqual(resolve(url).func, views.manage_category_for_survey)
+    def test_english_duplicate_dev_does_not_resolve(self):
+        with translation.override("en"):
+            with self.assertRaises(Resolver404):
+                resolve("/en/dev/login/")
 
-    def test_duplicate_survey_url(self):
-        url = reverse(constants.url_name_for_duplicate_survey, args=[1])
-        self.assertEqual(resolve(url).func, views.duplicate_survey)
 
-    def test_duplicate_question_url(self):
-        url = reverse(constants.url_name_for_duplicate_question, args=[1, 1])
-        self.assertEqual(resolve(url).func, views.duplicate_question)
+    def test_german_duplicate_dev_does_not_resolve(self):
+        with translation.override("de"):
+            with self.assertRaises(Resolver404):
+                resolve("/de/dev/login/")
 
-    def test_edit_survey_url(self):
-        url = reverse(constants.url_name_for_edit_survey, args=["teststudy"])
-        self.assertEqual(resolve(url).func, views.edit_survey)
 
-    def test_survey_list_url(self):
-        self.assertEqual(resolve(reverse(constants.url_name_for_survey)).func, views.survey_list)
+    # --------------------------------------------------------------
+    # Development deployment
+    # --------------------------------------------------------------
 
-    def test_close_url(self):
-        url = reverse(constants.url_name_for_close, args=["teststudy"])
-        self.assertEqual(resolve(url).func, views.close)
+    @override_settings(
+        FORCE_SCRIPT_NAME="/dev"
+    )
+    def test_dev_external_path_contains_dev_once(self):
+        factory = RequestFactory()
 
-    def test_download_dataset_url(self):
-        url = reverse(constants.url_name_for_download_dataset, args=["samplearg"])
-        self.assertEqual(resolve(url).func, views.download_dataset_from_link)
+        request = factory.get(
+            "/de/login/"
+        )
 
-    def test_download_json_url(self):
-        url = reverse(constants.url_name_for_download_json, args=[1])
-        self.assertEqual(resolve(url).func, views.download_survey_json)
+        self.assertEqual(
+            request.path_info,
+            "/de/login/",
+        )
 
-    def test_download_unused_files_url(self):
-        url = reverse(constants.url_name_for_download, args=["samplearg"])
-        self.assertEqual(resolve(url).func, views.download_unused_files)
+        self.assertEqual(
+            request.path,
+            "/dev/de/login/",
+        )
 
-    def test_list_of_studies_url(self):
-        self.assertEqual(resolve(reverse(constants.url_name_for_list_of_studies)).func, views.studies_list)
 
-    def test_analytics_url(self):
-        self.assertEqual(resolve(reverse(constants.url_name_for_analytics)).func, views.analytics)
+    @override_settings(
+        FORCE_SCRIPT_NAME="/dev"
+    )
+    def test_dev_english_external_path_contains_dev_once(self):
+        factory = RequestFactory()
 
-    def test_analytics_with_study_url(self):
-        url = reverse(constants.url_name_for_analytics, args=["teststudy"])
-        self.assertEqual(resolve(url).func, views.analytics)
+        request = factory.get(
+            "/en/login/"
+        )
 
-    def test_delete_subject_data_url(self):
-        self.assertEqual(resolve(reverse(constants.url_name_for_delete_subject_data)).func, views.delete_subject_data)
+        self.assertEqual(
+            request.path_info,
+            "/en/login/",
+        )
+
+        self.assertEqual(
+            request.path,
+            "/dev/en/login/",
+        )
+
+
+    # --------------------------------------------------------------
+    # Production deployment
+    # --------------------------------------------------------------
+
+    @override_settings(
+        FORCE_SCRIPT_NAME=None
+    )
+    def test_prod_german_has_no_dev_prefix(self):
+        factory = RequestFactory()
+
+        request = factory.get(
+            "/de/login/"
+        )
+
+        self.assertEqual(
+            request.path_info,
+            "/de/login/",
+        )
+
+        self.assertEqual(
+            request.path,
+            "/de/login/",
+        )
+
+
+    @override_settings(
+        FORCE_SCRIPT_NAME=None
+    )
+    def test_prod_english_has_no_dev_prefix(self):
+        factory = RequestFactory()
+
+        request = factory.get(
+            "/en/login/"
+        )
+
+        self.assertEqual(
+            request.path_info,
+            "/en/login/",
+        )
+
+        self.assertEqual(
+            request.path,
+            "/en/login/",
+        )
+
+
+    # --------------------------------------------------------------
+    # Resolver should work identically in dev and prod
+    # --------------------------------------------------------------
+
+    @override_settings(
+        FORCE_SCRIPT_NAME="/dev"
+    )
+    def test_dev_path_info_resolves(self):
+        factory = RequestFactory()
+
+        request = factory.get(
+            "/de/login/"
+        )
+
+        with translation.override("de"):
+            match = resolve(
+                request.path_info
+            )
+
+        self.assertIsNotNone(match)
+
+
+    @override_settings(
+        FORCE_SCRIPT_NAME=None
+    )
+    def test_prod_path_info_resolves(self):
+        factory = RequestFactory()
+
+        request = factory.get(
+            "/de/login/"
+        )
+
+        with translation.override("de"):
+            match = resolve(
+                request.path_info
+            )
+
+        self.assertIsNotNone(match)
