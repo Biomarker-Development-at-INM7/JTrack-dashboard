@@ -1,0 +1,22 @@
+{% load i18n %}
+<div
+  id="jdash-loading-overlay"
+  class="jdash-loading-overlay"
+  role="status"
+  aria-live="polite"
+  aria-hidden="true"
+  hidden>
+  <div class="jdash-loading-panel">
+    <div class="jdash-loading-logo-animation" aria-hidden="true">
+      <div class="jdash-loading-logo-backdrop"></div>
+      <div class="jdash-loading-logo-grid">
+        <div class="jdash-loading-logo-square jdash-loading-logo-square-tl"></div>
+        <div class="jdash-loading-logo-square jdash-loading-logo-square-tr"></div>
+        <div class="jdash-loading-logo-square jdash-loading-logo-square-br"></div>
+        <div class="jdash-loading-logo-square jdash-loading-logo-square-bl"></div>
+      </div>
+    </div>
+    <div id="jdash-loading-message" class="jdash-loading-message">{% trans "loading_please_wait" %}</div>
+  </div>
+</div>
+

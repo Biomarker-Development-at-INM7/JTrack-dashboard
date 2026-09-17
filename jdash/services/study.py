@@ -24,17 +24,18 @@ from django.conf import settings
 from django.contrib.auth.models import Group
 from django.db import connection
 from pandas.errors import EmptyDataError
-from jdash.config import constants as constants
-from jdash.config import runtime_config as config
-import jdash.exceptions.studyexceptions as studyexceptions
+
 from jdash.utils.utils import (
-        build_quality_control_test_cases,
+    build_quality_control_test_cases,
     calculate_stats_of_number_of_subjects,
     create_sql_statements_for_quality_control_tests,
     get_latest_received_study_sensor_details,
 )
+from jdash.config import constants as constants
+from jdash.config import runtime_config as config
+import jdash.exceptions.studyexceptions as studyexceptions
 from jdash.utils.fileutils import (
-        build_wearable_dashboard_sensor_name,
+    build_wearable_dashboard_sensor_name,
     get_json_data,
     change_permissions,
     save_study_json,
@@ -45,11 +46,13 @@ from jdash.utils.fileutils import (
     get_all_json_data,
     parse_get_dashboard_csv,
     create_backup_json_file,
-    change_ownership,
+    change_ownership
 )
 from jdash.services.datahelper import validate_empty
 from jdash.services.subject import Subject
 from jdash.services.survey import Survey
+
+from jdash.models import Study as StudyModel
 from jdash.repositories.study_repository import (
     create_new_study_in_db,
     close_study_model,
@@ -65,15 +68,16 @@ current_date = timezone.now().strftime('%Y-%m-%d')
 
 def _get_study_group_members(study_name, user=None):
     """
-    Resolve investigator and viewer usernames for a study group.
+    Resolve administrator, investigator, and viewer usernames for a study group.
 
     Args:
         study_name (str): Name of the study whose group members are requested.
         user (User, optional): Current user to exclude from the returned lists.
 
     Returns:
-        tuple: Two lists containing investigator usernames and viewer usernames.
+        tuple: Three lists containing administrator, investigator, and viewer usernames.
     """
+    administrators = []
     investigators = []
     viewers = []
     group_name = f"{study_name}_group"
@@ -81,13 +85,14 @@ def _get_study_group_members(study_name, user=None):
     try:
         study_group = Group.objects.get(name=group_name)
     except Group.DoesNotExist:
-        return investigators, viewers
+        return administrators, investigators, viewers
 
     for member in study_group.user_set.all().order_by("username"):
         if user is not None and member.pk == user.pk:
             continue
         member_group_names = set(member.groups.values_list("name", flat=True))
-        if "administrator" in member_group_names:
+        if constants.group_name_administrator in member_group_names:
+            administrators.append(member.username)
             continue
         if constants.group_name_investigator in member_group_names:
             investigators.append(member.username)
@@ -96,7 +101,55 @@ def _get_study_group_members(study_name, user=None):
         else:
             viewers.append(member.username)
 
-    return investigators, viewers
+    return administrators, investigators, viewers
+
+
+def _get_study_member_roster(study_name):
+    """Return structured study members for the details-page roster."""
+    def role_from_groups(member):
+        group_names = set(member.groups.values_list("name", flat=True))
+        if constants.group_name_administrator in group_names:
+            return "Admin"
+        if constants.group_name_investigator in group_names:
+            return "Investigator"
+        if constants.group_name_viewer in group_names:
+            return "Viewer"
+        return ""
+
+    study = StudyModel.objects.select_related("owner").filter(title=study_name).first()
+    owner = study.owner if study else None
+    members_by_id = {}
+
+    try:
+        group = Group.objects.get(name=f"{study_name}_group")
+        group_members = group.user_set.prefetch_related("groups").order_by(
+            "last_name", "first_name", "username"
+        )
+    except Group.DoesNotExist:
+        group_members = []
+
+    for member in group_members:
+        members_by_id[member.pk] = {
+            "username": member.username,
+            "display_name": member.get_full_name() or member.username,
+            "email": member.email,
+            "role": role_from_groups(member),
+            "is_owner": bool(owner and member.pk == owner.pk),
+        }
+
+    if owner and owner.pk not in members_by_id:
+        members_by_id[owner.pk] = {
+            "username": owner.username,
+            "display_name": owner.get_full_name() or owner.username,
+            "email": owner.email,
+            "role": role_from_groups(owner),
+            "is_owner": True,
+        }
+
+    return sorted(
+        members_by_id.values(),
+        key=lambda member: (not member["is_owner"], member["display_name"].lower()),
+    )
 
 
 class Study:
@@ -149,7 +202,7 @@ class Study:
     @property
     def created_at(self) -> datetime:
         """When this instance was first created (in memory)."""
-        return datetime.now().astimezone()
+        return timezone.now()
 
     @property
     def number_of_subjects(self) -> int:
@@ -284,13 +337,20 @@ class Study:
         Returns:
             None
         """
-        stmt_file = os.path.join(self.path, f"{self.study_name}_test_cases.sql")
         study_id = json.loads(retrieve_study_details_by_title(self.study_name))[constants.key_name_id]
-        create_sql_statements_for_quality_control_tests(self.meta, stmt_file, study_id)
-        with open(stmt_file, encoding=constants.encoding) as f:
-            stmts = [s.strip() for s in f.read().split(';') if s.strip()]
-        with connection.cursor() as cur:
-            for s in stmts: cur.execute(s)
+        for case in build_quality_control_test_cases(self.meta):
+            qctestsModel.objects.create(
+                testcase_id=case["testcase_id"],
+                test_type=case["test_type"],
+                description=case["description"],
+                steps=case["steps"],
+                expected_outcome=case["expected_outcome"],
+                tested_by_admin=False,
+                tested_by_owner=False,
+                admin_username="",
+                owner_username="",
+                study_id=study_id,
+            )
 
     def display_context(self) -> dict:
         """
@@ -298,7 +358,18 @@ class Study:
         """
         logger.info("Study.display_context called for study_name=%s", self.study_name)
         ctx = {'meta_data': self.meta}
-        self._ensure_legacy_survey_ids(ctx["meta_data"])
+        administrators, investigators, viewers = _get_study_group_members(self.study_name)
+        ctx["meta_data"]["administrators"] = administrators
+        ctx["meta_data"]["investigators"] = investigators
+        ctx["meta_data"]["viewers"] = viewers
+        ctx["meta_data"]["members"] = _get_study_member_roster(self.study_name)
+        ctx["meta_data"]["member_count"] = len(ctx["meta_data"]["members"])
+        number_of_subjects = (
+            ctx["meta_data"].get(constants.key_name_number_of_subjects, 0) or 0
+        )
+        ctx["meta_data"][constants.key_name_stats] = (
+            calculate_stats_of_number_of_subjects(self.study_name, number_of_subjects)
+        )
         dashboard_sensors = self._get_dashboard_sensor_names(ctx["meta_data"])
         ctx["meta_data"]["dashboard_sensor_list"] = dashboard_sensors
         ctx["meta_data"]["sensor_size"] = len(dashboard_sensors) * 2
@@ -311,6 +382,11 @@ class Study:
         grouping, count = self._group_by_subject(raw)
         ctx['meta_data'][constants.key_name_number_of_subjects] = count
         ctx['d'] = json.loads(grouping)
+        ctx['details_metrics_initial_args'] = {
+            "details-study-store": {
+                "data": self.study_name,
+            }
+        }
         ctx['subject_details'] = self._collect_subject_details(raw)
         logger.info("Study.display_context finished for study_name=%s", self.study_name)
         logger.debug("Study.display_context return_value=%s", ctx)
@@ -768,21 +844,22 @@ def get_all_study_details(user):
     stats_json = {}
     total_study_dict = []
     error_message = ""
-
-    for study in Study.list_all_for_user(user):
-        try:
+    try:
+        for study in Study.list_all_for_user(user):
             study[constants.key_name_created_date] = study[constants.key_name_created_date]
-            json_data = get_json_data(study[constants.key_name_study_title])            
-            investigators, viewers = _get_study_group_members(study[constants.key_name_study_title], user)
+            json_data = get_json_data(study[constants.key_name_study_title])
+            administrators, investigators, viewers = _get_study_group_members(study[constants.key_name_study_title], user)
+            study["administrators"] = administrators
             study["investigators"] = investigators
             study["viewers"] = viewers
+            
+            study["enrolled_subjects"] = json_data.get("number_of_enrolled_subjects", 0) or 0
             sensor_list_limited = json_data.get(constants.field_name_sensor_list_limited, [])
             study[constants.field_name_sensor_list_limited] = (
                 sensor_list_limited if isinstance(sensor_list_limited, list) else []
             )
-            number_of_subjects = Subject.count_pdfs(study[constants.key_name_study_title])
+            number_of_subjects = json_data.get(constants.key_name_number_of_subjects, 0) or 0
             study[constants.key_name_number_of_subjects] = number_of_subjects
-            study["enrolled_subjects"] = json_data.get("number_of_enrolled_subjects", 0) or 0
             study["duration"] = json_data.get("duration", 0) or 0
             if number_of_subjects:
                 study_stats = calculate_stats_of_number_of_subjects(
@@ -802,7 +879,6 @@ def get_all_study_details(user):
                 else:
                     res = list(raw_sensor_list)
                 study[constants.key_name_sensor_list] = res
-
                 if constants.key_name_survey in json_data:
                     res.append(constants.ema)
                 if constants.field_name_labeling in json_data:
@@ -815,36 +891,63 @@ def get_all_study_details(user):
                 sensors = ['ema']
             study['wearables'] = json_data.get('wearables', [])
             study[constants.key_name_current_sensor_list] = get_latest_received_study_sensor_details(study[constants.key_name_study_title])
-            # to add old surveys with no ids in session and use for survey files listing
+            # to add old surveys with no ids in session and use for survey files listing                          
             survey_data = json_data.get(constants.key_name_survey)
             if isinstance(survey_data, dict):
                 if "id" not in survey_data:
                     study["old_ema"]= True
-
+      
             total_study_dict.append(study)
-
-        except FileNotFoundError:
-            logger.warning(
-                "Study folder/json missing for study=%s",
-                study.get(constants.key_name_study_title)
-            )
-            continue
-        except EmptyDataError as ed:
-            logger.info("Empty Data Error %s",ed)
-            error_message = "Empty Data Error"
-            continue
-        except Exception:
-            logger.exception(
-                "Failed loading study=%s",
-                study.get(constants.key_name_study_title)
-            )
-            continue
-    #except Exception as e:
-    #    logger.info("get_all_study_details::: Exception occurred %s",e)
-    #    error_message = "Exception occurred"
+    except FileNotFoundError as fnfe:
+        logger.info("get_all_study_details::: FileNotFoundError occurred %s", fnfe)
+    except EmptyDataError as ed:
+        logger.info("Empty Data Error %s",ed)
+        error_message = "Empty Data Error"
+    except Exception as e:
+        logger.info("get_all_study_details::: Exception occurred %s",e)
+        error_message = "Exception occurred"
     logger.info("get_all_study_details finished for user=%s", user)
     logger.debug(
         "get_all_study_details return_value=%s",
         (total_study_dict, stats_json, error_message),
     )
+    total_study_dict.sort(
+        key=lambda study_item: _get_study_created_at_sort_key(
+            study_item.get(constants.key_name_created_date)
+        ),
+        reverse=True,
+    )
     return total_study_dict, stats_json,error_message
+
+
+def _get_study_created_at_sort_key(created_at_value):
+    """
+    Normalize a study created-date value for descending home-page sorting.
+
+    Args:
+        created_at_value: Raw created-date value from the study repository.
+
+    Returns:
+        datetime: Parsed timestamp, or ``datetime.min`` when unavailable.
+    """
+    if created_at_value is None:
+        return datetime.min
+
+    if isinstance(created_at_value, datetime):
+        return created_at_value
+
+    text_value = str(created_at_value).strip()
+    if not text_value:
+        return datetime.min
+
+    for fmt in ("%Y-%m-%d %H:%M:%S.%f%z", "%Y-%m-%d %H:%M:%S%z", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(text_value, fmt)
+        except ValueError:
+            continue
+
+    try:
+        return datetime.fromisoformat(text_value.replace("Z", "+00:00"))
+    except ValueError:
+        return datetime.min
+

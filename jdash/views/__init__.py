@@ -15,6 +15,7 @@ from jdash.views.study_views import (
     add_study,
     close,
     download_dataset_from_link,
+    export_study_dashboard_csv,
     edit_study,
     notify_qc_comment,
     qc_study,

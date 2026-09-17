@@ -4,6 +4,9 @@ import json
 from pathlib import Path
 from django import template
 from django.contrib.auth.models import Group
+from django.contrib.staticfiles import finders
+from django.utils.html import format_html, format_html_join
+from django.templatetags.static import static
 from jdash.services.subject import Subject
 from jdash.services import permissions
 from jdash.config import constants
@@ -96,6 +99,23 @@ def _format_sensor_display_name(value):
     if not value:
         return ""
     return value.lower()
+
+
+def _sensor_key_matches_any(candidate_keys, active_sensor_keys):
+    active_exact = {str(key or "").strip().lower() for key in active_sensor_keys or []}
+    active_normalized = {_normalize_sensor_token(key) for key in active_sensor_keys or []}
+
+    for candidate in candidate_keys:
+        candidate = str(candidate or "").strip()
+        if not candidate:
+            continue
+        if candidate.lower() in active_exact:
+            return True
+        if _normalize_sensor_token(candidate) in active_normalized:
+            return True
+
+    return False
+
 
 def _get_wearable_dashboard_sensor_meta_map(study):
     """
@@ -213,7 +233,7 @@ def get_activity_status_tag(value, studyobj):
     title = title_map.get(activity_status_code, "Unknown status")
     subject_name = value.get("subject_name", "Unknown")
 
-    return f'<span class="{css_class}" data-toggle="tooltip" data-placement="top" title="{title}">{subject_name}</span>'
+    return f'<span class="{css_class}" data-bs-toggle="tooltip" data-bs-placement="top" title="{title}">{subject_name}</span>'
 
 
 
@@ -248,7 +268,7 @@ def get_subject_status_tag(subject_row, studyobj):
         studyobj (dict): Study metadata dictionary.
 
     Returns:
-        str: HTML string representing the status with tooltip.
+        str: HTML string representing the status.
     """
     if not isinstance(subject_row, dict):
         return get_status_tag(subject_row)
@@ -273,8 +293,7 @@ def get_subject_status_tag(subject_row, studyobj):
         and time_in_study_days > study_duration_days
     ):
         return (
-            '<strong><span class="text-warning" data-bs-toggle="tooltip" '
-            'data-bs-placement="top" title="Subject is still in study, but the configured duration is exceeded.">'
+            '<strong><span class="text-warning">'
             'Instudy <small>(duration exceeded)</small></span></strong>'
         )
 
@@ -337,6 +356,37 @@ def get_sensor_activity_json(value, studyobj):
     subject_instance = Subject(value, None)
     sensor_dict = subject_instance.get_sensor_activity_code(value, studyobj)
     return json.dumps(sensor_dict)
+
+
+@register.filter(name="get_sensor_codes")
+def get_sensor_codes(sensor_list, current_sensor_list):
+    """
+    Render sensor codes as HTML buttons, highlighting those active today.
+
+    Args:
+        sensor_list (list or str): List of sensor keys or single sensor key as string.
+        current_sensor_list (list): List of sensors active today.
+
+    Returns:
+        str: Concatenated HTML string of buttons for sensors.
+    """
+    if sensor_list is None:
+        sensor_list = []
+    if current_sensor_list is None:
+        current_sensor_list = []
+    if isinstance(sensor_list, str):
+        sensor_list = [sensor_list]
+
+    result = []
+    for sensor in sensor_list:
+        label = constants.sensor_list.get(sensor, sensor)
+        btn_class = "btn-light today-sensor" if sensor in current_sensor_list else "btn-light"
+        button_html = (
+            f'<button style="margin-left:2px" class="btn {btn_class}" '
+            f'data-bs-toggle="tooltip" data-bs-placement="top" title="{sensor}">{label}</button>'
+        )
+        result.append(button_html)
+    return "".join(result)
 
 
 @register.filter(name="get_dashboard_sensor_filter_values")
@@ -419,35 +469,128 @@ def get_dashboard_sensor_filter_values(study):
 
     return values
 
-@register.filter(name="get_sensor_codes")
-def get_sensor_codes(sensor_list, current_sensor_list):
+
+@register.filter(name="get_wearable_sensor_codes")
+def get_wearable_sensor_codes(wearables, current_sensor_list):
     """
-    Render sensor codes as HTML buttons, highlighting those active today.
+    Render wearable sensor labels as HTML buttons.
 
     Args:
-        sensor_list (list or str): List of sensor keys or single sensor key as string.
-        current_sensor_list (list): List of sensors active today.
+        wearables (list): Wearable device configuration stored in study JSON.
+        current_sensor_list (list): Dashboard sensor keys active today.
 
     Returns:
-        str: Concatenated HTML string of buttons for sensors.
+        str: Concatenated HTML string of buttons for wearable sensors.
     """
-    if sensor_list is None:
-        sensor_list = []
-    if current_sensor_list is None:
-        current_sensor_list = []
-    if isinstance(sensor_list, str):
-        sensor_list = [sensor_list]
+    if not wearables:
+        return ""
+
+    sensor_code_map = _get_wearable_sensor_code_map(wearables)
+    result = []
+    for wearable in wearables:
+        sensor_entries = wearable.get("sensors", []) if isinstance(wearable, dict) else []
+        wearable_name = ""
+        if isinstance(wearable, dict):
+            sensorname = wearable.get("sensorname", "")
+            wearable_name = sensorname.strip()
+
+        for sensor in sensor_entries:
+            if not isinstance(sensor, dict):
+                continue
+            label = sensor.get("wearable_sensor", "")
+            if not label:
+                continue
+            sensor_code = sensor_code_map.get(label, label)
+            sampling_rate = sensor.get("sampling_rate", "-")
+            tooltip_parts = [label, f"rate: {sampling_rate}"]
+            tooltip = " | ".join(part for part in tooltip_parts if part)
+            button_label = sensor_code
+            if wearable_name:
+                button_label = f"{wearable_name}-{sensor_code}"
+            dashboard_sensor_name = build_wearable_dashboard_sensor_name(wearable_name, label)
+            is_current = _sensor_key_matches_any([dashboard_sensor_name, button_label], current_sensor_list)
+            btn_class = "btn-light today-sensor" if is_current else "btn-light"
+            button_html = (
+                f'<button style="margin-left:2px" class="btn {btn_class} wearable-sensor" '
+                f'data-bs-toggle="tooltip" data-bs-placement="top" title="{tooltip}">{button_label}</button>'
+            )
+            result.append(button_html)
+
+    return "".join(result)
+
+
+@register.filter(name="get_wearable_sensor_lines")
+def get_wearable_sensor_lines(wearables):
+    """
+    Render wearable sensors grouped by device for the details page.
+
+    Args:
+        wearables (list): Wearable device configuration stored in study JSON.
+
+    Returns:
+        str: Concatenated HTML rows for wearable sensors.
+    """
+    if not wearables:
+        return ""
 
     result = []
-    for sensor in sensor_list:
-        label = constants.sensor_list.get(sensor, sensor)
-        btn_class = "btn-light today-sensor" if sensor in current_sensor_list else "btn-light"
-        button_html = (
-            f'<button style="margin-left:2px" class="btn {btn_class}" '
-            f'data-toggle="tooltip" data-placement="top" title="{sensor}">{label}</button>'
+    for wearable in wearables:
+        if not isinstance(wearable, dict):
+            continue
+        device_name = "-".join(
+            _format_sensor_display_name(part)
+            for part in [wearable.get("sensorname", ""), wearable.get("model", "")]
+            if part
+        ).strip("-") or "wearable"
+        sensor_names = []
+        for sensor in wearable.get("sensors", []):
+            if not isinstance(sensor, dict):
+                continue
+            label = sensor.get("wearable_sensor", "")
+            if not label:
+                continue
+            sensor_names.append(_format_sensor_display_name(label))
+
+        if not sensor_names:
+            continue
+
+        sensor_chips = format_html_join(
+            "",
+            '<span class="study-sensor-chip">{}</span>',
+            ((sensor_name,) for sensor_name in sensor_names),
         )
-        result.append(button_html)
-    return "".join(result)
+        result.append(
+            format_html(
+                '<div class="study-wearable-row">'
+                '<div class="study-wearable-name">{}</div>'
+                '<div class="study-wearable-sensors">{}</div>'
+                '</div>',
+                device_name,
+                sensor_chips,
+            )
+        )
+
+    return format_html_join("", "{}", ((row,) for row in result))
+
+
+@register.filter(name="get_wearable_sensor_display_map")
+def get_wearable_sensor_display_map(study):
+    """
+    Build a case-insensitive display-name map for wearable sensors from the
+    backend-provided dashboard sensor keys.
+
+    Args:
+        study (dict): Study metadata dictionary containing ``wearables`` and
+            ``dashboard_sensor_list``.
+
+    Returns:
+        dict: Mapping from lower-cased wearable sensor label to display text.
+    """
+    display_map = {}
+    for dashboard_sensor_name, meta in _get_wearable_dashboard_sensor_meta_map(study).items():
+        display_map[dashboard_sensor_name] = meta["display_label"]
+    return display_map
+
 
 @register.filter(name="get_study_sensor_summary")
 def get_study_sensor_summary(study, current_sensor_list):
@@ -466,6 +609,44 @@ def get_study_sensor_summary(study, current_sensor_list):
     passive_html = get_sensor_codes(study.get("sensor_list"), current_sensor_list)
     wearable_html = get_wearable_sensor_codes(study.get("wearables"), current_sensor_list)
     return f"{passive_html}{wearable_html}"
+
+
+@register.filter(name="has_ema_sensor")
+def has_ema_sensor(study):
+    """
+    Return True when a study includes EMA/survey collection.
+    """
+    if not isinstance(study, dict):
+        return False
+    sensor_list = study.get("sensor_list") or []
+    if isinstance(sensor_list, str):
+        sensor_list = [sensor_list]
+    return constants.ema in sensor_list or bool(study.get("survey"))
+
+
+@register.filter(name="has_wearable_sensors")
+def has_wearable_sensors(study):
+    """
+    Return True when a study includes at least one wearable sensor.
+    """
+    if not isinstance(study, dict):
+        return False
+    for wearable in study.get("wearables", []) or []:
+        if isinstance(wearable, dict) and wearable.get("sensors"):
+            return True
+    return False
+
+
+@register.filter(name="has_active_labeling")
+def has_active_labeling(study):
+    """
+    Return True when a study has active labeling sensors configured.
+    """
+    if not isinstance(study, dict):
+        return False
+    sensor_list_limited = study.get(constants.field_name_sensor_list_limited) or []
+    return bool(sensor_list_limited)
+
 
 @register.filter(name="get_size")
 def get_size(obj):
@@ -820,182 +1001,3 @@ register.filter('get_n_batches', get_n_batches)
 register.filter('get_status_tag', get_status_tag)
 register.filter('get_sensor_tag', get_sensor_tag)
 register.filter('get_activity_status_tag', get_activity_status_tag)
-
-
-
-@register.filter(name="get_wearable_sensor_lines")
-def get_wearable_sensor_lines(wearables):
-    """
-    Render wearable sensors as plain paragraph lines for the details page.
-
-    Args:
-        wearables (list): Wearable device configuration stored in study JSON.
-
-    Returns:
-        str: Concatenated HTML paragraphs for wearable sensors.
-    """
-    if not wearables:
-        return ""
-
-    result = []
-    for wearable in wearables:
-        if not isinstance(wearable, dict):
-            continue
-        device_name = " ".join(
-            part for part in [wearable.get("sensorname", ""), wearable.get("model", "")]
-            if part
-        ).strip()
-        for sensor in wearable.get("sensors", []):
-            if not isinstance(sensor, dict):
-                continue
-            label = sensor.get("wearable_sensor", "")
-            if not label:
-                continue
-            sampling_rate = sensor.get("sampling_rate", "-")
-            unit = sensor.get("unit", "-")
-            line = _format_sensor_display_name(label)
-            if device_name:
-                line = f"{line} ({device_name})"
-            line = f"{line} - {sampling_rate}"
-            result.append(f"<p>{line}</p>")
-
-    return "".join(result)
-
-@register.filter(name="get_wearable_sensor_display_map")
-def get_wearable_sensor_display_map(study):
-    """
-    Build a case-insensitive display-name map for wearable sensors from the
-    backend-provided dashboard sensor keys.
-
-    Args:
-        study (dict): Study metadata dictionary containing ``wearables`` and
-            ``dashboard_sensor_list``.
-
-    Returns:
-        dict: Mapping from lower-cased wearable sensor label to display text.
-    """
-    display_map = {}
-    for dashboard_sensor_name, meta in _get_wearable_dashboard_sensor_meta_map(study).items():
-        display_map[dashboard_sensor_name] = meta["display_label"]
-    return display_map
-
-@register.filter(name="get_study_sensor_summary")
-def get_study_sensor_summary(study, current_sensor_list):
-    """
-    Render passive and wearable sensors for a study in one combined HTML string.
-
-    Args:
-        study (dict): Study dictionary for the index page.
-        current_sensor_list (list): List of sensors active today.
-
-    Returns:
-        str: Combined HTML for passive and wearable sensors.
-    """
-    if not isinstance(study, dict):
-        return ""
-
-    passive_html = get_sensor_codes(study.get("sensor_list"), current_sensor_list)
-    wearable_html = get_wearable_sensor_codes(study.get("wearables"),current_sensor_list)
-    return f"{passive_html}{wearable_html}"
-
-def _sensor_key_matches_any(candidate_keys, active_sensor_keys):
-    active_exact = {str(key or "").strip().lower() for key in active_sensor_keys or []}
-    active_normalized = {_normalize_sensor_token(key) for key in active_sensor_keys or []}
-
-    for candidate in candidate_keys:
-        candidate = str(candidate or "").strip()
-        if not candidate:
-            continue
-        if candidate.lower() in active_exact:
-            return True
-        if _normalize_sensor_token(candidate) in active_normalized:
-            return True
-
-    return False
-
-@register.filter(name="get_wearable_sensor_codes")
-def get_wearable_sensor_codes(wearables, current_sensor_list):
-    """
-    Render wearable sensor labels as HTML buttons.
-
-    Args:
-        wearables (list): Wearable device configuration stored in study JSON.
-        current_sensor_list (list): Dashboard sensor keys active today.
-
-    Returns:
-        str: Concatenated HTML string of buttons for wearable sensors.
-    """
-    if not wearables:
-        return ""
-    print("SUMMARY DEBUG",  current_sensor_list)
-    sensor_code_map = _get_wearable_sensor_code_map(wearables)
-    result = []
-    for wearable in wearables:
-        sensor_entries = wearable.get("sensors", []) if isinstance(wearable, dict) else []
-        device_name = ""
-        wearable_name = ""
-        if isinstance(wearable, dict):
-            sensorname = wearable.get("sensorname", "")
-            model = wearable.get("model", "")
-            wearable_name = sensorname.strip()
-
-        for sensor in sensor_entries:
-            if not isinstance(sensor, dict):
-                continue
-            label = sensor.get("wearable_sensor", "")
-            if not label:
-                continue
-            sensor_code = sensor_code_map.get(label, label)
-            sampling_rate = sensor.get("sampling_rate", "-")
-            tooltip_parts = [label, f"rate: {sampling_rate}"]
-            tooltip = " | ".join(part for part in tooltip_parts if part)
-            button_label = sensor_code
-            if wearable_name:
-                button_label = f"{wearable_name}-{sensor_code}"
-            dashboard_sensor_name = build_wearable_dashboard_sensor_name(wearable_name, label)
-            is_current = _sensor_key_matches_any([dashboard_sensor_name, button_label], current_sensor_list)
-            btn_class = "btn-light today-sensor" if is_current else "btn-light"
-            button_html = (
-                f'<button style="margin-left:2px" class="btn {btn_class} wearable-sensor" '
-                f'data-bs-toggle="tooltip" data-bs-placement="top" title="{tooltip}">{button_label}</button>'
-            )
-            result.append(button_html)
-
-    return "".join(result)
-
-@register.filter(name="has_ema_sensor")
-def has_ema_sensor(study):
-    """
-    Return True when a study includes EMA/survey collection.
-    """
-    if not isinstance(study, dict):
-        return False
-    sensor_list = study.get("sensor_list") or []
-    if isinstance(sensor_list, str):
-        sensor_list = [sensor_list]
-    return constants.ema in sensor_list or bool(study.get("survey"))
-
-
-@register.filter(name="has_wearable_sensors")
-def has_wearable_sensors(study):
-    """
-    Return True when a study includes at least one wearable sensor.
-    """
-    if not isinstance(study, dict):
-        return False
-    for wearable in study.get("wearables", []) or []:
-        if isinstance(wearable, dict) and wearable.get("sensors"):
-            return True
-    return False
-
-
-@register.filter(name="has_active_labeling")
-def has_active_labeling(study):
-    """
-    Return True when a study has active labeling sensors configured.
-    """
-    if not isinstance(study, dict):
-        return False
-    sensor_list_limited = study.get(constants.field_name_sensor_list_limited) or []
-    return bool(sensor_list_limited)
-

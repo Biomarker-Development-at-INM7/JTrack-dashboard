@@ -503,6 +503,7 @@ def question_serializer(queryset):
             "id": question_data['sortId'],
             "title": question_data['title'],
             "active": 1 if question_data['active'] else 0,
+            "mandatory": 1 if coerce_bool(question_data.get('mandatory'), default=False) else 0,
             "subText" : question_data['subText'],
             "frequency" : question_data['frequency'],
             "clockTime" : clocktime_str,

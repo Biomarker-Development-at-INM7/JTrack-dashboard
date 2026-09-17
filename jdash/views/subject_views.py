@@ -11,7 +11,7 @@ from jdash.services.controller import (
 from jdash.services.notification import send_email
 from jdash.forms import DeleteSubjectForm
 from jdash.config import constants as constants
-from jdash.repositories.study_repository import set_email_for_user
+from jdash.repositories.study_repository import is_test_study, set_email_for_user
 from jdash.config.textmessages import TextMessages as textmessages
 from jdash.views.study_views import study_details
 
@@ -48,13 +48,18 @@ def download_unused_files(request, arg):
                     user_details[constants.field_name_username],
                     data[constants.field_name_user_email],
                 )
-            data_type = request.POST.get(constants.key_name_type, "processed")
+            study_name = data[constants.key_name_study_name]
+            data_type = (
+                "raw"
+                if is_test_study(study_name)
+                else request.POST.get(constants.key_name_type, "processed")
+            )
             initiate_download_study_dataset(
-                data[constants.key_name_study_name],
+                study_name,
                 data_type,
                 user_details,
             )
-            return study_details(request, data[constants.key_name_study_name])
+            return study_details(request, study_name)
         return dowload_unused_qr_code_files(arg)
     except Exception as e:
         logger.info("download_unused_files::Unexpected Error %s ", e)

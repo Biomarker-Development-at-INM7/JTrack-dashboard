@@ -47,7 +47,12 @@ class Study(models.Model):
     labeling = models.IntegerField(default=0,choices= constants.LABELLING)
     ecological_momentary_assessment = models.BooleanField(default=False)
     #check for how to store if ema is not choosen
-    survey = models.OneToOneField(Survey,on_delete=models.PROTECT, blank=True, null=True)
+    survey = models.ForeignKey(
+        Survey,
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+    )
     images = models.CharField(max_length=500,default="",blank=True )
     closed = models.BooleanField(default=False)
     def __str__(self):

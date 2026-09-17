@@ -4,13 +4,21 @@ import plotly.express as px
 from dash import Input, Output
 from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
-from jdash.analytics.pipeline import data_per_day_candidates, trigger_pipeline_if_needed
 from jdash.config import runtime_config as config
 
 SUBJECT_CANDIDATES = [
     "subject", "Subject_ID","subject-id"
 ]
 X_AXIS_CANDIDATES = [ "Study_day","Date"]  # order = preference
+
+def data_per_day_candidates(study, sensor):
+    study_dir = os.path.join(config.analytics_storage_folder, study)
+    outputs_dir = os.path.join(study_dir, config.analytics_outputs_folder)
+    return [
+        os.path.join(outputs_dir, f"Data_per_day_{sensor}_latest.csv"),
+        os.path.join(outputs_dir, f"Data_per_day_device_{sensor}_latest.csv"),
+    ]
+
 
 def resolve_data_per_day_path(study, sensor):
     """
@@ -24,7 +32,6 @@ def resolve_data_per_day_path(study, sensor):
     for path in candidates:
         if os.path.exists(path):
             return path
-    trigger_pipeline_if_needed(study, sensor=sensor)
     return candidates[0]
 
 def default_callbacks(app):
@@ -137,7 +144,7 @@ def default_callbacks(app):
         try:
             df = pd.read_csv(path, sep=';')
         except Exception as e:
-            return blank_fig(f"File not found: Contact the administrator") 
+            return blank_fig(f"File parse error: {e}") 
 
         DT_COL, VAL_COL = "Date", "Data_per_day"
 

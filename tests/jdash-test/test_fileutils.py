@@ -112,6 +112,23 @@ def test_change_permissions_calls_chown_and_chmod(mock_chmod, mock_chown):
     mock_chown.assert_called_once_with("/some/path", 33, 3619)
     mock_chmod.assert_called_once()
 
+
+@patch("jdash.utils.fileutils.grp.getgrnam")
+@patch("os.chown")
+@patch("os.chmod")
+def test_set_download_file_permissions_uses_755_and_jtrack_group(
+    mock_chmod,
+    mock_chown,
+    mock_getgrnam,
+):
+    mock_getgrnam.return_value.gr_gid = 3619
+
+    fileutils.set_download_file_permissions("/some/download.zip")
+
+    mock_chmod.assert_called_once_with("/some/download.zip", 0o755)
+    mock_getgrnam.assert_called_once_with("jtrack")
+    mock_chown.assert_called_once_with("/some/download.zip", -1, 3619)
+
 # Test open_study_json loads JSON
 @patch("builtins.open", new_callable=mock_open, read_data='{"key": "value"}')
 @patch("os.path.join", return_value="/fake/path/study.json")

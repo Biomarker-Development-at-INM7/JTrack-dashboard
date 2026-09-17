@@ -10,6 +10,7 @@ from jdash.services.subject import Subject
 from jdash.forms import (
     AnswerForm,
     CategoryForm,
+    ChangeSubjectStatusForm,
     CreateSubjectForm,
     DeleteSubjectForm,
     JSONUploadForm,
@@ -129,13 +130,19 @@ def context_for_study_detail_page(study_name, session_key,subject_details=None):
     subject_details = subject_details or {
         constants.key_name_ids_to_be_removed: []
     }
+    eligible_subjects = subject_details.get(constants.key_name_ids_to_be_removed, [])
+    context["has_eligible_subjects"] = bool(eligible_subjects)
 
     context[constants.key_name_remove_subjects_form] = RemoveSubjectsForm(
-        receivers=subject_details.get(constants.key_name_ids_to_be_removed, [])
+        receivers=eligible_subjects
+    )
+
+    context[constants.key_name_change_subject_status_form] = ChangeSubjectStatusForm(
+        subjects=eligible_subjects
     )
 
     context[constants.key_name_notification_form] = SendNotificationForm(
-        receivers=subject_details.get(constants.key_name_ids_to_be_removed, [])
+        receivers=eligible_subjects
     )
 
     context[constants.key_name_delete_subject_form] = DeleteSubjectForm()

@@ -6,79 +6,135 @@
 {% block content %}
 <link href="{% static 'css/bootstrap-table.min.css' %}" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.0/font/bootstrap-icons.css" rel="stylesheet">
-<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css">
-<script src="{% static 'js/bootstrap-table.min.js' %}"></script>
-<script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
-<script src="{% static 'js/main.js' %}"></script>
-{{ meta_data|get_dashboard_sensor_filter_values|json_script:"sensor-filter-defaults" }}
-{{ meta_data|get_wearable_sensor_display_map|json_script:"wearable-sensor-display-map" }}
+	<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css">
+	<script src="{% static 'js/bootstrap-table.min.js' %}"></script>
+	<script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
+	<script src="{% static 'js/main.js' %}"></script>
+	<link href="{% static 'css/form.css' %}" rel="stylesheet">
+	{{ meta_data|get_dashboard_sensor_filter_values|json_script:"sensor-filter-defaults" }}
+	{{ meta_data|get_wearable_sensor_display_map|json_script:"wearable-sensor-display-map" }}
+{% trans "study_details_preparing_download" as study_details_preparing_download %}
+{% trans "study_details_preparing_file_download" as study_details_preparing_file_download %}
+{% trans "study_details_delete_data_confirm_missing" as study_details_delete_data_confirm_missing %}
+{% trans "study_details_not_applicable" as study_details_not_applicable %}
+{% trans "study_details_subjects_short" as study_details_subjects_short %}
+{% trans "study_details_to_confirm_suffix" as study_details_to_confirm_suffix %}
+{% trans "study_details_type_to_confirm" as study_details_type_to_confirm %}
 <script>
   var sensorFilterDefaults = JSON.parse(document.getElementById('sensor-filter-defaults').textContent);
   var wearableSensorDisplayMap = JSON.parse(document.getElementById('wearable-sensor-display-map').textContent);
   var studyDurationDays = Number('{{ meta_data.duration|default_if_none:0 }}');
 </script>
 <script>
-  (function () {
-    const btn = document.getElementById('user_unused_sheet');
-    const modal = document.getElementById('loading-modal');
-  
-    function showModal() { modal.style.display = 'block'; }
-    function hideModal() { modal.style.display = 'none'; }
-  
-    btn?.addEventListener('click', async function () {
-      const studyName = this.dataset.study;
-      if (!studyName) return;
-  
-      const url = `/download/${encodeURIComponent(studyName)}`; // adjust to your URLconf
-      showModal();
-      this.disabled = true;
-  
-      try {
-        // Start request; browser shows modal while server builds ZIP
-        const res = await fetch(url, { method: 'GET' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  
-        // Turn response into a Blob and trigger a download
-        const blob = await res.blob();
-        const objectUrl = URL.createObjectURL(blob);
-  
-        const a = document.createElement('a');
-        a.href = objectUrl;
-        // Match your backend filename if you want; otherwise a default:
-        a.download = 'unused-sheets.zip';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(objectUrl);
-      } catch (err) {
-        console.error(err);
-        alert('{% translate "study_details_download_failed" %}');
-      } finally {
-        hideModal();
-        this.disabled = false;
-      }
-    });
-  })();
-  </script>
-  <script>
+    var studyDataDownloadSubmitting = false;
+    var deleteSubjectConfirmationValue = "";
+    var deleteSubjectDataBackTarget = "";
+
     function download_study_data(){
       $("#downloadStudyDataModal").hide();
 
     }
 
     function confirm_download_data(){
+      if (studyDataDownloadSubmitting) {
+        return;
+      }
 
       const dataDownloadForm = document.forms.dataDownloadForm;
-        const selectedType = dataDownloadForm.querySelector('input[name="type"]:checked');
+      const selectedType = dataDownloadForm.querySelector(
+        'input[name="type"]:checked, input[name="type"][type="hidden"]'
+      );
       if (!selectedType) {
         alert('{% translate "study_details_download_failed" %}');
         return;
       }
-      dataDownloadForm.submit(); 
+      studyDataDownloadSubmitting = true;
+      if (typeof showJdashLoading === 'function') {
+        showJdashLoading('{{ study_details_preparing_download|escapejs }}');
+      }
+
+      window.setTimeout(function () {
+        dataDownloadForm.submit();
+      }, 80);
       
 
     }
+
+    function getDownloadFilename(response, fallbackFilename) {
+      const contentDisposition = response.headers.get('Content-Disposition') || '';
+      const utf8Match = contentDisposition.match(/filename\*=utf-8''([^;]+)/i);
+      if (utf8Match && utf8Match[1]) {
+        return decodeURIComponent(utf8Match[1]);
+      }
+
+      const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+      if (filenameMatch && filenameMatch[1]) {
+        return filenameMatch[1];
+      }
+
+      return fallbackFilename || 'download';
+    }
+
+    function setFileDownloadTriggerDisabled(trigger, disabled) {
+      trigger.classList.toggle('disabled', disabled);
+      trigger.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+      trigger.style.pointerEvents = disabled ? 'none' : '';
+    }
+
+    function initializeDetailsFileDownloads() {
+      document.querySelectorAll('[data-jdash-file-download]').forEach(function (trigger) {
+        trigger.addEventListener('click', function (event) {
+          if (!window.fetch || !window.URL || !window.URL.createObjectURL) {
+            return;
+          }
+
+          event.preventDefault();
+          const loadingMessage = trigger.getAttribute('data-loading-message') || '{{ study_details_preparing_file_download|escapejs }}';
+          const fallbackFilename = trigger.getAttribute('data-download-filename') || '';
+          setFileDownloadTriggerDisabled(trigger, true);
+          if (typeof showJdashLoading === 'function') {
+            showJdashLoading(loadingMessage);
+          }
+
+          fetch(trigger.href, {
+            method: 'GET',
+            credentials: 'same-origin',
+          })
+            .then(function (response) {
+              if (!response.ok) {
+                throw new Error('HTTP ' + response.status);
+              }
+              const filename = getDownloadFilename(response, fallbackFilename);
+              return response.blob().then(function (blob) {
+                return { blob: blob, filename: filename };
+              });
+            })
+            .then(function (download) {
+              const objectUrl = window.URL.createObjectURL(download.blob);
+              const link = document.createElement('a');
+              link.href = objectUrl;
+              link.download = download.filename;
+              document.body.appendChild(link);
+              link.click();
+              link.remove();
+              window.URL.revokeObjectURL(objectUrl);
+            })
+            .catch(function (error) {
+              console.error(error);
+              alert('{% translate "study_details_download_failed" %}');
+            })
+            .finally(function () {
+              if (typeof hideJdashLoading === 'function') {
+                hideJdashLoading();
+              }
+              setFileDownloadTriggerDisabled(trigger, false);
+            });
+        });
+      });
+    }
+
     document.addEventListener("DOMContentLoaded", function () {
+      initializeDetailsFileDownloads();
       const downloadModal = document.getElementById("downloadStudyDataModal");
       if (!downloadModal) return;
 
@@ -86,20 +142,409 @@
         const processedCheckbox = document.getElementById("flexCheckDefault");
         const rawCheckbox = document.getElementById("flexCheckChecked");
         if (processedCheckbox) {
-          processedCheckbox.checked = false;
+          processedCheckbox.checked = true;
         }
         if (rawCheckbox) {
-          rawCheckbox.checked = true;
+          rawCheckbox.checked = false;
         }
       });
     });
-    function delete_subject_data(){
+
+    function delete_subject_data(event){
+      if (event) {
+        event.preventDefault();
+      }
+      if (!isDeleteSubjectDataConfirmed()) {
+        alert("{{ study_details_delete_data_confirm_missing|escapejs }}");
+        return false;
+      }
       const deletedataForm = document.forms.deletedataForm;
-      deletedataForm.submit(); 
+      if (
+        deletedataForm
+        && typeof deletedataForm.reportValidity === "function"
+        && !deletedataForm.reportValidity()
+      ) {
+        return false;
+      }
+      deletedataForm.submit();
+      return false;
     }
 
-    function form_innerhtml_modal() {
-        var items=document.getElementsByName('check-subject-id');
+	    function getSelectedSubjectForRemoval() {
+	      const removeForm = document.forms.removeForm;
+	      if (!removeForm) {
+	        return "";
+	      }
+	      const subjectSelect = removeForm.querySelector('[name="subject_to_remove"]');
+	      return subjectSelect ? subjectSelect.value : "";
+	    }
+
+    function getDeleteSubjectIdFromRemovalValue(subjectValue) {
+      const subjectWithModality = String(subjectValue || "").split(";")[0];
+      const subjectId = subjectWithModality.split(":")[0];
+      return subjectId.replace(/_\d$/, "");
+    }
+
+    function getSubjectWithModalityFromRemovalValue(subjectValue) {
+      return String(subjectValue || "").split(";")[0];
+    }
+
+    function getSelectedRemovalDetails() {
+      const removeForm = document.forms.removeForm;
+      const subjectSelect = removeForm ? removeForm.querySelector('[name="subject_to_remove"]') : null;
+      const reasonSelect = document.getElementById("dropoutReason");
+      const subjectValue = getSelectedSubjectForRemoval();
+      const subjectId = getDeleteSubjectIdFromRemovalValue(subjectValue);
+      const subjectWithModality = getSubjectWithModalityFromRemovalValue(subjectValue);
+      const selectedSubjectOption = subjectSelect && subjectSelect.selectedIndex >= 0
+        ? subjectSelect.options[subjectSelect.selectedIndex]
+        : null;
+      const selectedReasonOption = reasonSelect && reasonSelect.selectedIndex >= 0
+        ? reasonSelect.options[reasonSelect.selectedIndex]
+        : null;
+
+      return {
+        subjectId: subjectId,
+        subjectWithModality: subjectWithModality,
+        subjectLabel: selectedSubjectOption ? selectedSubjectOption.textContent.trim() : subjectId,
+        reasonText: selectedReasonOption ? selectedReasonOption.textContent.trim() : "",
+      };
+    }
+
+    function getSelectedOptionText(selectId) {
+      const select = document.getElementById(selectId);
+      if (!select || select.selectedIndex < 0) {
+        return "";
+      }
+      const option = select.options[select.selectedIndex];
+      return option && option.value ? option.textContent.trim() : "";
+    }
+
+    function getDeleteDataReasonText() {
+      return getSelectedOptionText("deleteDataReason");
+    }
+
+    function setElementText(elementId, value) {
+      const element = document.getElementById(elementId);
+      if (element) {
+        element.textContent = value || "-";
+      }
+    }
+
+    function escapeHtml(value) {
+      const temp = document.createElement("div");
+      temp.textContent = value || "";
+      return temp.innerHTML;
+    }
+
+    function normalizeSubjectIds(selectedItems) {
+      return String(selectedItems || "")
+        .split(";")
+        .map(function (item) {
+          return item.trim();
+        })
+        .filter(function (item) {
+          return item !== "";
+        });
+    }
+
+    function updateDeleteSubjectDataSubmitState() {
+      const input = document.getElementById("subjectId");
+      const terms = document.getElementById("deleteDataTerms");
+      const submitButton = document.getElementById("deleteDataSubmitButton");
+      if (!submitButton) {
+        return;
+      }
+
+      const typedValue = input ? input.value.trim() : "";
+      const termsChecked = terms ? terms.checked : false;
+      submitButton.disabled = !deleteSubjectConfirmationValue || !termsChecked || typedValue !== deleteSubjectConfirmationValue;
+    }
+
+    function isDeleteSubjectDataConfirmed() {
+      const input = document.getElementById("subjectId");
+      const terms = document.getElementById("deleteDataTerms");
+      return Boolean(
+        input
+        && terms
+        && deleteSubjectConfirmationValue
+        && terms.checked
+        && input.value.trim() === deleteSubjectConfirmationValue
+      );
+    }
+
+    function populateRemoveSubjectConfirmModal() {
+      const details = getSelectedRemovalDetails();
+      setElementText("removeConfirmSubjectId", details.subjectWithModality);
+      setElementText("removeConfirmReason", details.reasonText);
+    }
+
+    function populateDeleteSubjectDataModal(subjectIds, reasonText) {
+      const normalizedSubjectIds = Array.isArray(subjectIds)
+        ? subjectIds.filter(function (subjectId) { return subjectId; })
+        : normalizeSubjectIds(subjectIds);
+      const subjectText = normalizedSubjectIds.join("; ");
+      deleteSubjectConfirmationValue = normalizedSubjectIds.length
+        ? normalizedSubjectIds.join(";") + ";"
+        : "";
+
+      const titleSubject = normalizedSubjectIds.length === 1
+        ? normalizedSubjectIds[0]
+        : normalizedSubjectIds.length
+          ? String(normalizedSubjectIds.length) + " {{ study_details_subjects_short|escapejs }}"
+          : "{{ study_details_subject_ids_to_delete|escapejs }}";
+      setElementText("deleteDataModalSubjectTitle", titleSubject);
+      const reasonTitle = document.getElementById("deleteDataModalReasonTitle");
+      if (reasonTitle) {
+        reasonTitle.textContent = reasonText ? " - " + reasonText : "";
+      }
+      setElementText("deleteDataSummarySubject", subjectText);
+      setElementText("deleteDataWarningSubject", subjectText);
+      setElementText("deleteDataSummaryReason", reasonText || "{{ study_details_not_applicable|escapejs }}");
+
+      renderDeleteSubjectActivations(normalizedSubjectIds);
+
+      const confirmInstruction = document.getElementById("deleteDataConfirmInstruction");
+      if (confirmInstruction) {
+        if (deleteSubjectConfirmationValue) {
+          confirmInstruction.innerHTML = "{{ study_details_type_to_confirm|escapejs }} "
+            + '<span class="subject-confirm-token">'
+            + escapeHtml(deleteSubjectConfirmationValue)
+            + '</span> {{ study_details_to_confirm_suffix|escapejs }} <span class="text-danger">*</span>';
+        } else {
+          confirmInstruction.textContent = "";
+        }
+      }
+
+      const input = document.getElementById("subjectId");
+      if (input) {
+        input.value = "";
+      }
+      const terms = document.getElementById("deleteDataTerms");
+      if (terms) {
+        terms.checked = false;
+      }
+      const backButton = document.getElementById("deleteDataBackButton");
+      if (backButton) {
+        backButton.style.display = deleteSubjectDataBackTarget ? "" : "none";
+      }
+      updateDeleteSubjectDataSubmitState();
+    }
+
+    function renderDeleteSubjectActivations(subjectIds) {
+      const container = document.getElementById("deleteDataActivationList");
+      const dataElement = document.getElementById("studySubjectActivationData");
+      if (!container || !dataElement) return;
+
+      let groupedSubjects = {};
+      try {
+        groupedSubjects = JSON.parse(dataElement.textContent);
+      } catch (error) {
+        container.textContent = "";
+        return;
+      }
+
+      const statusMap = {
+        0: { label: "{% trans 'study_details_subjects_in_study' %}", className: "is-active" },
+        1: { label: "{% trans 'study_details_subjects_left' %}", className: "is-left" },
+        2: { label: "{% trans 'study_details_subjects_completed' %}", className: "is-completed" },
+        3: { label: "{% trans 'study_details_subjects_removed' %}", className: "is-removed" }
+      };
+      const rows = subjectIds.flatMap(function (subjectId) {
+        return groupedSubjects[subjectId] || [];
+      });
+
+      if (!rows.length) {
+        container.innerHTML = '<span class="text-muted">{% trans "study_details_no_qr_activations" %}</span>';
+        return;
+      }
+
+      container.innerHTML = rows.map(function (row) {
+        const status = statusMap[Number(row.status_code)] || {
+          label: "{% trans 'study_details_status_empty' %}",
+          className: "is-unknown"
+        };
+        const appName = row.appName || row.app || "";
+        return '<div class="subject-activation-row">'
+          + '<span class="subject-activation-id">'
+          + escapeHtml(row.subject_name || "")
+          + (appName ? '<span class="subject-activation-app">' + escapeHtml(appName) + '</span>' : '')
+          + '</span>'
+          + '<span class="subject-activation-status ' + status.className + '">'
+          + escapeHtml(status.label) + '</span></div>';
+      }).join("");
+    }
+
+	    function getSelectedDeleteSubjectIds() {
+	      const subjectSelect = document.getElementById("deleteDataSubjectSelect");
+	      if (!subjectSelect) {
+	        return [];
+	      }
+	      return Array.from(subjectSelect.selectedOptions)
+	        .map(function (option) { return option.value.trim(); })
+	        .filter(function (subjectId) { return subjectId !== ""; });
+	    }
+
+	    function setDeleteSubjectSelectValues(subjectIds) {
+	      const subjectSelect = document.getElementById("deleteDataSubjectSelect");
+	      if (!subjectSelect) {
+	        return;
+	      }
+	      if (!subjectSelect.multiple) {
+	        subjectSelect.value = subjectIds.length ? subjectIds[0] : "";
+	        return;
+	      }
+	      const selectedValues = new Set(subjectIds);
+	      Array.from(subjectSelect.options).forEach(function (option) {
+	        option.selected = selectedValues.has(option.value);
+	      });
+	    }
+
+	    function resetDeleteSubjectSelect() {
+	      const subjectSelect = document.getElementById("deleteDataSubjectSelect");
+	      if (!subjectSelect) {
+	        return;
+	      }
+	      if (!subjectSelect.multiple) {
+	        subjectSelect.value = "";
+	        return;
+	      }
+	      Array.from(subjectSelect.options).forEach(function (option) {
+	        option.selected = false;
+	      });
+	    }
+
+	    function updateDeleteSubjectSelectionFromSelect() {
+	      populateDeleteSubjectDataModal(
+	        getSelectedDeleteSubjectIds(),
+	        getDeleteDataReasonText()
+	      );
+	    }
+
+	    function updateDeleteSubjectReasonSelection() {
+	      populateDeleteSubjectDataModal(
+	        getSelectedDeleteSubjectIds(),
+	        getDeleteDataReasonText()
+	      );
+	    }
+
+	    function ensureDropoutSubjectPlaceholder(subjectSelect) {
+	      if (!subjectSelect || subjectSelect.querySelector('option[value=""]')) {
+	        return;
+	      }
+	      const placeholder = document.createElement("option");
+	      placeholder.value = "";
+	      placeholder.textContent = "{% translate 'study_details_select_subject_placeholder' %}";
+	      placeholder.disabled = true;
+	      subjectSelect.insertBefore(placeholder, subjectSelect.firstChild);
+	    }
+
+	    function openDropoutSubjectModal(event) {
+	      if (event) {
+	        event.preventDefault();
+	      }
+	      const removeForm = document.forms.removeForm;
+	      if (!removeForm) {
+	        return;
+	      }
+	      const subjectSelect = removeForm.querySelector('[name="subject_to_remove"]');
+	      const reasonSelect = document.getElementById("dropoutReason");
+	      //const dropoutDate = document.getElementById("dropoutDate");
+	      ensureDropoutSubjectPlaceholder(subjectSelect);
+	      if (subjectSelect) {
+	        subjectSelect.value = "";
+	      }
+	      if (reasonSelect) {
+	        reasonSelect.value = "";
+	      }
+	    //   if (dropoutDate) {
+	    //     dropoutDate.value = "{% now 'Y-m-d' %}";
+	    //   }
+	      $("#dropoutSubjectModal").modal('show');
+	    }
+
+	    function confirmDropoutSubject(event) {
+	      if (event) {
+	        event.preventDefault();
+	      }
+	      const removeForm = document.forms.removeForm;
+	      if (!removeForm) {
+	        return;
+	      }
+	      const subjectSelect = removeForm.querySelector('[name="subject_to_remove"]');
+	      ensureDropoutSubjectPlaceholder(subjectSelect);
+	      if (typeof removeForm.reportValidity === "function" && !removeForm.reportValidity()) {
+	        return;
+	      }
+	      if (!getSelectedSubjectForRemoval()) {
+	        alert("{% translate 'study_details_select_subject_to_delete' %}");
+	        return;
+	      }
+	      $("#dropoutSubjectModal").modal('hide');
+	      populateRemoveSubjectConfirmModal();
+	      window.setTimeout(function () {
+	        $("#removeSubjectConfirmModal").modal('show');
+	      }, 200);
+	    }
+
+	    function openSubjectActionModal(event) {
+	      if (event) {
+	        event.preventDefault();
+	      }
+	      deleteSubjectDataBackTarget = "";
+	      $("#subjectActionModal").modal('show');
+	    }
+
+	    function openRemoveSubjectFormModal() {
+	      $("#subjectActionModal").modal('hide');
+	      window.setTimeout(function () {
+	        openDropoutSubjectModal();
+	      }, 200);
+	    }
+
+	    function backToRemoveSubjectFormModal() {
+	      $("#removeSubjectConfirmModal").modal('hide');
+	      window.setTimeout(function () {
+	        $("#dropoutSubjectModal").modal('show');
+	      }, 200);
+	    }
+
+	    function backToSubjectActionModalFromRemoveForm() {
+	      $("#dropoutSubjectModal").modal('hide');
+	      window.setTimeout(function () {
+	        $("#subjectActionModal").modal('show');
+	      }, 200);
+	    }
+
+	    function openDeleteSubjectDataFormModal() {
+	      deleteSubjectDataBackTarget = "subjectActionModal";
+	      resetDeleteSubjectSelect();
+	      const reasonSelect = document.getElementById("deleteDataReason");
+	      if (reasonSelect) {
+	        reasonSelect.value = "";
+	      }
+	      populateDeleteSubjectDataModal([], "");
+	      $("#subjectActionModal").modal('hide');
+	      window.setTimeout(function () {
+	        $("#deleteDataModal").modal('show');
+	      }, 200);
+	    }
+
+	    function openDeleteSubjectDataFromRemoval() {
+	      openDeleteSubjectDataFormModal();
+	    }
+
+	    function backToSubjectActionModalFromDeleteData() {
+	      $("#deleteDataModal").modal('hide');
+	      if (deleteSubjectDataBackTarget === "subjectActionModal") {
+	        window.setTimeout(function () {
+	          $("#subjectActionModal").modal('show');
+	        }, 200);
+	      }
+	    }
+	
+	    function form_innerhtml_modal() {
+	        var items=document.getElementsByName('check-subject-id');
         var selectedItems="";
         k= 0;
         for(var i=0; i<items.length; i++){
@@ -112,15 +557,17 @@
               alert("{% translate 'study_details_select_subject_to_delete' %}");
               $("#deleteDataModal").modal('hide');
         }else{
-          var label_str= "{% translate 'study_details_type_to_confirm' %}" + " " + selectedItems + " {% translate 'study_details_to_confirm_suffix' %}"
-
-          $("#label-subject").html(label_str);
+          deleteSubjectDataBackTarget = "";
+          populateDeleteSubjectDataModal(normalizeSubjectIds(selectedItems), "{{ study_details_not_applicable|escapejs }}");
           $("#deleteDataModal").modal('show');
         }
         
 
     } 
 </script>
+
+    {% include "includes/jdash_loading_overlay.html" %}
+    {{ d|json_script:"studySubjectActivationData" }}
 
     <div class="modal fade" id="downloadStudyDataModal" tabindex="-1" aria-labelledby="downloadStudyDataModalLabel" aria-hidden="true">
       <div class="modal-dialog">
@@ -132,29 +579,38 @@
           <div class="modal-body">
               <form id="dataDownloadForm" action="{%url 'download' arg='data' %}" method="POST">
                 {% csrf_token %}
-                <div class="form-check">
-                  <input class="form-check-input" type="radio" name="type" value="processed" id="flexCheckDefault">
-                  <label class="form-check-label" for="flexCheckDefault">
-                    {% trans "study_details_processed_data" %}
-                  </label>
+				{% if meta_data.is_test %}
+				<div class="study-info-note mt-3 mb-3" role="alert">
+                  {% trans "study_details_test_study_raw_download" %}
                 </div>
-                <div class="form-check">
+                <input type="hidden" name="type" value="raw">
+				{% else %}
+				<div class="study-info-note mt-3 mb-3" role="alert">
+                  {% trans "study_details_data_available_next_day" %}
+                </div>
+				<div class="form-check">
                   <input class="form-check-input" type="radio" name="type" value="raw" id="flexCheckChecked" checked>
                   <label class="form-check-label" for="flexCheckChecked">
                     {% trans "study_details_raw_data" %}
                   </label>
                 </div>
-                <div class="study-info-note mt-3 mb-3" role="alert">
-                  {% trans "study_details_data_available_next_day" %}
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="type" value="processed" id="flexCheckDefault" >
+                  <label class="form-check-label" for="flexCheckDefault">
+                    {% trans "study_details_processed_data" %}
+                  </label>
                 </div>
+                {% endif %}
+                
+                
                 <input name="study_name" value={{meta_data.name}} type="hidden"/>
                 {% if email != '' %}
                 <input name="user_email" value={{email}} type="hidden"/>
                 {% else %}
                 <div class="form-group mt-4 mb-3">
-                  <label for="user_email">{% trans "study_details_email_address" %}</label>
                   <input type="email" class="form-control" id="user_email"
-                  name="user_email" aria-describedby="emailHelp" placeholder="{% trans 'study_details_enter_email' %}">
+                  name="user_email" aria-describedby="emailHelp" required>
+                  <label for="user_email">{% trans "study_details_email_address" %}</label>
                   </div>
                   <small id="emailHelp" class="form-text text-muted">
                       {% trans "study_details_email_help" %}</small>
@@ -164,47 +620,383 @@
           <div class="modal-footer">
             <input data-bs-toggle="modal" data-bs-target="#confirmationModal" value="{% trans 'study_details_download' %}" type="submit" class="btn btn-primary" onclick="download_study_data()" >
           </div>
-        </div>
+	        </div>
       </div>
     </div>
-    <div class="modal fade" id="deleteDataModal" tabindex="-1" aria-labelledby="deleteDataModalLabel" aria-hidden="true">
-      <div class="modal-dialog">
-        <div class="modal-content">
+		    <div class="modal fade" id="studyMembersModal" tabindex="-1" aria-labelledby="studyMembersModalLabel" aria-hidden="true">
+		      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+		        <div class="modal-content">
+		          <div class="modal-header">
+		            <h5 class="modal-title" id="studyMembersModalLabel">{% trans "study_details_members" %}</h5>
+		            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'study_details_close' %}"></button>
+		          </div>
+		          <div class="modal-body p-0">
+		            <div class="table-responsive">
+		              <table class="table study-members-table mb-0">
+		                <thead>
+		                  <tr>
+		                    <th scope="col">{% trans "study_details_member_user" %}</th>
+		                    <th scope="col">{% trans "study_details_member_email" %}</th>
+		                    <th scope="col">{% trans "study_details_member_role" %}</th>
+		                  </tr>
+		                </thead>
+		                <tbody>
+		                  {% for member in meta_data.members %}
+		                  <tr>
+		                    <td>
+		                      <strong>{{ member.display_name }}</strong>
+		                      {% if member.is_owner %}<span class="study-member-owner-badge">{% trans "study_details_member_owner" %}</span>{% endif %}
+		                      {% if member.display_name != member.username %}<small class="study-member-username">{{ member.username }}</small>{% endif %}
+		                    </td>
+		                    <td>{% if member.email %}{{ member.email }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+		                    <td>{% if member.role %}{{ member.role }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+		                  </tr>
+		                  {% empty %}
+		                  <tr><td colspan="3" class="text-muted text-center py-4">{% trans "study_details_no_members" %}</td></tr>
+		                  {% endfor %}
+		                </tbody>
+		              </table>
+		            </div>
+		          </div>
+		        </div>
+		      </div>
+		    </div>
+		    {% if request.user|can_manage_study %}
+		    <div class="modal fade" id="createSubjectModal" tabindex="-1" aria-labelledby="createSubjectModalLabel" aria-hidden="true">
+		      <div class="modal-dialog">
+		        <div class="modal-content">
+		          <form name="createSubjectForm" action="{%url 'details' study_name=meta_data.name %}" method="POST">
+		            {% csrf_token %}
+		            <div class="modal-header">
+		              <h5 class="modal-title" id="createSubjectModalLabel">{% trans "study_details_create" %}</h5>
+		              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'study_details_close' %}"></button>
+		            </div>
+		            <div class="modal-body">
+		              <div class="study-info-note mb-4" role="alert">
+		                {% trans "study_details_create_subject_info" %}
+		              </div>
+		              <div class="form-group required mb-4">
+		                {{new_subjects_form.number_of_subjects}}
+						<label  for="{{ new_subjects_form.number_of_subjects.id_for_label }}">
+		                  {% trans "study_number_of_subjects" %} <span class="text-danger">*</span>
+		                </label>
+		              </div>
+		            </div>
+		            <div class="modal-footer">
+		              
+		              <button name="create_subjects" type="submit" value="1" class="btn btn-primary">
+		                {% trans "study_details_create" %}
+		              </button>
+		            </div>
+		          </form>
+		        </div>
+		      </div>
+		    </div>
+
+		    <div class="modal fade" id="sendNotificationModal" tabindex="-1" aria-labelledby="sendNotificationModalLabel" aria-hidden="true">
+		      <div class="modal-dialog">
+		        <div class="modal-content">
+		          <form class="study-details-form" action="{%url 'details' study_name=meta_data.name %}" method="POST">
+		            {% csrf_token %}
+		            <div class="modal-header">
+		              <h5 class="modal-title" id="sendNotificationModalLabel">{% trans "study_details_send_notification" %}</h5>
+		              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'study_details_close' %}"></button>
+		            </div>
+		            <div class="modal-body">
+		              <div class="study-info-note mb-4" role="alert">
+		                {% trans "study_details_send_notification_info" %}
+		              </div>
+		              {% if has_eligible_subjects %}
+					  <div class="form-group required mb-4">
+						{{notification_form.message_title}}
+		                <label  for="{{ notification_form.message_title.id_for_label }}">
+		                  {% trans "global_title" %} <span class="text-danger">*</span>
+		                </label>
+		                
+		              </div>
+					  <div class="form-group required mb-4">
+						{{notification_form.message_text}}
+		                <label  for="{{ notification_form.message_text.id_for_label }}">
+		                  {% trans "global_desc" %} <span class="text-danger">*</span>
+		                </label>
+		                
+		              </div>
+					  <div class="form-group required mb-4 subject-chip-field"
+					    data-filter-placeholder="{% trans 'study_details_filter_subjects' %}"
+					    data-clear-label="{% trans 'study_details_clear_all_subjects' %}"
+					    data-remove-label="{% trans 'study_details_remove_selection' %}">
+						{{notification_form.receivers}}
+		                <label  for="{{ notification_form.receivers.id_for_label }}">
+		                  {% trans "study_details_subjects_short" %} <span class="text-danger">*</span>
+		                </label>
+		                
+		              </div>
+		              <div class="study-details-form-actions">
+		                <input type="button" value="{% trans 'study_details_all_ids' %}" onclick="select_all_ids()"
+		                  class="btn btn-secondary" role="button" name="all_id_submit"/>
+		                <input type="button" value="{% trans 'study_details_missing_ids' %}" onclick="select_missing_ids()"
+		                  name="missing_id_submit" role="button" class="btn btn-warning"/>
+		              </div>
+		              {% else %}
+		              <span class="study-no-subjects-message">{% trans "study_details_no_subjects_available" %}</span>
+		              {% endif %}
+		            </div>
+		            <div class="modal-footer">
+		              {% if has_eligible_subjects %}
+		              <button name="send_notification" type="submit" value="1" class="btn btn-primary">
+		                {% trans "study_details_send_notification" %}
+		              </button>
+		              {% endif %}
+		            </div>
+		          </form>
+		        </div>
+		      </div>
+		    </div>
+		    {% endif %}
+		    {% if request.user|can_manage_study %}
+		    <div class="modal fade" id="changeSubjectStatusModal" tabindex="-1" aria-labelledby="changeSubjectStatusModalLabel" aria-hidden="true">
+		      <div class="modal-dialog">
+		        <div class="modal-content">
+		          <div class="modal-header">
+		            <h5 class="modal-title" id="changeSubjectStatusModalLabel">{% trans "study_details_change_status" %}</h5>
+		            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'study_details_close' %}"></button>
+		          </div>
+		          <form action="{% url 'details' study_name=meta_data.name %}" method="POST">
+		            {% csrf_token %}
+		            <div class="modal-body">
+		              {% if has_eligible_subjects %}
+		              <div class="form-group required subject-chip-field"
+		                data-filter-placeholder="{% trans 'study_details_filter_subjects' %}"
+		                data-clear-label="{% trans 'study_details_clear_all_subjects' %}"
+		                data-remove-label="{% trans 'study_details_remove_selection' %}">
+		                {{ change_subject_status_form.subject_to_change }}
+		                <label for="{{ change_subject_status_form.subject_to_change.id_for_label }}">
+		                  {% trans "study_details_subject_id" %} <span class="text-danger">*</span>
+		                </label>
+		              </div>
+		              <p class="text-muted mt-3 mb-0">{% trans "study_details_change_status_left_info" %}</p>
+		              {% else %}
+		              <span class="study-no-subjects-message">{% trans "study_details_no_subjects_available" %}</span>
+		              {% endif %}
+		            </div>
+		            <div class="modal-footer">
+		              {% if has_eligible_subjects %}
+		              <button name="change_subject_status" value="1" type="submit" class="btn btn-primary">
+		                {% trans "study_details_mark_as_left" %}
+		              </button>
+		              {% endif %}
+		            </div>
+		          </form>
+		        </div>
+		      </div>
+		    </div>
+		    <div class="modal fade" id="dropoutSubjectModal" tabindex="-1" aria-labelledby="dropoutSubjectModalLabel" aria-hidden="true">
+		      <div class="modal-dialog">
+		        <div class="modal-content">
+		          <div class="modal-header">
+		            <h5 class="modal-title" id="dropoutSubjectModalLabel">{% trans "study_details_subject_action_choice_title" %}</h5>
+		            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'study_details_close' %}"></button>
+		          </div>
+		          <form name="removeForm" action="{%url 'details' study_name=meta_data.name %}" method="POST">
+		            {% csrf_token %}
+		            <div class="modal-body">
+		              {% if has_eligible_subjects %}
+		              <div class="form-group required mb-4">
+						{{remove_subjects_form.subject_to_remove}}
+		                <label  for="{{ remove_subjects_form.subject_to_remove.id_for_label }}">
+		                  {% trans "study_details_subject_id" %} <span class="text-danger">*</span>
+		                </label>
+		                
+		              </div>
+		              <!-- <div class="form-group mb-4">
+		                <label class="subject-dropout-label" for="dropoutDate">
+		                  {% trans "study_details_dropout_date" %} <span class="text-danger">*</span>
+		                </label>
+		                <input id="dropoutDate" class="form-control" type="date" name="dropout_date" value="{% now 'Y-m-d' %}" required>
+		              </div> -->
+		              <div class="form-group required mb-4">
+		                
+		                <select id="dropoutReason" class="form-control" name="dropout_reason" required>
+		                  <option value="" selected disabled>{% trans "study_details_select_reason_placeholder" %}</option>
+		                  <option value="withdrawn">{% trans "study_details_dropout_reason_withdrawn" %}</option>
+		                  <option value="lost_follow_up">{% trans "study_details_dropout_reason_lost_follow_up" %}</option>
+		                  <option value="technical_issue">{% trans "study_details_dropout_reason_technical_issue" %}</option>
+		                  <option value="other">{% trans "study_details_dropout_reason_other" %}</option>
+		                </select>
+						<label for="dropoutReason">
+		                  {% trans "study_details_dropout_reason" %} <span class="text-danger">*</span>
+		                </label>
+		              </div>
+		              <input name="remove_subjects" value="Remove" type="hidden"/>
+		              {% else %}
+		              <span class="study-no-subjects-message">{% trans "study_details_no_subjects_available" %}</span>
+		              {% endif %}
+		            </div>
+		            <div class="modal-footer">
+		              <button type="button" class="btn btn-secondary" onclick="backToSubjectActionModalFromRemoveForm()">{% trans "study_details_back" %}</button>
+		              {% if has_eligible_subjects %}
+		              <button type="button" class="btn btn-primary" onclick="confirmDropoutSubject(event)">
+		                {% trans "study_details_confirm_dropout" %}
+		              </button>
+		              {% endif %}
+		            </div>
+		          </form>
+		        </div>
+		      </div>
+		    </div>
+		    {% endif %}
+		    <div class="modal fade" id="subjectActionModal" tabindex="-1" aria-labelledby="subjectActionModalLabel" aria-hidden="true">
+		      <div class="modal-dialog modal-lg">
+		        <div class="modal-content">
+	          <div class="modal-header">
+	            <h5 class="modal-title" id="subjectActionModalLabel">{% trans "study_details_subject_action_choice_title" %}</h5>
+	            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'study_details_close' %}"></button>
+	          </div>
+	          <div class="modal-body">
+	            <p class="mb-4">{% trans "study_details_subject_action_choice_question" %}</p>
+	            <button type="button" class="subject-action-choice" onclick="openRemoveSubjectFormModal()">
+	              <span class="subject-action-choice-title">{% trans "study_details_subject_action_keep_data_title" %}</span>
+	              <span class="subject-action-choice-copy">{% trans "study_details_subject_action_keep_data_copy" %}</span>
+	            </button>
+	            <button type="button" class="subject-action-choice subject-action-choice-danger" onclick="openDeleteSubjectDataFormModal()">
+		              <span class="subject-action-choice-title">{% trans "study_details_subject_action_delete_data_title" %}</span>
+		              <span class="subject-action-choice-copy">{% trans "study_details_subject_action_delete_data_copy" %}</span>
+		            </button>
+		          </div>
+		        </div>
+		      </div>
+		    </div>
+	    <div class="modal fade" id="deleteDataModal" tabindex="-1" aria-labelledby="deleteDataModalLabel" aria-hidden="true">
+	      <div class="modal-dialog modal-lg">
+	        <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title" id="deleteDataModalLabel">{% trans "study_details_delete_subject_data" %}</h5>
+            <h5 class="modal-title" id="deleteDataModalLabel">
+              {% trans "study_details_delete_subject_data" %}: <span id="deleteDataModalSubjectTitle"></span><span id="deleteDataModalReasonTitle"></span>
+            </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'study_details_close' %}"></button>
           </div>
-          <form id ="deletedataForm" action="{%url 'details' study_name=meta_data.name %}" method="POST">
+          <form id ="deletedataForm" name="deletedataForm" action="{%url 'details' study_name=meta_data.name %}" method="POST" onsubmit="return delete_subject_data(event)">
               {% csrf_token %}
-          <div class="modal-body">
-              <div class="input-group mb-3">
-                <label id="label-subject" class="control-label"> </label>
-                </div>
-              <div class="input-group mb-3">
-                  <input class="form-control" id="subjectId"
-                  name="subjectId"  placeholder="{% trans 'study_details_subject_ids_to_delete' %}" required>
-              </div>
-          </div>
-          <div class="modal-footer">
-            <input name= "delete_subject_data" value="{% trans 'study_details_delete_data_confirm' %}" type="submit" class="btn btn-danger" onclick="delete_subject_data()" >
+              <input type="hidden" name="delete_subject_data" value="1">
+	          <div class="modal-body">
+	              {% if has_eligible_subjects %}
+	              <div class="form-group required mb-4 subject-chip-field"
+	                data-filter-placeholder="{% trans 'study_details_filter_subjects' %}"
+	                data-clear-label="{% trans 'study_details_clear_all_subjects' %}"
+	                data-remove-label="{% trans 'study_details_remove_selection' %}">
+	                <select
+	                  id="deleteDataSubjectSelect"
+	                  class="form-control"
+	                  name="delete_subject_select"
+	                  multiple
+	                  size="6"
+	                  required
+	                  onchange="updateDeleteSubjectSelectionFromSelect()">
+	                  <option value="" selected disabled>{% trans "study_details_select_subject_placeholder" %}</option>
+	                  {% for subject_id, subject_rows in d.items %}
+	                  <option value="{{subject_id}}">{{subject_id}}</option>
+	                  {% endfor %}
+	                </select>
+	                <label for="deleteDataSubjectSelect">
+	                  {% trans "study_details_subject_ids_to_delete" %} <span class="text-danger">*</span>
+	                </label>
+	              </div>
+				  <div class="form-group required mb-4">
+		                
+		                <select id="deleteDataReason" class="form-control" name="dropout_reason" required onchange="updateDeleteSubjectReasonSelection()">
+		                  <option value="" selected disabled>{% trans "study_details_select_reason_placeholder" %}</option>
+		                  <option value="withdrawn">{% trans "study_details_dropout_reason_withdrawn" %}</option>
+		                  <option value="lost_follow_up">{% trans "study_details_dropout_reason_lost_follow_up" %}</option>
+		                  <option value="technical_issue">{% trans "study_details_dropout_reason_technical_issue" %}</option>
+		                  <option value="other">{% trans "study_details_dropout_reason_other" %}</option>
+		                </select>
+						<label for="deleteDataReason">
+		                  {% trans "study_details_dropout_reason" %} <span class="text-danger">*</span>
+		                </label>
+		              </div>
+	              <div class="subject-activation-summary mb-3">
+	                <div class="subject-activation-summary-title">{% trans "study_details_qr_activations_and_status" %}</div>
+	                <div id="deleteDataActivationList" class="subject-activation-list"></div>
+	              </div>
+	              <div class="subject-removal-warning mb-3">
+	                <p>
+	                  {% trans "study_details_delete_data_warning_subject_prefix" %}
+	                  <strong id="deleteDataWarningSubject"></strong>
+	                  {% trans "study_details_delete_data_warning_subject_suffix" %}
+	                </p>
+	                <p>{% trans "study_details_delete_subject_data_qr_reuse_note" %}</p>
+	              </div>
+	              <div class="form-check subject-removal-confirm-check mb-3">
+	                <input
+	                  id="deleteDataTerms"
+	                  class="form-check-input"
+	                  type="checkbox"
+	                  required
+	                  onchange="updateDeleteSubjectDataSubmitState()">
+	                <label class="form-check-label" for="deleteDataTerms">
+	                  {% trans "study_details_delete_data_terms" %} <span class="text-danger">*</span>
+	                </label>
+	              </div>
+	              <span id="deleteDataConfirmInstruction" class="subject-confirm-instruction"></span>
+	              <div class="form-group required mb-3">
+	                <input
+	                  class="form-control"
+	                  id="subjectId"
+	                  name="subjectId"
+	                  autocomplete="off"
+	                  oninput="updateDeleteSubjectDataSubmitState()"
+	                  required>
+	                <label for="subjectId">{% trans "study_details_subject_id" %} <span class="text-danger">*</span></label>
+	              </div>
+	              {% else %}
+	              <span class="study-no-subjects-message">{% trans "study_details_no_subjects_available" %}</span>
+	              {% endif %}
+	          </div>
+	          <div class="modal-footer">
+		            <button id="deleteDataBackButton" type="button" class="btn btn-secondary" onclick="backToSubjectActionModalFromDeleteData()">{% trans "study_details_back" %}</button>
+	            {% if has_eligible_subjects %}
+	            <button
+	              id="deleteDataSubmitButton"
+	              type="button"
+	              class="btn btn-danger"
+	              onclick="delete_subject_data(event)"
+	              disabled>
+	              {% trans "study_details_delete_data_confirm" %}
+	            </button>
+	            {% endif %}
           </div>
           </form>
         </div>
       </div>
     </div>
-      <div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
+      <div class="modal fade" id="removeSubjectConfirmModal" tabindex="-1" aria-labelledby="removeSubjectConfirmModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
           <div class="modal-content">
             <div class="modal-header">
-              <h5 class="modal-title" id="exampleModalLabel">{% trans "study_details_remove_subject" %}</h5>
+              <h5 class="modal-title" id="removeSubjectConfirmModalLabel">{% trans "study_details_remove_subject_confirm_title" %}</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'study_details_close' %}"></button>
-            </div>
-            <div class="modal-body">
-                {% trans "study_details_confirm_remove_subject" %}
-            </div>
+	            </div>
+	            <div class="modal-body">
+	              <p class="mb-3">{% trans "study_details_remove_subject_confirm_body" %}</p>
+	              <div class="subject-removal-summary mb-3">
+	                <div class="subject-removal-summary-row">
+	                  <span>{% trans "study_details_subject_id" %}</span>
+	                  <strong id="removeConfirmSubjectId"></strong>
+	                </div>
+	                <div class="subject-removal-summary-row">
+	                  <span>{% trans "study_details_dropout_reason" %}</span>
+	                  <strong id="removeConfirmReason"></strong>
+	                </div>
+	              </div>
+	              <div class="subject-removal-warning subject-removal-warning-neutral">
+	                {% trans "study_details_remove_subject_keep_data_warning" %}
+	              </div>
+	            </div>
             <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans "study_details_close" %}</button>
-              <input type="button"  value="{% trans 'study_details_confirm' %}" type="submit" class="btn btn-primary" onclick="remove_subject()" >
+              <button type="button" class="btn btn-secondary" onclick="backToRemoveSubjectFormModal()">{% trans "study_details_back" %}</button>
+              <button type="button" class="btn btn-primary" onclick="remove_subject()">
+                {% trans "study_details_confirm_remove_keep_data" %}
+              </button>
             </div>
           </div>
         </div>
@@ -237,22 +1029,14 @@
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'study_details_close' %}"></button>
             </div>
             <div class="modal-body">
-              {% trans "study_details_confirm_close_study" %}
+              <div class="study-info-note mb-0" role="alert">
+                {% trans "study_details_confirm_close_study" %}
+              </div>
             </div>
             <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans "study_details_close" %}</button>
               <input type="button"  value="{% trans 'study_details_confirm' %}" type="submit" class="btn btn-primary" onclick="close_study()" >
             </div>
           </div>
-        </div>
-      </div>
-      <!-- Simple loading modal -->
-      <div id="loading-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:9999;">
-        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-                    background:#fff; padding:20px 28px; border-radius:12px; min-width:260px; text-align:center;">
-          <div class="spinner-border" role="status" aria-hidden="true"></div>
-          <div style="margin-top:12px; font-weight:600;">{% trans "study_details_generating_zip" %}</div>
-          <div style="font-size:12px; opacity:.7; margin-top:4px;">{% trans "study_details_take_a_moment" %}</div>
         </div>
       </div>
       <div class="row mx-0 mb-4">
@@ -268,231 +1052,280 @@
           </li>
           </ul>
       </div> 
-      <div class="row">
-        <div class="d-flex justify-content-between align-items-center">
-          <div class="d-flex justify-content-start align-items-center">
-               {% if request.user|can_manage_study %}
-            <h3><a class="edit" name="edit_study" title="Edit" href="{% url 'edit_study' study_name=meta_data.name %}"  >
-              <i class="fas fa-pencil-alt"></i></a>{{meta_data.name}} </h3>
-            {% else %}
-            <h3>{{meta_data.name}}</h3>
-            {% endif %}
-          </div>
-           {% if request.user|can_manage_study %}
-          <a class="btn btn-outline-primary" href="{% url 'qc_study' study_name=meta_data.name %}" >{% trans "global_qc" %}</a>
-          {% endif %}
-      </div>
-          
-          <div class="col-xs-12 col-sm-9 justify-content-end d-flex" >
-              
-            {% if messages %}
-            <ul class="messages">
-                {% for message in messages %}
-                <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
-                {% endfor %}
-            </ul>
-            {% endif %}
-              
-                
-          </div>
-      </div>
-      <div class="row mx-0 ">
-        <div class="col-xs-12 col-sm-4" style="background-color: lightgray;">
-          <div class="card-body">
-            
-              <h6 class="heading-small text-muted mb-4">{% trans "study_details_information" %}</h6>
-              <div class="pl-lg-4">
-                <div class="row">
-                    <div class="col-lg-4">
-                        <label class="form-label" >{% trans "study_duration" %}</label>
-                    </div>
-                    <div class="col-lg-4">
-                      <p> {{meta_data.duration}} {% trans "study_days" %}</p>
-                  </div>
-                </div>
-                <div class="row"> 
-                    <div class="col-lg-4">
-                      <label class="form-control-label" >{% trans "index_overview9" %}</label>
-                    </div>
-                      <div class="col-lg-4">
-                        {% for sensor in meta_data.sensor_list %}
-                        <p> {{sensor}}</p>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% if  meta_data.sensor_list_limited %}
-                <div class="row">
-                  <div class="col-lg-4">
-                    <label class="form-control-label" >{% trans "study_active_sensors" %}</label>
-                  </div>
-                    <div class="col-lg-4">
-                      {% for sensor in meta_data.sensor_list_limited %}
-                      <p> {{sensor}}</p>
-                      {% endfor %}
-                  </div>
-                </div>
-                {% endif %}
-                {% if meta_data.wearables %}
-                  <div class="row">
-                    <div class="col-lg-4">
-                      <label class="form-control-label">Wearables</label>
-                    </div>
-                    <div class="col-lg-4">
-                      {{ meta_data.wearables|get_wearable_sensor_lines|safe }}
-                    </div>
-                  </div>
-                  {% endif %}
+	      <div class="row mx-0">
+	        <div class="col-12">
+	          {% if messages %}
+	          <ul class="messages">
+	              {% for message in messages %}
+	              <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+	              {% endfor %}
+	          </ul>
+	          {% endif %}
 
-                  {% if meta_data.survey and meta_data.survey.id %}
-  <div class="row">
-    <div class="col-lg-4">
-      <label class="form-control-label">{% trans "study_sel_ema" %}</label>
-    </div>
+		          <section class="study-details-shell">
+		            <div class="study-details-header">
+		              <div class="study-details-summary">
+		                <div class="study-details-title">
+		                  {% if request.user|can_manage_study %}
+		                  <h3><a class="edit" name="edit_study" title="Edit" href="{% url 'edit_study' study_name=meta_data.name %}">
+		                    <i class="fas fa-pencil-alt"></i>
+		                  </a></h3>
+		                  {% endif %}
+		                  <h3>{{meta_data.name}}</h3>
+		                  <span class="study-details-duration-badge">
+		                    {% trans "study_details_duration_short" %}: {{meta_data.duration}} {% trans "study_days" %}
+		                  </span>
+		                  <button
+		                    type="button"
+		                    name="study_data_download"
+		                    class="btn btn-primary btn-sm"
+		                    data-bs-toggle="modal"
+		                    data-bs-target="#downloadStudyDataModal"
+		                    title="{% trans 'study_details_download_data' %}">
+		                    <i class="bi bi-cloud-arrow-down-fill" aria-hidden="true"></i>
+		                    {% trans "study_details_download_data" %}
+		                  </button>
+		                </div>
+		                {% if meta_data.description %}
+		                <p class="study-details-description">{{meta_data.description}}</p>
+		                {% endif %}
+				<div class="study-members-sensors-row">
+				<div class="study-members-summary">
+				  <div class="study-members-summary-label">
+				    <span>{% trans "study_details_members_assigned" %}</span>
+				    <span class="study-sensor-count">{{ meta_data.member_count|default:0 }}</span>
+				  </div>
+				  <button
+				    type="button"
+				    class="btn btn-outline-primary btn-sm"
+				    data-bs-toggle="modal"
+				    data-bs-target="#studyMembersModal"
+				    title="{% trans 'study_details_view_members' %}"
+				    aria-label="{% trans 'study_details_view_members' %}">
+				    <i class="bi bi-people" aria-hidden="true"></i>
+				  </button>
+				</div>
+				                <div class="study-sensor-summary">
+				                  <div class="study-sensor-button-line">
+				                    {% if meta_data.sensor_list %}
+				                    <button
+				                      class="study-sensor-toggle collapsed"
+				                      type="button"
+				                      data-bs-toggle="collapse"
+				                      data-bs-target="#allSensorsPanel"
+				                      aria-expanded="false"
+				                      aria-controls="allSensorsPanel">
+				                      <span>{% trans "study_details_sensor_list" %}</span>
+				                      <span class="study-sensor-toggle-meta">
+				                        <span class="study-sensor-count">{{ meta_data.sensor_list|length }}</span>
+				                        <i class="fas fa-chevron-down"></i>
+				                      </span>
+				                    </button>
+				                    {% endif %}
 
-    <div class="col-lg-4">
-      {% if meta_data.survey.id == '999' %}
-        <a href="{% url 'edit_survey' study_name=meta_data.name %}">
-          <input type="button"
-                 name="edit_survey"
-                 value="{% trans 'study_details_survey_info' %}"
-                 class="btn btn-primary">
-        </a>
-      {% elif meta_data.survey.id %}
-        <a type="button"
-           href="{% url 'create_survey' survey_id=meta_data.survey.id %}"
-           class="btn btn-primary btn-sm"
-           data-bs-toggle="tooltip">
-          {% trans "study_details_survey_info" %}
-        </a>
-      {% else %}
-        <a type="button"
-           href="{% url 'create_survey' %}"
-           class="btn btn-primary btn-sm"
-           data-bs-toggle="tooltip">
-          {% trans "study_details_survey_info" %}
-        </a>
-      {% endif %}
-    </div>
-  </div>
-{% endif %}
+				                    {% if meta_data.sensor_list_limited %}
+				                    <button
+				                      class="study-sensor-toggle collapsed"
+				                      type="button"
+				                      data-bs-toggle="collapse"
+				                      data-bs-target="#activeSensorsPanel"
+				                      aria-expanded="false"
+				                      aria-controls="activeSensorsPanel">
+				                      <span>{% trans "study_details_sensor_list_limited" %}</span>
+				                      <span class="study-sensor-toggle-meta">
+				                        <span class="study-sensor-count">{{ meta_data.sensor_list_limited|length }}</span>
+				                        <i class="fas fa-chevron-down"></i>
+				                      </span>
+				                    </button>
+				                    {% endif %}
 
-              </div>               
-          </div>
-          <hr class="my-4">
-          <div class="card-body">           
-              <h6 class="heading-small text-muted mb-4">{% trans "study_details_subjects_information" %}</h6>
-              <div class="pl-lg-4">
-                  <div class="row">
-                      <div class="col-lg-7">
-                          <label class="form-label" >{% trans "study_details_total_number_of_subjects" %}</label>
-                      </div>
-                      <div class="col-lg-2">
-                        <div> {{total_count}}</div>
-                    </div>
-                  </div>
-                  <div class="row"> 
-                      <div class="col-lg-7">
-                        <label class="form-control-label" >{% trans "study_details_number_of_enrolled_subjects" %}</label>
-                      </div>
-                        <div class="col-lg-2">
-                          <div> {{meta_data.number_of_enrolled_subjects}}</div>
-                      </div>
-                  </div>
-                
-                  <div class="row">
-                     {% if request.user|can_manage_study %}
-                    <form name="createSubjectForm"  class="row row-cols-lg-auto g-3 align-items-center" action="{%url 'details' study_name=meta_data.name %}" method="POST">
-                      {% csrf_token %}
-                      <div class="col-12">
-                        {{new_subjects_form}}
-                      </div>  
-                      <div class="col-12">
-                        <input name="create_subjects" type="submit" value="{% trans 'study_details_create' %}" class="btn btn-primary" role="button" />
-                      </div>
-                      
-                    </form>
-                    {% endif %}
-                  </div>     
-              </div>
-              
-          </div>
-          <hr class="my-4">
-                {% if request.user|can_manage_study %}
-          <div class="card-body">
-                <h6 class="heading-small text-muted mb-4">{% trans "study_details_remove_subject" %}</h6>
-                <div class="pl-lg-4">
-                  <form name="removeForm" class="row row-cols-lg-auto g-3 align-items-center" action="{%url 'details' study_name=meta_data.name %}" method="POST">
-                    {% csrf_token %}
-                    <div class="col-12">
-                      {{remove_subjects_form}}
-                    </div>
-                    <input name="remove_subjects" value="Remove" type="hidden"/>
-                    <div class="col-12">
-                      <a  href="#"  type="submit"  value="{% trans 'study_details_remove' %}" class="btn
-                          btn-primary" data-bs-toggle="modal" data-bs-target="#exampleModal" > {% trans "study_details_remove" %}</a>
-                      
-                    </div>
-                  </form>   
-                </div>
-            </div>
-                {% endif %}
-            <hr class="my-4">
-            <div class="card-body">
-                  <h6 class="heading-small text-muted mb-4">{% trans "study_details_send_notification" %}</h6>
-                  <form action="{%url 'details' study_name=meta_data.name %}" method="POST">
-                    {% csrf_token %}
-                    {{notification_form.as_p}}
-                    <input type="button" value= "{% trans 'study_details_all_ids' %}" onclick="select_all_ids()"
-                     class="btn btn-secondary btn-block mb-4" role="button" name="all_id_submit"/>
-                     <input  type="button" value= "{% trans 'study_details_missing_ids' %}" onclick="select_missing_ids()" 
-                      name="missing_id_submit" role="button"  class="btn btn-warning btn-block mb-4"/>
-                    
-                    <!-- Submit button -->
-                    <p><input name="send_notification" type="submit" value="{% trans 'study_details_send_notification' %}" class="btn btn-primary" /></p>
-                  </form> 
-                  </div>
-              <hr class="my-4">
-               {% if request.user|can_manage_study %}
-              <div class="card-body">
-                  <h6 class="heading-small text-muted mb-4">{% trans "study_details_close_study" %}</h6>
-                  <form name="closeForm" action="{%url 'close' study_name=meta_data.name %}" method="POST">
-                    {% csrf_token %}
-                  <input name="close" type="button" value="{% trans 'study_details_close_study' %}"
-                  class="btn btn-danger btn-block mb-4" role="button"
-                  data-bs-toggle="modal" data-bs-target="#closeModal" />
-                </form>
-                </div>
-              {% endif %}
-        </div>
-        <div class="col-xs-12 col-sm-8 ">
-              <div class="row mb-4 justify-content-end d-flex">
-                <div class="col-xs-12 col-sm-9">
-                  <!--- <input name="generate_files" type="submit" 
-                  role="button" value="Generate CSV files" class="btn btn-outline-primary btn-block mb-8"
-                  data-toggle="modal" data-target="#confirmationModal" /> !-->
-                  <div class="study-info-note mb-3" role="alert">
-                      {% trans "study_details_live_monitoring_data_info" %}
-                    </div>
-                </div>
-                <div class="col-xs-12 col-sm-3">
-                  <a href="{%url 'details' study_name=meta_data.name %}" data-bs-toggle="tooltip" title="{% trans 'study_details_refresh' %}">
-                    <img src="{% static 'icons/refresh-64.png' %}" height="35"></a>
-                  
-                  <a name="user_unused_sheet" href="{%url 'download' arg=meta_data.name  %}" data-bs-toggle="tooltip" title="{% trans 'study_details_download_unused_user_sheets' %}" download >
-                    <img src="{% static 'icons/icon-pdf-100.png' %}" height="35"></a>
-                  <a name="study_data_download" data-bs-toggle="modal" data-bs-target="#downloadStudyDataModal" data-bs-toggle="tooltip" title="{% trans 'study_details_download_data' %}">
-                    <img src="{% static 'icons/download-128.png' %}" height="35"></a>
-                   {% if request.user|can_manage_study %}
-                  <button type="button" class="btn "  data-bs-toggle="modal"
-                      data-bs-target="#deleteDataModal" data-bs-toggle="tooltip" title="{% trans 'global_delete' %}" id="delete_subjects" onclick="form_innerhtml_modal()">
-                    <img src="{% static 'icons/remove-data-100.png' %}" height="35"> </button>
-                     {% endif %}
-                </div>
-                
+				                    {% if meta_data.wearables %}
+				                    <button
+				                      class="study-sensor-toggle collapsed"
+				                      type="button"
+				                      data-bs-toggle="collapse"
+				                      data-bs-target="#wearablesSensorPanel"
+				                      aria-expanded="false"
+				                      aria-controls="wearablesSensorPanel">
+				                      <span>{% trans "study_details_wearables" %}</span>
+				                      <span class="study-sensor-toggle-meta">
+				                        <span class="study-sensor-count">{{ meta_data.wearables|length }}</span>
+				                        <i class="fas fa-chevron-down"></i>
+				                      </span>
+				                    </button>
+				                    {% endif %}
 
-                
-              </div>
-              <div class="row" style="display: none;">
+				                    {% if meta_data.survey %}
+				                      {% if meta_data.survey.id %}
+				                      <a class="btn btn-outline-primary btn-sm study-ema-link-button" href="{% url 'create_survey' survey_id=meta_data.survey.id %}">
+				                        EMA
+				                      </a>
+				                      {% elif request.user|can_manage_survey %}
+				                      <a class="btn btn-outline-primary btn-sm study-ema-link-button" href="{%url 'edit_survey' study_name=meta_data.name %}">
+				                        EMA
+				                      </a>
+				                      {% endif %}
+				                    {% endif %}
+				                  </div>
+
+				                  {% if meta_data.sensor_list %}
+				                  <div class="collapse" id="allSensorsPanel">
+				                    <div class="study-sensor-panel">
+				                      {% for sensor in meta_data.sensor_list %}
+			                      <span class="study-sensor-chip">{{sensor}}</span>
+			                      {% endfor %}
+				                    </div>
+				                  </div>
+				                  {% endif %}
+
+				                  {% if meta_data.sensor_list_limited %}
+				                  <div class="collapse" id="activeSensorsPanel">
+				                    <div class="study-sensor-panel">
+				                      {% for sensor in meta_data.sensor_list_limited %}
+			                      <span class="study-sensor-chip">{{sensor}}</span>
+			                      {% endfor %}
+			                    </div>
+			                  </div>
+				                  {% endif %}
+
+				                  {% if meta_data.wearables %}
+				                  <div class="collapse" id="wearablesSensorPanel">
+				                    <div class="study-sensor-panel study-sensor-panel-text">
+				                      {{ meta_data.wearables|get_wearable_sensor_lines|safe }}
+			                    </div>
+			                  </div>
+			                  {% endif %}
+			                </div>
+				</div>
+			              </div>
+
+		              <div class="study-details-actions">
+		                {% if request.user|can_manage_study %}
+		                <a class="btn btn-outline-primary" href="{% url 'qc_study' study_name=meta_data.name %}">
+		                  {% trans "global_qc" %}
+		                </a>
+		                <form name="closeForm" class="study-details-inline-form" action="{%url 'close' study_name=meta_data.name %}" method="POST">
+		                  {% csrf_token %}
+		                  <input
+		                    name="close"
+		                    type="button"
+		                    value="{% trans 'study_details_close_study' %}"
+		                    class="btn btn-outline-danger"
+		                    role="button"
+		                    data-bs-toggle="modal"
+		                    data-bs-target="#closeModal" />
+		                </form>
+		                {% endif %}
+			              </div>
+			</div>
+		  </section>
+
+		  <div class="study-subject-toolbar">
+		    <div class="study-subject-summary-content">
+		    <div class="study-summary-card-heading">
+		      <div class="study-summary-card-title-line">
+		        <div class="study-summary-card-title">{% trans "study_details_subjects_information" %}</div>
+		        <span class="study-summary-inline-metric">
+		          {% trans "study_details_enrolled_short" %}: {{ meta_data.number_of_enrolled_subjects|default:0 }}
+		        </span>
+		      </div>
+		      <span class="study-summary-corner-metric">
+		        {% trans "study_details_total_number_of_subjects" %}: {{ total_count }}
+		      </span>
+		    </div>
+		    {% with stats=meta_data.stats %}
+		    <div class="study-subject-status-grid">
+		      <div class="study-subject-status-item study-subject-status-item--active">
+		        <span class="study-subject-status-label">{% trans "study_details_subjects_in_study" %}</span>
+		        <span class="study-subject-status-value">{{ stats.instudy|default:0 }}</span>
+		      </div>
+		      <div class="study-subject-status-item study-subject-status-item--left">
+		        <span class="study-subject-status-label">{% trans "study_details_subjects_left" %}</span>
+		        <span class="study-subject-status-value">{{ stats.leftstudy|default:0 }}</span>
+		      </div>
+		      <div class="study-subject-status-item study-subject-status-item--removed">
+		        <span class="study-subject-status-label">{% trans "study_details_subjects_removed" %}</span>
+		        <span class="study-subject-status-value">{{ stats.removed|default:0 }}</span>
+		      </div>
+		      <div class="study-subject-status-item study-subject-status-item--completed">
+		        <span class="study-subject-status-label">{% trans "study_details_subjects_completed" %}</span>
+		        <span class="study-subject-status-value">{{ stats.completed|default:0 }}</span>
+		      </div>
+		    </div>
+		    {% endwith %}
+		    </div>
+
+		    <div class="study-table-toolbar">
+					<div class="study-table-tools study-table-tools--subjects">
+		              <a
+		                name="user_unused_sheet"
+		                href="{% url 'download' arg=meta_data.name %}"
+		                class="btn btn-primary btn-sm"
+		                data-bs-toggle="tooltip"
+		                title="{% trans 'study_details_download_unused_user_sheets' %}"
+		                data-jdash-file-download
+		                data-loading-message="{{ study_details_preparing_file_download|escape }}"
+		                data-download-filename="unused-sheets.zip"
+		                download>
+		                <i class="bi bi-download"></i>
+		                <i class="bi bi-qr-code"></i>
+		              </a>
+						{% if request.user|can_manage_study %}
+		              <button
+		                type="button"
+		                class="btn btn-outline-primary btn-sm"
+		                data-bs-toggle="modal"
+		                data-bs-target="#createSubjectModal">
+		                {% trans "study_details_create" %}
+		              </button>
+		              <button
+		                type="button"
+		                class="btn btn-outline-danger btn-sm study-remove-subject-button"
+		                title="{% trans 'study_details_subject_action_choice_title' %}"
+		                onclick="openSubjectActionModal(event)">
+		                {% trans "study_details_remove_subject" %}
+		              </button>
+		              {% endif %}
+					</div>
+		            {% comment %}
+		            <div class="study-info-note mb-0" role="alert">
+		              {% trans "study_details_live_monitoring_data_info" %}
+		            </div>
+		            {% endcomment %}
+		            <div class="study-table-tools study-table-tools--data">
+		              {% if request.user|can_manage_study %}
+		              <button
+		                type="button"
+		                class="btn btn-outline-primary btn-sm"
+		                data-bs-toggle="modal"
+		                data-bs-target="#sendNotificationModal">
+		                {% trans "study_details_send_notification" %}
+		              </button>
+		              <button
+		                type="button"
+		                class="btn btn-outline-primary btn-sm"
+		                data-bs-toggle="modal"
+		                data-bs-target="#changeSubjectStatusModal">
+		                {% trans "study_details_change_status" %}
+		              </button>
+		              {% endif %}
+		              <a href="{%url 'details' study_name=meta_data.name %}" data-bs-toggle="tooltip" 
+					  title="{% trans 'study_details_refresh' %}">
+		                <img src="{% static 'icons/refresh-64.png' %}" height="35"></a>
+		              <a
+		                href="{% url 'export_study_csv' study_name=meta_data.name %}"
+		                data-bs-toggle="tooltip"
+		                title="{% trans 'study_details_export_csv' %}"
+		                data-jdash-file-download
+		                data-loading-message="{{ study_details_preparing_file_download|escape }}"
+		                data-download-filename="jutrack_dashboard_{{ meta_data.name }}.csv"
+		                download>
+		                <img src="{% static 'icons/export-csv.png' %}" height="35" alt="{% trans 'study_details_export_csv' %}"></a>
+		            </div>
+		    </div>
+		  </div>
+
+	          <div class="row" style="display: none;">
                 <div class="col-xs-12 col-sm-6">
                       <ul>
                         <li class="text-danger">{% trans "study_details_no_data_2_days" %}</li>
@@ -514,7 +1347,7 @@
               </div>
               
               
-             <div>
+	          <div>
               
                     <table id ="metadata_table" class=" table table-responsive"  
                     data-show-header="true" 
@@ -534,27 +1367,27 @@
                     data-response-handler="responseHandler">
                         <thead class="table-dark">
                           <tr >
-
-                            <th data-field="subject_id" data-filter-control="input" rowspan="2">{% trans "study_details_subject_id" %}</th>
+                                              
+                            <th data-field="subject_id" data-filter-control="input" rowspan="2">{% trans "study_details_subject_id" %}</th>                             
                             <th data-field="appName" data-filter-control="select" rowspan="2">{% trans "study_details_app" %}</th>
-
+                                                                         
                             <th data-field="duration" data-filter-control="input" rowspan="2">{% trans "study_duration" %}</th>
-                            <th data-field="sensor_info" data-filter-control="select" data-filter-data="var:sensorFilterDefaults" data-filter-strict-search="false" data-filter-custom-search="sensorInfoFilterSearch" rowspan="2">{% trans "study_details_sensor_information" %}</th>
-
+                            <th data-field="sensor_info" data-filter-control="select" data-filter-data="var:sensorFilterDefaults" data-filter-strict-search="false" data-filter-custom-search="sensorInfoFilterSearch" rowspan="2">{% trans "study_details_sensor_information" %}</th> 
+                             
                             <th data-field="status" data-filter-control="select" data-filter-data="var:filterDefaults" data-filter-strict-search="false" rowspan="2">{% trans "study_details_status" %}</th>
-
+                            
                             {% if meta_data.sensor_size > 0  %}
-
+                            
                             <th colspan = '{{ meta_data.sensor_size |add:9  }}' data-visible="false">{% trans "study_details_more_details" %}</th>
                             {% else%}
-
+                            
                             <th colspan = '9' data-visible="false">{% trans "study_details_more_details" %}</th>
                             {% endif %}
-
+                              
                           </tr>
                           <tr >
                             <th data-field="device_id"  data-visible="false">{% trans "study_details_device_id" %}</th>
-                            <th data-field="date_registered"  data-visible="false">{% trans "study_details_date_registered" %}</th>
+                            <th data-field="date_registered"  data-visible="false">{% trans "study_details_date_registered" %}</th> 
                             <th data-field="date_left_study" data-visible="false">{% trans "study_details_date_left_study" %}</th>
                             <th data-field="n_batches_ema" data-visible="false">{% trans "study_details_n_batches_ema" %}</th>
                             <th data-field="last_time_received_ema" data-visible="false">{% trans "study_details_last_time_received_ema" %}</th>
@@ -565,22 +1398,22 @@
                             {% for sensor in meta_data.dashboard_sensor_list %}
                             <th data-field='n_batches_{{sensor}}' data-visible="false">n_batches_{{sensor}}</th>
                             <th data-field='last_time_received_{{sensor}}' data-visible="false">last_time_received_{{sensor}}</th>
-                            {% endfor %}
+                            {% endfor %} 
                           </tr>
-                        </thead>
+                        </thead>                       
                           <!-- looping through the json array -->
                           <tbody>
                           {% for k,v in d.items %}
                           <tr class="group" >
                             <td colspan="5">
-                            <input class="form-check-input" type="checkbox" value="{{k}}" name="check-subject-id" >
-                            <a name='user_sheet' download href="{%url 'download' arg=k  %}" >{{k}}</a></td>
-
+                            <!-- <input class="form-check-input" type="checkbox" value="{{k}}" name="check-subject-id" > -->
+                            <a name='user_sheet' download href="{%url 'download' arg=k  %}" >{{k}}<img src="{% static 'icons/icon-qr-code.png' %}" alt="Download" width="20" height="20"></a></td>
+                            
                           </tr>
-
+                          
                             {% for i in v %}
-                              <tr colspan="5" >
-
+                              <tr colspan="5" > 
+                                                            
                                 <td data-field="subject_id" data-filter-control="input" >{{i.subject_name}} </td>
                                 <td data-field="appName" >{{i.app}}</td>
                                 <td data-field="duration" data-filter-control="input">{{i.time_in_study}}</td>
@@ -598,11 +1431,11 @@
                                 {% for sensor in meta_data.dashboard_sensor_list %}
                                 <td data-field='n_batches_{{sensor}}' data-visible="false">{{i | get_n_batches:sensor|safe}}</td>
                                 <td data-field='last_time_received_{{sensor}}' data-visible="false">{{i | get_last_time_received:sensor|safe}}</td>
-                                {% endfor %}
-
+                                {% endfor %}    
+                                       
                               </tr>
-
-
+                             
+                              
                               {% endfor %}
                             {% endfor %}
                             </tbody>

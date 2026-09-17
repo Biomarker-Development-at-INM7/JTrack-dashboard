@@ -1,7 +1,10 @@
 import logging
 
+from django.db import transaction
+from django.db.models import Max
 from jdash.config import constants as constants
 from jdash.exceptions.controllerexceptions import controller_error_message
+from jdash.models import Question, Survey as SurveyModel
 from jdash.repositories.survey_repository import (
     create_categories_in_db_from_data,
     create_new_survey_in_db,
@@ -34,6 +37,15 @@ from jdash.utils.utils import get_survey_list
 
 logger = logging.getLogger("django")
 
+def _next_question_sort_id_for_update(survey_id):
+    SurveyModel.objects.select_for_update().get(pk=survey_id)
+    max_sort_id = (
+        Question.objects
+        .filter(survey_id=survey_id)
+        .aggregate(max_sort_id=Max("sortId"))
+        .get("max_sort_id")
+    )
+    return (max_sort_id or 0) + 1
 
 def get_all_survey_details(user, session_key):
     """
@@ -261,12 +273,13 @@ def duplicate_and_create_new_question_id(survey_id, source_question_id):
     Duplicate a question and its answers within the selected survey.
     """
     try:
-        questions_of_survey = retrieve_all_questions_for_survey(survey_id)
         question_data = retrieve_question_details(source_question_id)
-        question_data["id"] = len(questions_of_survey) + 1
-        question = create_question_answers_in_db(survey_id, question_data)
-        new_sequence_id = len(questions_of_survey) + 1
-        Survey.update_question_order(question.id, new_sequence_id)
+        with transaction.atomic():
+            new_sequence_id = _next_question_sort_id_for_update(survey_id)
+            question_data["id"] = new_sequence_id
+            question_data["sortId"] = new_sequence_id
+            question = create_question_answers_in_db(survey_id, question_data)
+            Survey.update_question_order(question.id, new_sequence_id)
         return context_for_create_survey_page(survey_id)
     except Exception as exc:
         logger.exception(

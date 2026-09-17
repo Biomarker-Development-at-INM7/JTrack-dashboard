@@ -21,7 +21,7 @@ SECRETS_DIR = BASE_DIR / "secrets"
 
 load_dotenv(BASE_DIR / "secrets" / "tokens.env")
 
-LOG_FILENAME = os.path.join(os.getenv("LOG_DIR", ''),
+LOG_FILENAME = os.path.join(os.getenv("LOG_DIR", '/var/www/jdash.inm7.de/www/dashboard/logs'),
                 f"debug_{datetime.datetime.now().strftime('%Y-%m-%d')}.log")
 
 
@@ -173,7 +173,7 @@ LOGGING = {
     },
 
 }
-SSH_RUNTIME_DIR = os.getenv("SSH_RUNTIME_DIR", "")
+SSH_RUNTIME_DIR = os.getenv("SSH_RUNTIME_DIR", "/var/www/.ssh")
 MAINTENANCE_MODE = os.environ.get("MAINTENANCE_MODE", "False").lower() == "true"
 MAINTENANCE_ALLOWED_USERNAMES = [
     username.strip()
@@ -190,9 +190,9 @@ EMAIL_HOST_PASSWORD = os.environ['EMAIL_HOST_PASSWORD']
 
 STORAGE_FOLDER = os.getenv("STORAGE_FOLDER", "")
 DASH_FOLDER = os.getenv("DASH_FOLDER", "")
-FIREBASE_URL = os.getenv('FIREBASE_URL', '')
-FIREBASE_URL_EMA = os.getenv("FIREBASE_URL_EMA", "")
-FIREBASE_URL_MAIN = os.getenv("FIREBASE_URL_MAIN", "")
+FIREBASE_URL = os.getenv('FIREBASE_URL', 'https://fcm.googleapis.com/send')
+FIREBASE_URL_EMA = os.getenv("FIREBASE_URL_EMA", "https://fcm.googleapis.com/v1/projects/jtrackema/messages:send")
+FIREBASE_URL_MAIN = os.getenv("FIREBASE_URL_MAIN", "https://fcm.googleapis.com/v1/projects/jtrack-social/messages:send")
 SMTP_SERVER = os.getenv("SMTP_SERVER", EMAIL_HOST)
 SMTP_PORT = int(os.getenv("SMTP_PORT", str(EMAIL_PORT)))
 SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", EMAIL_HOST_USER)
@@ -203,18 +203,18 @@ REMOTE_USERNAME = os.getenv('REMOTE_USERNAME', 'mnarava')
 ANALYTICS_PIPELINE_REMOTE_SCRIPT = os.getenv("ANALYTICS_PIPELINE_REMOTE_SCRIPT", "")
 ANALYTICS_PIPELINE_SSH_KEY = os.getenv(
     "ANALYTICS_PIPELINE_SSH_KEY",
-    "",
+    "/var/www/.ssh/id_ed25519_pipeline",
 )
-JUSELESS_SCRIPT_FOLDER = os.getenv('JUSELESS_SCRIPT_FOLDER', '')
-JUSELESS_STUDIES_FOLDER = os.getenv('JUSELESS_STUDIES_FOLDER', '')
+JUSELESS_SCRIPT_FOLDER = os.getenv('JUSELESS_SCRIPT_FOLDER', '/data/project/JTrack/Scripts')
+JUSELESS_STUDIES_FOLDER = os.getenv('JUSELESS_STUDIES_FOLDER', '/data/project/JTrack/Studies')
 SERVICE_ACCOUNT_FILE_EMA = os.getenv(
     'SERVICE_ACCOUNT_FILE_EMA',
-    str(SECRETS_DIR / '')
-) or str(SECRETS_DIR / '')
+    str(SECRETS_DIR / 'jtrackema-firebase-adminsdk.json')
+) or str(SECRETS_DIR / 'jtrackema-firebase-adminsdk.json')
 SERVICE_ACCOUNT_FILE_MAIN = os.getenv(
     'SERVICE_ACCOUNT_FILE_MAIN',
-    str(SECRETS_DIR / '')
-) or str(SECRETS_DIR / '')
+    str(SECRETS_DIR / 'jtracksocial-firebase-adminsdk.json')
+) or str(SECRETS_DIR / 'jtracksocial-firebase-adminsdk.json')
  
 # Internationalization
 # https://docs.djangoproject.com/en/3.2/topics/i18n/

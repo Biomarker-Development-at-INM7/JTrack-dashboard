@@ -2,7 +2,7 @@ import os
 
 from django.conf import settings
 
-
+site_url = "https://jdash.inm7.de"
 studies = 'studies'
 archive = 'archive'
 users = 'users'
@@ -21,7 +21,7 @@ zip_file = 'sheets.zip'
 app_study_folder = 'Studies'
 download_folder = 'downloads'
 analytics_outputs_folder = "outputs"
-analytics_storage_folder = os.path.join('/mnt/jutrack_data', studies_bids)
+analytics_storage_folder = os.path.join(storage_folder, studies_bids)
 max_subjects_exp = 5
 number_of_activations = 4
 ema = 'ema'
@@ -33,3 +33,4 @@ download_zip_files_log = 'download_zip_files_log.csv'
 firebase_content_type = 'application/json'
 SCOPES = ['https://www.googleapis.com/auth/firebase.messaging']
 juseless_download_script_path = os.path.join(settings.JUSELESS_SCRIPT_FOLDER, 'download.py')
+subject_QR_code_url= "https://jdash.inm7.de?username=%s&studyid=%s"

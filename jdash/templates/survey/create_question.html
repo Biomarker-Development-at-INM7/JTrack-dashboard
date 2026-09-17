@@ -33,7 +33,7 @@
       </div>
 
       <div class="modal-footer">
-        <button type="button" name="add_button" onclick="addQuestion()" class="btn btn-secondary" data-dismiss="modal">Ok</button></div>
+        <button type="button" name="add_button" onclick="addQuestion()" class="btn btn-secondary" >Ok</button></div>
 
     </div>
   </div>
@@ -142,9 +142,9 @@
                     <label >{% trans "question_deactivate_on_answer" %}</label>
                     <span><small><i>{{question_help_text.deactivateOnAnswer}}</i></small></span>
                   </div>
-                  <div class=" form-group col  required mb-4" >
+                  <div class=" form-group col mb-4" >
                     {{ question_form.deactivateOnDate}}
-                    <label >{% trans "question_deactivate_after_days" %}*</label>
+                    <label >{% trans "question_deactivate_after_days" %}</label>
                     <span><small><i>{{question_help_text.deactivateOnDate}}</i></small></span>
                   </div>
 
@@ -315,7 +315,7 @@
             <div class="row mt-3">
               <div class="col">
                 <button
-                  type="submit"
+                        type="button"
                   name="add_question"
                   onclick="display_info()"
                   class="btn btn-primary">

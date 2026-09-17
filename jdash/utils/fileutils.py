@@ -1,5 +1,7 @@
 import copy
+import grp
 import json, os, csv,shutil,logging,re
+import posixpath
 import subprocess
 import shlex
 from datetime import datetime, date
@@ -12,6 +14,32 @@ from jdash.config import runtime_config as config
 from jdash.config import constants as constants
 logger = logging.getLogger("django")
 #create csv for loggin the downlaoded request
+
+
+def _study_json_path(study_name):
+    return os.path.join(config.studies_folder, study_name, study_name + '.json')
+
+
+def _load_json_file(path):
+    with open(path, 'r', encoding=constants.encoding) as f:
+        return json.load(f)
+
+
+def _normalize_study_json_for_context(data):
+    data["number_of_subjects"] = data.get("number_of_subjects", 0)
+    data["number-of-subjects"] = data["number_of_subjects"]
+
+    new_data = {}
+    for key, value in data.items():
+        new_key = key.replace("-", "_")
+        new_data[new_key] = value
+
+    if "sensor_list" in data:
+        new_data["sensor_size"] = len(data["sensor_list"]) * 2
+        if "sensor_list_limited" in data:
+            new_data["sensor_size"] += len(data["sensor_list_limited"]) * 2
+
+    return new_data
 
 def get_notification_json_for_study(study_name):
     json_path = os.path.join(config.storage_folder, "standalone", 'json_of_days_for_push_notification.json')
@@ -52,6 +80,96 @@ def create_download_file_log(row):
         writer.writerow(row)
 
 
+def _download_zip_filename(file_name):
+    filename = os.path.basename(str(file_name or ""))
+    if not filename.endswith(constants.zip_extension):
+        filename += constants.zip_extension
+    return filename
+
+
+def delete_download_dataset_zip(local_zip_path, file_name, delete_remote=True):
+    """
+    Delete the generated dataset ZIP after it has been streamed to the user.
+    """
+    zip_filename = _download_zip_filename(file_name)
+    if local_zip_path and os.path.isfile(local_zip_path):
+        try:
+            os.remove(local_zip_path)
+            logger.info("Deleted local dataset ZIP: %s", local_zip_path)
+        except OSError as exc:
+            logger.error("Failed to delete local dataset ZIP %s: %s", local_zip_path, exc)
+    else:
+        logger.info("Local dataset ZIP does not exist: %s", local_zip_path)
+
+    if delete_remote:
+        delete_remote_download_dataset_zip(zip_filename)
+
+
+def set_download_file_permissions(path, group_name="jtrack", mode=0o755):
+    """Set a generated download file's mode and group without changing its owner."""
+    os.chmod(path, mode)
+    try:
+        group_id = grp.getgrnam(group_name).gr_gid
+    except KeyError:
+        logger.warning(
+            "Download group %s does not exist; ownership unchanged for %s",
+            group_name,
+            path,
+        )
+        return
+    os.chown(path, -1, group_id)
+
+
+def delete_remote_download_dataset_zip(zip_filename):
+    """
+    Delete the generated dataset ZIP from the remote download folder.
+    """
+    remote_download_folder = getattr(settings, "JUSELESS_DOWNLOAD_FOLDER", "")
+    if not remote_download_folder:
+        logger.info("Remote download folder is not configured; skipping ZIP cleanup.")
+        return
+
+    remote_target = shlex.quote(
+        posixpath.join(remote_download_folder.rstrip("/"), os.path.basename(zip_filename))
+    )
+    ssh_runtime_dir = getattr(settings, "SSH_RUNTIME_DIR", "/var/www/.ssh")
+    known_hosts_path = os.path.join(ssh_runtime_dir, "known_hosts")
+    ssh_key_path = getattr(
+        settings,
+        "ANALYTICS_PIPELINE_SSH_KEY",
+        "/var/www/.ssh/id_ed25519_pipeline",
+    )
+
+    cmd = [
+        "ssh",
+        "-o", "BatchMode=yes",
+        "-o", "StrictHostKeyChecking=no",
+        "-o", f"UserKnownHostsFile={known_hosts_path}",
+        "-o", "IdentitiesOnly=yes",
+        "-i", ssh_key_path,
+        f"{settings.REMOTE_USERNAME}@{settings.JUSELESS_SERVER}",
+        f"rm -f -- {remote_target}",
+    ]
+    try:
+        result = subprocess.run(
+            cmd,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        logger.info("Deleted remote dataset ZIP: %s", remote_target)
+        logger.debug("STDOUT: %s", result.stdout)
+        logger.debug("STDERR: %s", result.stderr)
+    except subprocess.TimeoutExpired:
+        logger.error("Remote dataset ZIP cleanup timed out for %s", remote_target)
+    except subprocess.CalledProcessError as exc:
+        logger.error("Remote dataset ZIP cleanup failed for %s", remote_target)
+        logger.error("Return code: %s", exc.returncode)
+        logger.error("STDOUT: %s", exc.stdout)
+        logger.error("STDERR: %s", exc.stderr)
+
+
 # updating the status of the downloaded status into csv file
 def updated_status():
     """
@@ -82,26 +200,8 @@ def get_json_data(study_name):
     :param study_name:
     :return:
     """
-    path = os.path.join(config.storage_folder , "studies/" , study_name)
+    return _normalize_study_json_for_context(_load_json_file(_study_json_path(study_name)))
 
-    with open(path + '/' + study_name + '.json', encoding=constants.encoding) as fh:
-        data = json.load(fh)
-
-    # Set additional keys
-    data["number_of_subjects"] = data.get("number_of_subjects", 0)
-    data["number-of-subjects"] = data["number_of_subjects"]
-
-    new_data = {}
-    for key, value in data.items():
-        new_key = key.replace("-", "_")
-        new_data[new_key] = value
-
-    if "sensor_list" in data:
-        new_data["sensor_size"] = len(data["sensor_list"]) * 2
-        if "sensor_list_limited" in data:
-            new_data["sensor_size"] += len(data["sensor_list_limited"]) * 2
-
-    return new_data
 
 def handle_uploaded_file(f, name):
     """
@@ -488,10 +588,8 @@ def open_study_json(study_name):
     :param study_directories: 
     :return: 
     """
-    study_json_file_path = os.path.join(config.studies_folder, study_name, study_name + '.json')
-    with open(study_json_file_path, 'r', encoding=constants.encoding) as f:
-        study_json = json.load(f)
-    return study_json
+    return _load_json_file(_study_json_path(study_name))
+
 
 def delete_user_files(study_name,subject_id):
     """
@@ -504,7 +602,8 @@ def delete_user_files(study_name,subject_id):
     if result is not None:
         for index in range(1, 4):
             subject_str = subject_id + "_" + str(index)
-            user_file = os.path.join(config.users_folder, study_name + subject_str + ".json")
+            user_file = os.path.join(config.users_folder, study_name + "_"+subject_str + ".json")
+            logger.info("Attempting to delete user file: %s", user_file)
         
             if os.path.exists(user_file):
                 try:

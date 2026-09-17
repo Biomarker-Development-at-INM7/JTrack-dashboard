@@ -373,21 +373,18 @@ class SendNotificationForm(forms.Form):
     """Class representing a SendNotificationForm"""
     message_title =  forms.CharField(widget=forms.TextInput(
         attrs={
-            'class' : 'form-control',
-            'placeholder': 'Message title'
+            'class' : 'form-control'
         }
     ), label = False)
     message_text = forms.CharField(widget=forms.Textarea(
         attrs={
             'rows' : 4,
-            'class' : 'form-control' ,
-            'placeholder': 'Message text'
+            'class' : 'form-control'
         }
     ), label = False)
     receivers = forms.MultipleChoiceField(choices = (),widget=forms.SelectMultiple(
         attrs={
             'class' : 'form-control' ,
-           'placeholder': 'Receivers',
            'id' :"id-choices" 
         }
     ), label = False )
@@ -418,12 +415,27 @@ class RemoveSubjectsForm(forms.Form):
         fields = '__all__'
 
 
+class ChangeSubjectStatusForm(forms.Form):
+    """Select a subject activation to mark as having left the study."""
+    subject_to_change = forms.MultipleChoiceField(
+        choices=(),
+        widget=forms.SelectMultiple(attrs={'class': 'form-control'}),
+        label=False,
+    )
+
+    def __init__(self, *args, **kwargs):
+        subjects = kwargs.pop('subjects', None) or []
+        super().__init__(*args, **kwargs)
+        self.fields['subject_to_change'].choices = [
+            (value, value.split(';')[0]) for value in subjects
+        ]
+
+
 class CreateSubjectForm(forms.Form):
     """Class representing a CreateSubjectForm""" 
     number_of_subjects = forms.IntegerField(widget=forms.NumberInput(
         attrs={
-            'class' : 'form-control',
-            'placeholder': 'Number of Subjects'
+            'class' : 'form-control'
         }
     ),label = False, min_value=0)
     class Meta:
@@ -679,7 +691,7 @@ class QuestionForm(forms.ModelForm):
         attrs={
             'id' : 'deactivateOnDate'
         }
-    ), label = False)
+    ), label = False, required=False)
     deactivateOnAnswer = forms.CharField(widget=forms.TextInput(
         attrs={
             'id' :"deactivateOnAnswer"
@@ -779,8 +791,7 @@ class QuestionForm(forms.ModelForm):
     deactivate_question = CommaSeparatedIntegerField(required=False)
     clockTime_start = CommaSeparatedIntegerField(required=False)
     clockTime_end = CommaSeparatedIntegerField(required=False)
-
-
+    
     answer_formset = formset_factory(AnswerForm)
     def __init__(self, *args, categories=None, **kwargs):
         json_data = kwargs.pop('json_data', None)
