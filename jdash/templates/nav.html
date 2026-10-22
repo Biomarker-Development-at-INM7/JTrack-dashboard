@@ -9,19 +9,6 @@
         <img src="{% static 'icons/logo.png' %}" height="75" alt="JDash">
       </a>
     </div>
-    <!-- Title -->
-    <div  id="title-div">
-      <a href="{% url 'home' %}">
-        
-        <h1 id="title">JDash</h1>
-      </a>
-      <h6 id="subtitle">
-        <span>{% trans "header_filler" %} </span>
-        <a href="https://www.fz-juelich.de/en/inm/inm-7/research-groups/biomarker-development" rel="noreferrer" target="_blank">
-          {% trans "header_group" %}
-        </a>
-      </h6>
-    </div>
     </div>
     <div class="jdash-navbar-actions">
     <!-- Logged-in User -->
@@ -71,21 +58,27 @@
     data-check-interval-ms="30000"
     data-keepalive-throttle-ms="60000"
     data-logout-url="{% url 'logout' %}"
+    data-csrf-token="{{ csrf_token }}"
     data-session-check-url="{% url 'session_check' %}">
   </div>
 </div>
 <div class="jdash-user-menu">
-    <span class="jdash-user-identity">
+  <div class="jdash-user-summary" aria-label="{% trans 'Current user' %}">
     <span class="jdash-username">{{ user.username }}</span>
-    {% with role_label=user|role_group_label %}
-      {% if role_label %}
-      <span class="jdash-user-role">{{ role_label }}</span>
+    {% current_study_role user request as study_role %}
+    {% if study_role %}
+    <span class="jdash-user-role">
+      {% if study_role == "administrator" %}{% trans "Administrator" %}
+      {% elif study_role == "maintainer" %}{% trans "profile_role_principal_investigator" %}
+      {% elif study_role == "investigator" %}{% trans "profile_role_investigator" %}
+      {% elif study_role == "viewer" %}{% trans "profile_role_viewer" %}
       {% endif %}
-    {% endwith %}
-  </span>
+    </span>
+    {% endif %}
+  </div>
   <span id="logout-timer" class="jdash-logout-timer"></span>
-  <a href="{% url 'logout' %}" class="jdash-nav-icon-link">
-    <img src="{% static 'icons/logout-58.png' %}" height="35" alt="{% trans 'Logout' %}">
+  <a href="{% url 'logout' %}" class="jdash-nav-icon-link jdash-logout-link" aria-label="{% trans 'Logout' %}" title="{% trans 'Logout' %}">
+    <i class="fas fa-sign-out-alt" aria-hidden="true"></i>
   </a>
 </div>
 
@@ -104,33 +97,7 @@
   </div>
 </div>
 </div>
-<script>
-  function buildLanguageSwitchPath(targetLang) {
-    const url = new URL(window.location.href);
-    let path = url.pathname;
 
-    if (/^\/dev\/(en|de)(\/|$)/.test(path)) {
-      return path.replace(/^\/dev\/(en|de)(?=\/|$)/, `/dev/${targetLang}`) + url.search + url.hash;
-    } else if (/^\/(en|de)(\/|$)/.test(path)) {
-      path = path.replace(/^\/(en|de)(?=\/|$)/, "");
-    } else if (/^\/(en|de)\/dev(\/|$)/.test(path)) {
-      path = path.replace(/^\/(en|de)\/dev(?=\/|$)/, "/dev");
-    }
-
-    if (!path.startsWith("/")) {
-      path = `/${path}`;
-    }
-    if (path === "") {
-      path = "/";
-    }
-
-    return `/${targetLang}${path}${url.search}${url.hash}`;
-  }
-
-  document.querySelectorAll(".language-next").forEach((input) => {
-    input.value = buildLanguageSwitchPath(input.dataset.language);
-  });
-</script>
 <script src="{% static 'js/session-timer.js' %}"></script>
 {% endif %}
 

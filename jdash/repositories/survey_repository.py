@@ -3,7 +3,7 @@ import logging
 import re
 from operator import itemgetter
 
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import User
 from django.db.models import Q
 from django.db import transaction
 
@@ -219,7 +219,11 @@ def create_survey_in_db(study_name, survey_dict, user):
             scrolling=_normalize_import_text(survey_dict.get("scrolling"), "H")[:1] or "H",
             owner=user,
         )
-        logger.info("create_survey_in_db::start::%s", survey)
+        logger.info(
+            "Survey repository action=create survey_id=%s owner_id=%s",
+            survey.id,
+            getattr(user, "id", None),
+        )
 
         if "categories" in survey_dict:
             create_categories_in_db_from_data(survey.id, survey_dict["categories"] or [])
@@ -254,13 +258,13 @@ def create_survey_in_db(study_name, survey_dict, user):
             for answer_data in question_data["answer"]:
                 create_answer_from_file_in_db(question.id, answer_data)
 
-    logger.info("create_survey_in_db::end %s", survey)
+    logger.info("Survey repository action=create_complete survey_id=%s", survey.id)
     return survey
 
 
 def create_answer_from_file_in_db(question_id, answer_data):
     """Create an answer row from imported survey JSON."""
-    logger.info("creating answer %s", answer_data)
+    logger.debug("create_answer_from_file_in_db payload=%s", answer_data)
     answerModel.objects.create(
         question_id=question_id,
         answerSortId=answer_data.get("id", answer_data.get("answerSortId", 1)),
@@ -279,7 +283,7 @@ def create_answer_from_file_in_db(question_id, answer_data):
 
 def create_answer_in_db(question_id, answer_data):
     """Create an answer row from normalized form data."""
-    logger.info("create_answer_in_db:::start %s", answer_data)
+    logger.debug("create_answer_in_db payload=%s", answer_data)
     answer_data["answerSortId"] = (
         answer_data["id"] if "id" in answer_data else answer_data["answerSortId"]
     )
@@ -346,7 +350,8 @@ def create_question_answers_in_db(survey_id, question_data):
 
 def update_answer_in_db(form_data, answer_id):
     """Update an answer row."""
-    logger.info("update_answer_in_db ::%s :: %s", form_data, answer_id)
+    logger.info("Survey repository action=update_answer answer_id=%s", answer_id)
+    logger.debug("update_answer_in_db payload=%s", form_data)
     answer = answerModel.objects.get(id=answer_id)
     answer.text = form_data["text"]
     answer.answerSubText = form_data["answerSubText"]
@@ -373,7 +378,8 @@ def delete_answer_in_db(answer_id):
 
 def update_question_in_db(question_id, question_data):
     """Update a question row."""
-    logger.info("update_question_in_db %s", question_data)
+    logger.info("Survey repository action=update_question question_id=%s", question_id)
+    logger.debug("update_question_in_db payload=%s", question_data)
 
     question_data["activate_question"] = question_data.get("activate_question") or []
     question_data["deactivate_question"] = question_data.get("deactivate_question") or []
@@ -405,12 +411,10 @@ def update_question_in_db(question_id, question_data):
     question.save()
 
 
-def delete_survey_for_user(group_name, user, survey_id):
-    """Delete a survey for the current user/group context."""
-    if "administrator" in group_name:
-        result = surveyModel.objects.filter(id=survey_id).all()
-    else:
-        result = surveyModel.objects.filter(owner=user).filter(id=survey_id).all()
+def delete_survey_for_user(user, survey_id):
+    """Delete a survey after the view has authorized the request."""
+    del user
+    result = surveyModel.objects.filter(id=survey_id).all()
     result.delete()
     return True
 
@@ -465,7 +469,7 @@ def retrieve_all_categories_for_survey(survey_id):
     """Return serialized categories for a survey."""
     queryset = categoryModel.objects.filter(survey__pk=survey_id).order_by("categoryValue").values()
     category_list = json.loads(category_serializer(queryset))
-    logger.info("retrieve_all_categories_for_survey %s", category_list)
+    logger.debug("retrieve_all_categories_for_survey payload=%s", category_list)
     return category_list
 
 
@@ -489,6 +493,7 @@ def retrieve_question_details(question_id):
     """Return serialized question details including answers."""
     data = questionModel.objects.filter(id=question_id).values()
     question_json = json.loads(question_db_serializer(data))[0]
+    logger.debug("retrieve_question_details payload=%s", question_json)
     question_json["answer"] = retrieve_all_answers_for_questions(question_id)
     for answer in question_json["answer"]:
         answer["answerSortId"] = answer["id"]
@@ -500,34 +505,23 @@ def retrieve_questions_greater_than_sortId(survey_id, sort_id):
     """Return questions in a survey after the given sort position."""
     questions = questionModel.objects.filter(survey_id=survey_id, sortId__gt=sort_id).values()
     question_json = json.loads(question_serializer(questions))
-    logger.info("retrieve_questions_greater_than_sortId:::%s", question_json)
+    logger.debug("retrieve_questions_greater_than_sortId payload=%s", question_json)
     return question_json
 
 
 def retrieve_all_survey_for_user(user, session_key):
     """Return surveys and current study associations directly from the DB."""
     del session_key  # Kept in the signature for compatibility with existing callers.
-    group_names = list(user.groups.values_list("name", flat=True))
-
-    if constants.group_name_administrator in group_names:
+    if user.groups.filter(name=constants.group_name_administrator).exists():
         queryset = surveyModel.objects.all()
     else:
-        study_prefixes = [name.removesuffix("_group") for name in group_names]
-        if study_prefixes:
-            visible_study_query = Q()
-            for prefix in study_prefixes:
-                visible_study_query |= Q(title__startswith=prefix)
-            visible_survey_ids = studymodel.objects.filter(
-                visible_study_query,
-                closed=False,
-                survey__isnull=False,
-            ).values_list("survey_id", flat=True)
-        else:
-            visible_survey_ids = studymodel.objects.none().values_list(
-                "survey_id", flat=True
-            )
+        visible_survey_ids = studymodel.objects.filter(
+            memberships__user=user,
+            closed=False,
+            survey__isnull=False,
+        ).values_list("survey_id", flat=True)
         queryset = surveyModel.objects.filter(
-            Q(owner=user) | Q(id__in=visible_survey_ids)
+            Q(owner=user, study__isnull=True) | Q(id__in=visible_survey_ids)
         )
 
     survey_list = json.loads(
@@ -550,12 +544,11 @@ def _add_survey_metadata(survey):
 
 def retrieve_all_survey_for_study_members(study_name, survey_id=None):
     """Return surveys created by members of a study group."""
-    member_ids = []
-    try:
-        study_group = Group.objects.get(name=f"{study_name}_group")
-        member_ids = list(study_group.user_set.values_list("id", flat=True))
-    except Group.DoesNotExist:
-        logger.warning("retrieve_all_survey_for_study_members:: group missing for %s", study_name)
+    member_ids = list(
+        User.objects.filter(study_memberships__study__title=study_name)
+        .distinct()
+        .values_list("id", flat=True)
+    )
 
     queryset = surveyModel.objects.filter(owner_id__in=member_ids)
     if survey_id:
@@ -587,89 +580,15 @@ def retrieve_surveys_visible_to_study_editor(user, survey_id=None):
             _add_survey_metadata(survey)
         return survey_list
 
-    study_group_titles = []
-    for group_name in user.groups.values_list("name", flat=True):
-        if group_name.endswith("_group"):
-            study_group_titles.append(group_name[:-len("_group")])
-
-    linked_survey_ids = []
-    if study_group_titles:
-        linked_survey_ids = list(
-            studymodel.objects.filter(
-                title__in=study_group_titles,
-                closed=False,
-                survey__isnull=False,
-            ).values_list("survey_id", flat=True)
-        )
-
-def _add_survey_metadata(survey):
-    study_details = studymodel.objects.filter(survey=survey["id"], closed=False).values()
-    if study_details:
-        survey["study_name"] = ", ".join([study["title"] for study in study_details])
-    category_titles = list(
-        categoryModel.objects.filter(survey_id=survey["id"])
-        .order_by("categoryValue")
-        .values_list("categoryTitle", flat=True)
+    linked_survey_ids = list(
+        studymodel.objects.filter(
+            memberships__user=user,
+            closed=False,
+            survey__isnull=False,
+        ).values_list("survey_id", flat=True)
     )
-    survey["category_names"] = ", ".join(category_titles)
-    return survey
 
-
-def retrieve_all_survey_for_study_members(study_name, survey_id=None):
-    """Return surveys created by members of a study group."""
-    member_ids = []
-    try:
-        study_group = Group.objects.get(name=f"{study_name}_group")
-        member_ids = list(study_group.user_set.values_list("id", flat=True))
-    except Group.DoesNotExist:
-        logger.warning("retrieve_all_survey_for_study_members:: group missing for %s", study_name)
-
-    queryset = surveyModel.objects.filter(owner_id__in=member_ids)
-    if survey_id:
-        queryset = queryset | surveyModel.objects.filter(id=survey_id)
-
-    survey_list = json.loads(
-        survey_serializer(queryset.distinct().order_by("title", "id").values())
-    )
-    for survey in survey_list:
-        _add_survey_metadata(survey)
-    return survey_list
-
-def retrieve_surveys_visible_to_study_editor(user, survey_id=None):
-    """
-    Return surveys the user can choose while editing a study.
-
-    A survey is visible if the user created it, or if it is linked to a study
-    whose study-specific group the user belongs to. The currently linked survey
-    is kept in the list so existing study edits do not lose their selection.
-    Administrators can choose from all surveys.
-    """
-    if user.groups.filter(name=constants.group_name_administrator).exists():
-        survey_list = json.loads(
-            survey_serializer(
-                surveyModel.objects.all().distinct().order_by("title", "id").values()
-            )
-        )
-        for survey in survey_list:
-            _add_survey_metadata(survey)
-        return survey_list
-
-    study_group_titles = []
-    for group_name in user.groups.values_list("name", flat=True):
-        if group_name.endswith("_group"):
-            study_group_titles.append(group_name[:-len("_group")])
-
-    linked_survey_ids = []
-    if study_group_titles:
-        linked_survey_ids = list(
-            studymodel.objects.filter(
-                title__in=study_group_titles,
-                closed=False,
-                survey__isnull=False,
-            ).values_list("survey_id", flat=True)
-        )
-
-    query = Q(owner=user)
+    query = Q(owner=user, study__isnull=True)
     if linked_survey_ids:
         query |= Q(id__in=linked_survey_ids)
     if survey_id:
@@ -686,9 +605,17 @@ def retrieve_surveys_visible_to_study_editor(user, survey_id=None):
 
 def get_list_surveys_for_user(user, ema_studies):
     """Return visible surveys for a non-admin user."""
+    del ema_studies
     unique_surveys = set()
     surveys = []
-    queryset = surveyModel.objects.filter(owner=user).values()
+    visible_survey_ids = studymodel.objects.filter(
+        memberships__user=user,
+        closed=False,
+        survey__isnull=False,
+    ).values_list("survey_id", flat=True)
+    queryset = surveyModel.objects.filter(
+        Q(owner=user, study__isnull=True) | Q(id__in=visible_survey_ids)
+    ).distinct().values()
 
     if queryset:
         for survey in json.loads(survey_serializer(queryset)):
@@ -705,25 +632,6 @@ def get_list_surveys_for_user(user, ema_studies):
                 unique_surveys.add(survey["id"])
                 surveys.append(survey)
 
-    for studyname in ema_studies:
-        data = studymodel.objects.filter(title=studyname, closed=False).values()
-        if not data:
-            continue
-        jsondata = json.loads(custom_serializer(data))[0]
-        survey_queryset = surveyModel.objects.filter(id=jsondata["survey"]).values()
-        if survey_queryset:
-            for survey in json.loads(survey_serializer(survey_queryset)):
-                survey["study_name"] = jsondata["title"]
-                category_titles = list(
-                    categoryModel.objects.filter(survey_id=survey["id"])
-                    .order_by("categoryValue")
-                    .values_list("categoryTitle", flat=True)
-                )
-                survey["category_names"] = ", ".join(category_titles)
-                if survey["id"] not in unique_surveys:
-                    unique_surveys.add(survey["id"])
-                    surveys.append(survey)
-
     return surveys
 
 
@@ -736,7 +644,12 @@ def get_categories_from_db(survey_id):
 
 def create_categories_in_db(survey_id, category_data):
     """Create survey categories from form data."""
-    logger.info("create_categories_in_db:::start %s", category_data)
+    logger.info(
+        "Survey repository action=create_categories survey_id=%s count=%s",
+        survey_id,
+        len(category_data.get("category_list", [])),
+    )
+    logger.debug("create_categories_in_db payload=%s", category_data)
     for data in category_data["category_list"]:
         categoryModel.objects.create(
             survey_id=survey_id,
@@ -768,7 +681,7 @@ def get_question_by_sortid(survey_id, sort_id):
     question = questionModel.objects.filter(survey_id=survey_id, sortId=sort_id).values()
     if question:
         result = json.loads(question_db_serializer(question))[0]
-        logger.info("get_question_by_sortid::question: %s", result)
+        logger.debug("get_question_by_sortid payload=%s", result)
         return result
     return None
 

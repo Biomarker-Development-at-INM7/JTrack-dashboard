@@ -8,6 +8,7 @@ from jdash.views.core_views import (
     password_reset_confirm,
     password_reset_done,
     password_reset_request,
+    profile,
     server_error,
     session_check,
 )
@@ -16,15 +17,22 @@ from jdash.views.study_views import (
     close,
     download_dataset_from_link,
     export_study_dashboard_csv,
+    export_combined_study_dashboard_csv,
+    export_study_wearables_csv,
     edit_study,
     notify_qc_comment,
     qc_study,
     study_audit,
+    study_json_version_diff,
+    study_json_versions,
+    download_study_json_version,
     study_details,
+    study_title_availability,
 )
 from jdash.views.subject_views import (
     delete_subject_data,
     download_unused_files,
+    generate_additional_qr_codes,
 )
 from jdash.views.survey_views import (
     create_survey,
@@ -39,7 +47,7 @@ from jdash.views.survey_views import (
     manage_category_for_survey,
     manage_question,
     survey_audit,
+    survey_commit_changes,
     survey_list,
 )
-from jdash.views.analytics_views import analytics
-
+from jdash.views.analytics_views import analytics, download_subject_raw_data

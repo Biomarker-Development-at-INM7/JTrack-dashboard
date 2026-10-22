@@ -1,12 +1,11 @@
 import json
 import logging
 
-from django.contrib.auth.models import Group, Permission, User
+from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Case, IntegerField, Q, Value, When
+from django.db.models import Case, IntegerField, Value, When
 from django.shortcuts import get_object_or_404
-from django.utils.encoding import force_str
 from django.utils import timezone
 from auditlog.models import LogEntry
 
@@ -19,6 +18,7 @@ from jdash.models import (
     # ResolutionCatalog,
     SamplingRateCatalog,
     Study as studymodel,
+    StudyMembership,
     StudyDeviceSensor,
     Survey as surveyModel,
     Task,
@@ -39,29 +39,25 @@ def set_email_for_user(username, email):
 def retrieve_all_studies_for_user(user):
     """Return serialized studies visible to the given user."""
     queryset = studymodel.objects.none()
-    group_names = [gp.name for gp in user.groups.all()]
-
-    if "administrator" in group_names:
+    if user.groups.filter(name=constants.group_name_administrator).exists():
         queryset = studymodel.objects.filter(closed=False)
     else:
-        combined_query = Q()
-        for group_name in group_names:
-            search_string = group_name.split("_group")[0]
-            combined_query |= Q(title__startswith=search_string, closed=False)
-        queryset = studymodel.objects.filter(combined_query)
+        queryset = studymodel.objects.filter(
+            closed=False,
+            memberships__user=user,
+        ).distinct()
 
     return custom_serializer(queryset.values())
 
 
 def log_action(user, obj, action_flag, message):
     """Create an auditlog entry for the given object."""
-    LogEntry.objects.log_action(
-        user_id=user.pk,
-        content_type_id=ContentType.objects.get_for_model(obj).pk,
-        object_id=obj.pk,
-        object_repr=force_str(obj)[:200],
-        action_flag=action_flag,
-        change_message=message,
+    return LogEntry.objects.log_create(
+        obj,
+        force_log=True,
+        action=action_flag,
+        actor=user if getattr(user, "is_authenticated", False) else None,
+        changes={"study_access": ["-", message]},
     )
 
 
@@ -171,21 +167,14 @@ def sync_study_device_sensors(study, rows):
             study_device_sensor.delete()
 
 
-def get_group_name_for_user(user):
-    """Resolve the primary dashboard group mapping for the user."""
-    group = constants.default_group
-    group_names = [gp.name for gp in user.groups.all()]
-
-    for group_name in group_names:
-        if group_name in constants.group_mapping:
-            group = constants.group_mapping[group_name]
-            break
-    return group
-
-
 def create_new_study_in_db(user, form_data, survey, images_url):
     """Create a study record and its related DB rows."""
-    logger.info("create_new_study_in_db %s", form_data)
+    logger.info(
+        "Study repository action=create user_id=%s study_name=%s",
+        getattr(user, "id", None),
+        form_data.get(constants.field_name_name),
+    )
+    logger.debug("create_new_study_in_db payload=%s", form_data)
     frequency = form_data[constants.field_name_frequency]
     labeling = form_data[constants.field_name_labeling]
     sensor_list = form_data[constants.field_name_sensor_list]
@@ -209,15 +198,12 @@ def create_new_study_in_db(user, form_data, survey, images_url):
 
     persist_task_list(study, form_data.get("task_list", []))
     persist_study_device_sensors(study, user, form_data.get("device_sensor_rows", []))
-    create_new_study_group(user, form_data)
+    StudyMembership.objects.update_or_create(
+        study=study,
+        user=user,
+        defaults={"role": StudyMembership.Role.MAINTAINER, "added_by": user},
+    )
     return study
-
-
-def create_new_study_group(user, form_data):
-    """Create the per-study group and assign creator permissions."""
-    study_group, _created = Group.objects.get_or_create(name=form_data["name"] + "_group")
-    assign_all_group_permissions(user.username, study_group.name)
-
 
 @transaction.atomic
 def update_study_db_details(form_data):
@@ -243,21 +229,6 @@ def update_study_db_details(form_data):
 
     sync_task_list(study, form_data.get("task_list", []))
     sync_study_device_sensors(study, form_data.get("device_sensor_rows", []))
-
-
-def assign_all_group_permissions(username, groupname):
-    """Assign the standard study permissions to the study group."""
-    logged_user = User.objects.get(username=username)
-    user_group = Group.objects.get(name=groupname)
-    creator_permissions = [
-        Permission.objects.get(name="Can add study"),
-        Permission.objects.get(name="Can change study"),
-        Permission.objects.get(name="Can delete study"),
-        Permission.objects.get(name="Can view study"),
-    ]
-
-    user_group.user_set.add(logged_user)
-    user_group.permissions.set(creator_permissions)
 
 
 def close_study_model(study_name):
@@ -314,19 +285,40 @@ def retrieve_test_cases_for_study(study_db_id):
         results.append(item)
     return json.dumps(results, default=str)
 
-def update_test_case_flags(testcase_updates, username):
-    """Update admin/owner completion flags for quality-control test cases."""
+def update_test_case_flags(
+    testcase_updates,
+    username,
+    study_id=None,
+    *,
+    can_update_admin_checks=True,
+    can_update_owner_checks=True,
+):
+    """Update QC flags only for checks in the selected study and permitted role."""
     success_count = 0
     failure_count = 0
     errors = []
-    logger.info(testcase_updates)
+    logger.debug("update_test_case_flags payload=%s", testcase_updates)
 
     for test_case in testcase_updates:
         try:
-            logger.info("An test %s %s", test_case, type(test_case))
-            db_test_case = qctestsModel.objects.get(id=test_case["id"])
+            logger.debug("update_test_case_flags test_case=%s type=%s", test_case, type(test_case))
+            test_case_query = {"id": test_case["id"]}
+            if study_id is not None:
+                test_case_query["study_id"] = study_id
+            db_test_case = qctestsModel.objects.get(**test_case_query)
             new_admin_flag = test_case.get("tested_by_admin", db_test_case.tested_by_admin)
             new_owner_flag = test_case.get("tested_by_owner", db_test_case.tested_by_owner)
+
+            if (
+                not can_update_admin_checks
+                and new_admin_flag != db_test_case.tested_by_admin
+            ):
+                raise PermissionError("You cannot update administrator QC checks.")
+            if (
+                not can_update_owner_checks
+                and new_owner_flag != db_test_case.tested_by_owner
+            ):
+                raise PermissionError("You cannot update owner QC checks.")
 
             if new_admin_flag != db_test_case.tested_by_admin:
                 db_test_case.admin_username = username
@@ -338,12 +330,13 @@ def update_test_case_flags(testcase_updates, username):
             db_test_case.save()
             success_count += 1
         except Exception as exc:
-            logger.info(
+            logger.warning(
                 "An error occurred while updating Test Case %s: %s",
                 test_case["id"],
                 exc,
             )
             failure_count += 1
+            errors.append(str(exc))
 
     return {
         "success_count": success_count,

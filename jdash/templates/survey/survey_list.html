@@ -6,18 +6,16 @@
 
 <script src="{% static 'js/jquery.min.js' %}"></script>
 <link href="{% static 'css/form.css' %}" rel="stylesheet">
-<link href="{% static 'css/bootstrap-table.min.css' %}" rel="stylesheet">
+<link href="{% static 'css/dataTables.bootstrap5.min.css' %}" rel="stylesheet">
 <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css">
-<script src="{% static 'js/bootstrap-table.min.js' %}"></script>
-<script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
+<script src="{% static 'js/dataTables.min.js' %}"></script>
+<script src="{% static 'js/dataTables.bootstrap5.min.js' %}"></script>
 <script src="{% static 'js/survey.js' %}"></script>
-<script src="{% static 'js/popper.js' %}"></script>
 <div class="modal fade" id="surveyModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
 	<div class="modal-dialog">
 	  <div class="modal-content">
 		<div class="modal-header">
 		  <h5 class="modal-title" id="exampleModalLabel">{% trans "index_survey_modal" %}</h5>
-		  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
 		</div>
 		<form action="{%url 'create_survey' survey_id=0 %}" method="POST" >
 			{% csrf_token %}
@@ -42,6 +40,9 @@
 				
 			</div>
 			<div class="modal-footer">
+				<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+					{% trans "common_cancel" %}
+				</button>
 				<input name="create_survey" type="submit"  value="Create" role="button" class="btn btn-primary"  >
 			</div>
 		</form>
@@ -82,80 +83,91 @@
   </ul>
 </div> 
 	  
-	<div class="row mb-3 align-items-start">
-        {% if request.user|can_manage_survey  %}
-		<div id="toolbar" class="col-md-6 col-lg-6">
-			<div class="d-flex flex-wrap align-items-center gap-2">
+	{% if request.user|can_manage_survey %}
+	<section class="survey-list-header mb-3">
+		<div class="survey-list-header-title-row">
+			<div>
+				<h2 class="survey-list-header-title">{% trans "survey_list_two_ways_title" %}</h2>
+			</div>
+		</div>
+		<div class="survey-create-options">
+			<div class="survey-create-option">
+				<div class="survey-create-option-copy">
+					<span class="survey-create-option-number">1</span>
+					<div>
+						<div class="survey-create-option-title">{% trans "survey_list_manual_label" %}</div>
+						<div class="survey-create-option-description">{% trans "survey_list_manual_desc" %}</div>
+					</div>
+				</div>
 				<button type="button"
-					class="btn btn-outline-primary"
+					class="btn btn-outline-primary btn-sm"
 					data-bs-toggle="modal"
 					data-bs-target="#surveyModal">
 					{% trans "index_survey_new" %}
 				</button>
-				
 			</div>
-		</div>
-		<div id="survey_table_toolbar" class="col-md-2 col-lg-2 ">
-			<a class="btn btn-outline-secondary btn-sm " href="{% static 'survey_question_template.txt' %}" download>
-					<i class="fa fa-download fa-lg" aria-hidden="true"></i> {% trans "survey_list_download_template" %}
-				</a>
-		</div> 
-		<div class="col-md-6 col-lg-4 d-flex justify-content-md-end">
-			<div class="d-flex flex-column align-items-end gap-2">
+			<div class="survey-create-option survey-create-option--template">
+				<div class="survey-create-option-copy">
+					<span class="survey-create-option-number">2</span>
+					<div>
+						<div class="survey-create-option-title">{% trans "survey_list_template_label" %}</div>
+						<div class="survey-create-option-description">{% trans "survey_list_template_desc" %}</div>
+					</div>
+				</div>
+				<div class="survey-create-template-actions">
+					<a class="btn btn-outline-secondary" href="{% static 'survey_question_template.txt' %}" download>
+						<i class="fa fa-download me-2" aria-hidden="true"></i>{% trans "survey_list_download_template" %}
+					</a>
 				<form action="{% url 'create_survey'  survey_id=0 %}" method="post" enctype="multipart/form-data">
 					{% csrf_token %}
-					<div class="input-group mb-2">
+					<div class="input-group">
 						{{json_form.json_file}}
 						<button type="submit" value="Upload" name="upload_survey" class="btn btn-outline-primary px-3">
 							<i class="fa fa-upload me-2" aria-hidden="true"></i>Upload
 						</button>
 					</div>
-					<small class="form-text text-muted">{% trans "survey_upload_supported_formats" %}</small>
 				</form>
-				</div>
-		</div>
-        {% endif %}
-	</div>
-
-	<div >
-        <div class="col-md-6 col-lg-6">
-			{% if messages %}
-            <ul class="messages">
-                {% for message in messages %}
-                <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
-                {% endfor %}
-            </ul>
-            {% endif %}
-           
-		</div>
-        {% if request.user|can_manage_survey  %}
-		<div class="alert alert-light border mb-3" role="alert">
-			<div class="fw-semibold mb-2">{% trans "survey_list_two_ways_title" %}</div>
-			<div class="small">
-				<div class="mb-2">
-					<strong>{% trans "survey_list_manual_label" %}</strong> {% trans "survey_list_manual_desc" %}
-				</div>
-				<div class="text-muted">
-					<strong>{% trans "survey_list_template_label" %}</strong> {% trans "survey_list_template_desc" %}
 				</div>
 			</div>
 		</div>
-        {% endif %}
-		<table id ="survey_table" class="table-responsive"
-			data-search="true"
-			data-pagination="true"
-			data-id-field="survey_id"
-			data-sort-name="created_date"
-			data-sort-order="desc"
-			data-page-list="[10, 30, 50, 100, all]">
+	</section>
+	{% endif %}
+
+	<div>
+		<div class="survey-question-filters survey-list-filters" aria-label="{% trans 'Filter surveys' %}">
+			<div id="survey_count_toolbar" class="survey-table-count-toolbar filter-result-count">
+			  <span id="survey-visible-count" class="survey-count-badge" data-total="{{ survey_list|length }}">
+			    {% blocktrans count survey_count=survey_list|length %}{{ survey_count }} survey{% plural %}{{ survey_count }} surveys{% endblocktrans %}
+			  </span>
+			</div>
+				<div class="survey-question-filter survey-question-filter--search">
+				<label for="survey-filter-search">{% trans "Search surveys" %}</label>
+				<input id="survey-filter-search" class="form-control" type="search" placeholder="{% trans 'Search title, category or study' %}">
+			</div>
+			<div class="survey-question-filter">
+				<label for="survey-filter-category">{% trans "Category" %}</label>
+				<select id="survey-filter-category" class="form-select">
+					<option value="">{% trans "All categories" %}</option>
+				</select>
+			</div>
+			<div class="survey-question-filter">
+				<label for="survey-filter-study">{% trans "Associated study" %}</label>
+				<select id="survey-filter-study" class="form-select">
+					<option value="">{% trans "All studies" %}</option>
+				</select>
+			</div>
+			<button id="survey-filter-clear" type="button" class="btn btn-outline-secondary">{% trans "Clear filters" %}</button>
+		</div>
+		<div class="table-responsive survey-question-table-shell">
+		<table id="survey_table" class="table table-striped align-middle w-100">
 			<thead>
 				<tr>
 				<th data-field="survey_id">Id</th>
 				<th data-field="survey_title">{% trans "global_title" %}</th>
-				<th data-field="category_names">Categories</th>
-				<th data-field="study_name" >Study associated</th>
-				<th data-field="created_date" data-sortable="true">Created date</th>
-				<th data-events="survey_operateEvents">{% trans "global_act" %}</th>
+				<th class="survey-category-column">Categories</th>
+				<th class="survey-study-column">Study associated</th>
+				<th class="survey-created-column">Created date</th>
+				<th class="no-sort">{% trans "global_act" %}</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -180,7 +192,7 @@
 							<i class="fa fa-copy fa-lg"></i>
 						  </a>
 					  {% endif %}
-					  {% if request.user|can_manage_survey %}
+						  {% if request.user|can_manage_survey %}
 						  <a class="delete text-danger"
 							 href="#"
 							 title="{% trans 'global_delete' %}"
@@ -232,7 +244,7 @@
 				{% endfor  %}
 			</tbody>
     	</table>
+		</div>
 	</div>
 	
 {% endblock %}
-

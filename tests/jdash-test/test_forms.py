@@ -22,6 +22,64 @@ from jdash.models import (
 from jdash.config import constants
 
 
+def test_study_survey_choices_include_searchable_id():
+    form = CreateStudyForm(survey=[{"id": 42, "title": "Daily Mood"}])
+
+    assert list(form.fields["survey"].choices) == [
+        ("", "Select survey"),
+        (42, "Daily Mood (ID: 42)"),
+    ]
+
+
+def test_edit_study_form_restores_active_sensors_for_active_labeling_mode_one():
+    active_sensors = [
+        "accelerometer",
+        "gravity_sensor",
+        "gyroscope",
+        "magnetic_sensor",
+        "rotation_vector",
+        "linear_acceleration",
+        "voice",
+    ]
+    form = CreateStudyForm(
+        survey=[],
+        json_data={
+            "name": "ActiveTrackingQC",
+            "duration": 30,
+            "number_of_subjects": 10,
+            "description": "Active tracking study",
+            "frequency": 0,
+            "sensor_list": [],
+            "sensor_list_limited": active_sensors,
+            "active_labeling": 1,
+        },
+    )
+
+    assert form.fields["sensor_list_limited"].initial == active_sensors
+    assert form.fields["active_labeling"].initial == 1
+
+
+def test_edit_study_form_does_not_enable_passive_for_active_only_study():
+    form = CreateStudyForm(
+        survey=[],
+        json_data={
+            "name": "ActiveOnlyStudy",
+            "duration": 30,
+            "number_of_subjects": 10,
+            "description": "Active sensors without passive sensors",
+            "frequency": 0,
+            "sensor_size": 14,
+            "sensor_list": [],
+            "sensor_list_limited": ["accelerometer"],
+            "active_labeling": 1,
+        },
+    )
+
+    assert form.fields["passive_checkbox"].initial is False
+    assert form.fields["sensor_list"].initial == []
+    assert form.fields["recording_freq"].initial == 0
+
+
 @pytest.mark.django_db
 def test_create_study_form_valid_data():
     form_data = {

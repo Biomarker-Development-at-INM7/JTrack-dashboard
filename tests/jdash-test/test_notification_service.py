@@ -89,8 +89,8 @@ def test_send_push_notification_all_variants(
     # Return tokens and no errors
     mock_get_receivers_tokens.return_value = (["token123"], [])
 
-    # push_notification returns success string
-    mock_push_notification.return_value = "success"
+    # Successful notifications return no error.
+    mock_push_notification.return_value = None
 
     receivers = [
         "subject1:main",
@@ -104,12 +104,13 @@ def test_send_push_notification_all_variants(
     assert mock_get_receivers_tokens.call_count == 2
     assert mock_push_notification.call_count == 2
     assert isinstance(errors, list)
-    assert errors == ["success", "success"]
+    assert errors == []
 
 
 @patch("jdash.services.notification.requests.post")
 def test_push_notification_sends_post(mock_post):
     mock_post.return_value.text = "OK"
+    mock_post.return_value.status_code = 200
     result = notification.push_notification(
         title="Test",
         text="Body",
@@ -122,9 +123,48 @@ def test_push_notification_sends_post(mock_post):
     mock_post.assert_called_once()
     called_args, called_kwargs = mock_post.call_args
     assert called_kwargs["json"]["message"]["notification"]["title"] == "Test"
-    assert result.startswith("OK")
-    assert "subject1" in result
-    assert "Android" in result
+    assert called_kwargs["timeout"] == 30
+    assert result is None
+
+
+@patch("jdash.services.notification.requests.post")
+def test_push_notification_returns_message_id_when_requested(mock_post):
+    mock_post.return_value.text = '{"name":"projects/test/messages/message-123"}'
+    mock_post.return_value.status_code = 200
+
+    result = notification.push_notification(
+        title="Test",
+        text="Body",
+        tokens_auth="token1",
+        headers={"Authorization": "Bearer token"},
+        deviceBrand="Android",
+        ids="subject1",
+        url="http://fake.url",
+        return_message_id=True,
+    )
+
+    assert result == (None, "message-123")
+
+
+@patch("jdash.services.notification.requests.post")
+def test_push_notification_returns_sanitized_http_error(mock_post):
+    mock_post.return_value.text = '{"error": {"message": "invalid token"}}'
+    mock_post.return_value.status_code = 400
+
+    result = notification.push_notification(
+        title="Test",
+        text="Body",
+        tokens_auth="device-token",
+        headers={"Authorization": "Bearer secret-access-token"},
+        deviceBrand="apple",
+        ids="subject1",
+        url="http://fake.url",
+    )
+
+    assert "subject1 (apple)" in result
+    assert "HTTP 400" in result
+    assert "invalid token" in result
+    assert "secret-access-token" not in result
 
 
 @patch("builtins.open", new_callable=mock_open, read_data='{"pushNotification_token":"token123","pushNotification_token_ema":"token456"}')

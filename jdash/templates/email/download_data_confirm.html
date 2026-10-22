@@ -54,7 +54,20 @@
 </script>
 <div class="row justify-content-center mt-5">
     <div class="col-xl-10 col-lg-6 col-md-6">
-    {% if download_complete %}
+    {% if download_invalidated %}
+    <div class="card">
+        <div class="card-header text-dark bg-warning">
+            <h2 class="h4 text-center mb-0">
+                <i class="fas fa-exclamation-circle"></i> Download link expired
+            </h2>
+        </div>
+        <div class="card-body text-center">
+            <p class="card-text mb-0">
+              The study data changed after this download was prepared. Please request a new download to receive the current data.
+            </p>
+        </div>
+    </div>
+    {% elif download_complete %}
     <div class="card">
         <div class="card-header text-white" style="background-color: #198754;">
             <h2 class="h4 text-center mb-0">

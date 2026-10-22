@@ -4,6 +4,7 @@
 {% load i18n %}
 {% block content %}
 {% load plotly_dash %}
+<link type="text/css" rel="stylesheet" href="{% static 'css/dash_style.css' %}?v=20261020-1" />
 
 <div class="row mb-4 mx-0">
   <ul class="nav nav-tabs">
@@ -25,29 +26,197 @@
         
         <div class="col-xs-12 col-sm-9" style="display: flex; justify-content: flex-end">
             
-          {% if messages %}
-          <ul class="messages">
-              {% for message in messages %}
-              <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
-              {% endfor %}
-          </ul>
-          {% endif %}
-            
-            
         </div>
-        <div id="session-id" style="display: none;" data-username="{{ initial_args }}" 
-        data-session-key="{{ session_id }}">
-          
-        </div>
-        
-        <div class="{% plotly_class name='janalytica' %} " style="height: 100%; width: 100%;">
-          {% plotly_app name='janalytica' ratio=1 initial_arguments=initial_args %}
-        </div>
+        {% if has_studies %}
+          <div id="session-id" style="display: none;" data-username="{{ initial_args }}"
+          data-session-key="{{ session_id }}">
+          </div>
 
-      <br>
-      {{ plot | safe }}
-      <br>
+          <div id="analytics-dash-host" class="{% plotly_class name='janalytica' %} analytics-dash-host" style="position: relative;">
+            {% include "includes/jdash-loader-only-red.html" %}
+            {% plotly_app name='janalytica' ratio=1 initial_arguments=initial_args %}
+          </div>
+
+          <script>
+            (function () {
+              const host = document.getElementById("analytics-dash-host");
+              const loadingOverlay = document.getElementById("analytics-loading-overlay");
+              let analyticsReadyObserver = null;
+              let observedAnalyticsDocument = null;
+              if (!host) {
+                return;
+              }
+
+            const hideAnalyticsLoader = function () {
+              if (!loadingOverlay || loadingOverlay.hidden) {
+                return;
+              }
+              loadingOverlay.hidden = true;
+              loadingOverlay.setAttribute("aria-hidden", "true");
+              if (analyticsReadyObserver) {
+                analyticsReadyObserver.disconnect();
+                analyticsReadyObserver = null;
+              }
+              observedAnalyticsDocument = null;
+            };
+
+            const analyticsKpisAreReady = function (frame) {
+              try {
+                const doc = frame.contentDocument || frame.contentWindow.document;
+                if (!doc) {
+                  return false;
+                }
+
+                const summary = doc.getElementById("live-summary");
+                if (summary && summary.querySelector(".analytics-kpi-card")) {
+                  return true;
+                }
+
+                const subjectProfile = doc.getElementById("overview-subject-profile");
+                if (
+                  subjectProfile &&
+                  subjectProfile.querySelector(".analytics-kpi-card") &&
+                  frame.contentWindow.getComputedStyle(subjectProfile).display !== "none"
+                ) {
+                  return true;
+                }
+
+                const noDataMessage = doc.getElementById("analytics-no-data-message");
+                return Boolean(
+                  noDataMessage &&
+                  noDataMessage.textContent.trim() &&
+                  frame.contentWindow.getComputedStyle(noDataMessage).display !== "none"
+                );
+              } catch (error) {
+                return false;
+              }
+            };
+
+            const observeAnalyticsReadiness = function (frame) {
+              if (analyticsKpisAreReady(frame)) {
+                hideAnalyticsLoader();
+                return;
+              }
+
+              try {
+                const doc = frame.contentDocument || frame.contentWindow.document;
+                if (!doc || !doc.documentElement || observedAnalyticsDocument === doc) {
+                  return;
+                }
+
+                if (analyticsReadyObserver) {
+                  analyticsReadyObserver.disconnect();
+                }
+                observedAnalyticsDocument = doc;
+                analyticsReadyObserver = new MutationObserver(function () {
+                  if (analyticsKpisAreReady(frame)) {
+                    hideAnalyticsLoader();
+                  }
+                });
+                analyticsReadyObserver.observe(doc.documentElement, {
+                  attributes: true,
+                  childList: true,
+                  subtree: true,
+                });
+              } catch (error) {
+                // The timeout below remains a fallback if iframe inspection is unavailable.
+              }
+            };
+
+            const resizeDashFrame = function () {
+              const frame = host.querySelector("iframe");
+              if (!frame) {
+                return;
+              }
+
+              frame.setAttribute("scrolling", "no");
+              frame.setAttribute("allowfullscreen", "true");
+              frame.setAttribute("allow", "fullscreen");
+              if (!frame.dataset.analyticsResizeBound) {
+                frame.addEventListener("load", function () {
+                  scheduleResize();
+                  observedAnalyticsDocument = null;
+                  observeAnalyticsReadiness(frame);
+                });
+                frame.dataset.analyticsResizeBound = "true";
+              }
+
+              try {
+                if (frame.contentDocument && frame.contentDocument.readyState === "complete") {
+                  observeAnalyticsReadiness(frame);
+                }
+              } catch (error) {
+                // The timeout below remains a fallback if iframe inspection is unavailable.
+              }
+
+              const frameContainer = frame.parentElement;
+              if (frameContainer) {
+                frameContainer.style.paddingBottom = "0";
+                frameContainer.style.height = "auto";
+                frameContainer.style.minHeight = "0";
+                frameContainer.style.overflow = "visible";
+              }
+
+              let contentHeight = 0;
+              try {
+                const doc = frame.contentDocument || frame.contentWindow.document;
+                if (!doc) {
+                  return;
+                }
+
+                doc.documentElement.style.overflow = "hidden";
+                if (doc.body) {
+                  doc.body.style.overflow = "hidden";
+                }
+
+                contentHeight = Math.max(
+                  doc.body ? doc.body.scrollHeight : 0,
+                  doc.documentElement.scrollHeight,
+                  doc.body ? doc.body.offsetHeight : 0,
+                  doc.documentElement.offsetHeight
+                );
+              } catch (error) {
+                return;
+              }
+
+              if (contentHeight > 0) {
+                contentHeight = contentHeight + 24;
+                frame.style.position = "relative";
+                frame.style.height = contentHeight + "px";
+                frame.style.minHeight = contentHeight + "px";
+                frame.style.overflow = "hidden";
+                if (frameContainer) {
+                  frameContainer.style.height = contentHeight + "px";
+                }
+              }
+            };
+
+            const scheduleResize = function () {
+              resizeDashFrame();
+              window.setTimeout(resizeDashFrame, 250);
+              window.setTimeout(resizeDashFrame, 800);
+            };
+
+            window.addEventListener("load", scheduleResize);
+            window.addEventListener("resize", scheduleResize);
+            window.setInterval(resizeDashFrame, 1500);
+            window.setTimeout(hideAnalyticsLoader, 30000);
+            scheduleResize();
+            })();
+          </script>
+
+          <br>
+          {{ plot | safe }}
+          <br>
+        {% else %}
+          <div class="col-12">
+            <div class="profile-summary-card analytics-empty-state">
+              <p>{% trans "No studies are available for analytics yet." %}</p>
+            </div>
+          </div>
+        {% endif %}
         
-    </div> 
+    </div>
+
  
 {% endblock %}

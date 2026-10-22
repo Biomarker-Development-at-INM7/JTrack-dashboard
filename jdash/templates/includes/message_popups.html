@@ -1,0 +1,69 @@
+{% if messages %}
+<div class="jdash-message-popups" aria-live="polite" aria-atomic="false">
+  {% for message in messages %}
+  <div class="jdash-message-popup jdash-message-popup--{{ message.tags|default:'info' }}"
+       role="{% if 'error' in message.tags %}alert{% else %}status{% endif %}"
+       data-jdash-message-popup>
+    <span class="jdash-message-popup-icon" aria-hidden="true">
+      {% if 'success' in message.tags %}
+      <i class="fas fa-check-circle"></i>
+      {% elif 'error' in message.tags %}
+      <i class="fas fa-times-circle"></i>
+      {% elif 'warning' in message.tags %}
+      <i class="fas fa-exclamation-triangle"></i>
+      {% else %}
+      <i class="fas fa-info-circle"></i>
+      {% endif %}
+    </span>
+    <span class="jdash-message-popup-text">{{ message }}</span>
+    <button type="button" class="jdash-message-popup-close" aria-label="Close message" data-jdash-message-close>
+      <i class="fas fa-times" aria-hidden="true"></i>
+    </button>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+<script>
+  window.showJdashMessage = function (text, level) {
+    const icons = {
+      success: "fa-check-circle",
+      error: "fa-times-circle",
+      warning: "fa-exclamation-triangle",
+      info: "fa-info-circle"
+    };
+    const severity = icons[level] ? level : "info";
+    let container = document.querySelector(".jdash-message-popups");
+    if (!container) {
+      container = document.createElement("div");
+      container.className = "jdash-message-popups";
+      container.setAttribute("aria-live", "polite");
+      document.body.appendChild(container);
+    }
+    const popup = document.createElement("div");
+    popup.className = "jdash-message-popup jdash-message-popup--" + severity;
+    popup.setAttribute("role", severity === "error" ? "alert" : "status");
+    popup.innerHTML = '<span class="jdash-message-popup-icon" aria-hidden="true"><i class="fas ' + icons[severity] + '"></i></span>'
+      + '<span class="jdash-message-popup-text"></span>'
+      + '<button type="button" class="jdash-message-popup-close" aria-label="Close message"><i class="fas fa-times" aria-hidden="true"></i></button>';
+    popup.querySelector(".jdash-message-popup-text").textContent = text;
+    const dismiss = function () {
+      popup.classList.add("jdash-message-popup--leaving");
+      window.setTimeout(function () { popup.remove(); }, 220);
+    };
+    popup.querySelector("button").addEventListener("click", dismiss);
+    container.appendChild(popup);
+    window.setTimeout(dismiss, 6000);
+  };
+
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll("[data-jdash-message-popup]").forEach(function (popup, index) {
+      const closeButton = popup.querySelector("[data-jdash-message-close]");
+      const dismiss = function () {
+        popup.classList.add("jdash-message-popup--leaving");
+        window.setTimeout(function () { popup.remove(); }, 220);
+      };
+      if (closeButton) closeButton.addEventListener("click", dismiss);
+      window.setTimeout(dismiss, 6000 + (index * 350));
+    });
+  });
+</script>

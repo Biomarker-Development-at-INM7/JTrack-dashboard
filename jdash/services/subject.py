@@ -439,7 +439,51 @@ class Subject:
         logger.debug("Subject.create_qr_codes return_value=%s", None)
 
     @staticmethod
-    def write_pdf(study_id, subject_name):
+    def add_qr_activations(study_id, subject_name, start_activation=5, end_activation=8):
+        """Generate an additional activation range and add it to page two of the subject PDF."""
+        if os.path.basename(subject_name) != subject_name or not subject_name.startswith(f"{study_id}_"):
+            raise ValueError("Invalid subject identifier")
+
+        qr_path = os.path.join(
+            settings.DASH_FOLDER,
+            config.app_study_folder,
+            study_id,
+            config.qr_folder,
+        )
+        pdf_path = os.path.join(
+            settings.DASH_FOLDER,
+            config.app_study_folder,
+            study_id,
+            config.sheets_folder,
+            subject_name + constants.pdf_extension,
+        )
+        if not os.path.isfile(pdf_path):
+            raise FileNotFoundError(f"Subject PDF does not exist: {subject_name}")
+
+        for activation_number in range(start_activation, end_activation + 1):
+            user_activation_number = f"{subject_name}_{activation_number}"
+            output_path = os.path.join(qr_path, user_activation_number + ".png")
+            if os.path.isfile(output_path):
+                continue
+
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_H,
+                box_size=10,
+                border=4,
+            )
+            qr.add_data(config.subject_QR_code_url % (user_activation_number, study_id))
+            qr.make(fit=True)
+            qr.make_image().save(output_path)
+
+        Subject.write_pdf(
+            study_id,
+            subject_name,
+            additional_activation_range=(start_activation, end_activation),
+        )
+
+    @staticmethod
+    def write_pdf(study_id, subject_name, additional_activation_range=None):
         """
         Generate a subject PDF based on QR codes and subject information.
 
@@ -466,6 +510,8 @@ class Subject:
             subject_name + '.pdf'
         )
 
+        existing_stat = os.stat(pdf_path) if os.path.exists(pdf_path) else None
+        temporary_pdf_path = pdf_path + ".tmp.pdf"
         pdf = SubjectPDF(study_id)
         pdf_string = "<html>"
         pdf_string += pdf.header()
@@ -474,8 +520,24 @@ class Subject:
         pdf_string += pdf.draw_input_line('Clinical ID')
         pdf_string += "<br><br>"
         pdf_string += pdf.qr_codes(qr_codes_path)
+        if additional_activation_range:
+            start_activation, end_activation = additional_activation_range
+            pdf_string += '<div style="page-break-before: always;"></div>'
+            pdf_string += pdf.draw_input_line_filled('Subject ID', subject_name)
+            pdf_string += "<br><br>"
+            pdf_string += pdf.qr_codes(
+                qr_codes_path,
+                start_activation=start_activation,
+                end_activation=end_activation,
+            )
         pdf_string += "</body></html>"
-        pdfkit.from_string(pdf_string, pdf_path, options={"enable-local-file-access": ""})
+        pdfkit.from_string(pdf_string, temporary_pdf_path, options={"enable-local-file-access": ""})
+        os.replace(temporary_pdf_path, pdf_path)
+        if existing_stat:
+            try:
+                os.chown(pdf_path, existing_stat.st_uid, existing_stat.st_gid)
+            except PermissionError:
+                logger.warning("Could not preserve PDF ownership for %s", pdf_path)
         os.chmod(pdf_path, 0o0775)
         logger.debug("Subject.write_pdf finished for study_id=%s subject_name=%s", study_id, subject_name)
         logger.debug("Subject.write_pdf return_value=%s", None)

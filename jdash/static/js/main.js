@@ -27,12 +27,29 @@ $(document).ready(function() {
 
   function setIndexLayout(layout) {
     const showList = layout === 'list';
+    const listContainer = document.getElementById('index-list');
+    const gridContainer = document.getElementById('index-grid');
 
-    document.getElementById("index-list").style.display = showList ? "" : "none";
-    document.getElementById("index-grid").style.display = showList ? "none" : "";
+    if (!listContainer || !gridContainer) {
+      return;
+    }
+
+    listContainer.style.display = '';
+    listContainer.classList.toggle('study-grid-mode', !showList);
+    gridContainer.style.display = showList ? 'none' : '';
 
     $('#grid').toggleClass('active', !showList).attr('aria-pressed', String(!showList));
     $('#list').toggleClass('active', showList).attr('aria-pressed', String(showList));
+
+    if (showList && window.studyIndexDataTable) {
+      window.requestAnimationFrame(function () {
+        window.studyIndexDataTable.columns.adjust();
+      });
+    }
+  }
+
+  if (document.getElementById('index-list')) {
+    setIndexLayout('grid');
   }
 
   $('#list').click(function(event){
@@ -82,7 +99,7 @@ function initializeSubjectChipMultiSelects() {
     const values = document.createElement('div');
     values.className = 'subject-chip-values';
     const input = document.createElement('input');
-    input.type = 'search';
+    input.type = 'text';
     input.className = 'subject-chip-filter';
     input.placeholder = filterLabel;
     input.setAttribute('aria-label', filterLabel);
@@ -134,7 +151,7 @@ function initializeSubjectChipMultiSelects() {
       const query = input.value.trim().toLowerCase();
       const matches = Array.from(select.options).filter(function (option) {
         return option.value && !option.selected && option.textContent.toLowerCase().includes(query);
-      }).slice(0, 12);
+      });
       menu.innerHTML = '';
       matches.forEach(function (option) {
         const item = document.createElement('button');
@@ -155,7 +172,13 @@ function initializeSubjectChipMultiSelects() {
       menu.classList.toggle('is-open', document.activeElement === input && matches.length > 0);
     }
 
-    input.addEventListener('input', renderOptions);
+    input.addEventListener('input', function () {
+      if (!input.value.trim() && selectedOption()) {
+        select.value = '';
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      renderOptions();
+    });
     input.addEventListener('focus', renderOptions);
     input.addEventListener('blur', function () {
       window.setTimeout(function () { menu.classList.remove('is-open'); }, 100);
@@ -177,6 +200,107 @@ function initializeSubjectChipMultiSelects() {
 
 document.addEventListener('DOMContentLoaded', initializeSubjectChipMultiSelects);
 
+function initializeStudySurveySearchSelects() {
+  document.querySelectorAll('.study-searchable-select-field select').forEach(function (select) {
+    if (select.dataset.searchSelectReady === 'true') return;
+    select.dataset.searchSelectReady = 'true';
+    select.classList.add('study-searchable-native-select');
+
+    const field = select.closest('.study-searchable-select-field');
+    const placeholder = field.dataset.searchPlaceholder || 'Search surveys';
+    const clearLabel = field.dataset.clearLabel || 'Remove selected option';
+    const allowClear = field.dataset.allowClear !== 'false';
+    const widget = document.createElement('div');
+    widget.className = 'study-searchable-select';
+    const input = document.createElement('input');
+    input.type = 'search';
+    input.className = 'study-searchable-select-input';
+    input.placeholder = placeholder;
+    input.setAttribute('aria-label', placeholder);
+    input.setAttribute('autocomplete', 'off');
+    const toggle = document.createElement('span');
+    toggle.className = 'study-searchable-select-arrow';
+    toggle.setAttribute('aria-hidden', 'true');
+    toggle.textContent = '⌄';
+    const clearButton = document.createElement('button');
+    clearButton.type = 'button';
+    clearButton.className = 'study-searchable-select-clear';
+    clearButton.setAttribute('aria-label', clearLabel);
+    clearButton.setAttribute('title', clearLabel);
+    clearButton.textContent = '×';
+    const menu = document.createElement('div');
+    menu.className = 'study-searchable-select-options';
+    widget.appendChild(input);
+    widget.appendChild(clearButton);
+    widget.appendChild(toggle);
+    widget.appendChild(menu);
+    select.insertAdjacentElement('afterend', widget);
+
+    function selectedOption() {
+      return Array.from(select.options).find(function (option) {
+        return option.selected && option.value;
+      });
+    }
+
+    function syncInput() {
+      const selected = selectedOption();
+      input.value = selected ? selected.textContent : '';
+      clearButton.hidden = !allowClear || !selected;
+    }
+
+    function renderOptions() {
+      const query = input.value.trim().toLowerCase();
+      const current = selectedOption();
+      const matches = Array.from(select.options).filter(function (option) {
+        return option.value && option.textContent.toLowerCase().includes(query);
+      });
+      menu.innerHTML = '';
+      matches.forEach(function (option) {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'study-searchable-select-option';
+        item.classList.toggle('is-selected', Boolean(current && current.value === option.value));
+        item.textContent = option.textContent;
+        item.addEventListener('mousedown', function (event) {
+          event.preventDefault();
+          select.value = option.value;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          syncInput();
+          menu.classList.remove('is-open');
+          input.blur();
+        });
+        menu.appendChild(item);
+      });
+      menu.classList.toggle('is-open', document.activeElement === input && matches.length > 0);
+    }
+
+    input.addEventListener('focus', function () {
+      input.select();
+      renderOptions();
+    });
+    input.addEventListener('input', renderOptions);
+    input.addEventListener('blur', function () {
+      window.setTimeout(function () {
+        menu.classList.remove('is-open');
+        syncInput();
+      }, 100);
+    });
+    if (allowClear) {
+      clearButton.addEventListener('click', function () {
+        select.value = '';
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+        input.value = '';
+        renderOptions();
+        input.focus();
+      });
+    }
+    select.addEventListener('change', syncInput);
+    syncInput();
+  });
+}
+
+document.addEventListener('DOMContentLoaded', initializeStudySurveySearchSelects);
+
 function change_active_sensors() {
   // Get selected options from the Passive Sensors dropdown
   let selectedOptions = Array.from(document.getElementById('id_sensor_list').selectedOptions);
@@ -189,7 +313,7 @@ function change_active_sensors() {
   let allActiveOptions = Array.from(sensorListLimited.options);
 
   // Add back any options that were previously deselected in Passive Sensors
-  let allSensors = ["accelerometer", "activity", "application_usage", "barometer", "gravity_sensor", "gyroscope", "location", "magnetic_sensor", "rotation_vector", "linear_acceleration", "lockUnlock", "voice"];
+  let allSensors = [ "activity", "application_usage", "barometer", "gravity_sensor", "gyroscope", "location", "magnetic_sensor", "rotation_vector", "linear_acceleration", "lockUnlock", "voice", "pedometer", "homeBeacon"];
 
   // Clear the Active Sensors dropdown
   //sensorListLimited.innerHTML = '';
@@ -199,7 +323,7 @@ function change_active_sensors() {
       if (!selectedValues.includes(sensor)) {
           let option = document.createElement('option');
           option.value = sensor;
-          option.text = sensor.replace(/_/g, ' ');
+          option.text = sensor === 'homeBeacon' ? 'homeStation' : sensor.replace(/_/g, ' ');
           sensorListLimited.add(option);
             // At least one sensor is being added back to the list
       
@@ -221,7 +345,7 @@ function change_active_sensors() {
   let allActiveOptions = Array.from(sensorListLimited.options);
 
   // Add back any options that were previously deselected in Passive Sensors
-  let allSensors = ["accelerometer", "activity", "application_usage", "barometer", "gravity_sensor", "gyroscope", "location", "magnetic_sensor", "rotation_vector", "linear_acceleration", "lockUnlock", "voice"];
+  let allSensors = ["accelerometer", "activity", "application_usage", "barometer", "gravity_sensor", "gyroscope", "location", "magnetic_sensor", "rotation_vector", "linear_acceleration", "lockUnlock", "voice", "pedometer", "homeBeacon"];
 
   // Clear the Active Sensors dropdown
   sensorListLimited.innerHTML = '';
@@ -231,7 +355,7 @@ function change_active_sensors() {
       if (!selectedValues.includes(sensor)) {
           let option = document.createElement('option');
           option.value = sensor;
-          option.text = sensor.replace(/_/g, ' ');
+          option.text = sensor === 'homeBeacon' ? 'homeStation' : sensor.replace(/_/g, ' ');
           sensorListLimited.add(option);
             // At least one sensor is being added back to the list
       
@@ -547,8 +671,7 @@ function escapeHtml(value) {
 
 function getDevicePlatformMeta(deviceId) {
   const normalizedDeviceId = String(deviceId || '').trim();
-  //const isAndroid = /[A-Z]/.test(normalizedDeviceId);
-  const isAndroid = normalizedDeviceId == 'Android' 
+  const isAndroid = /[a-z]/.test(normalizedDeviceId);
   return {
     label: isAndroid ? 'Android' : 'iOS',
     iconClass: isAndroid ? 'fab fa-android' : 'fab fa-apple',
@@ -789,22 +912,494 @@ function detailFormatter(index, row, element){
 };
 
 function initTable() {
-  $('#metadata_table').bootstrapTable({
-    detailViewAlign : 'right',
-    paginationParts: ['pageInfoshort', 'pageSize', 'pageList']
-  })
-  updateMetadataDetailHeaderToggle();
-  $('#index_table').bootstrapTable({
-    detailViewAlign : 'right',
-    paginationParts: ['pageInfoshort', 'pageSize', 'pageList']
-  })
-    $('#qc_table').bootstrapTable({
-    detailViewAlign : 'right',
-    paginationParts: ['pageInfoshort', 'pageSize', 'pageList']
-  })
-  $('#study_audit_table').bootstrapTable({
-    paginationParts: ['pageInfoshort', 'pageSize', 'pageList']
-  })
+  initializeStudyIndexDataTable();
+  initializeStudyUtilityDataTables();
+  initializeJsonVersionDiff();
+
+  if (typeof $.fn.bootstrapTable !== 'function') {
+    return;
+  }
+
+  if ($('#metadata_table').length) {
+    $('#metadata_table').bootstrapTable({
+      detailViewAlign : 'right',
+      paginationParts: ['pageInfoshort', 'pageSize', 'pageList']
+    })
+    updateMetadataDetailHeaderToggle();
+  }
+
+}
+
+function initializeJsonVersionDiff() {
+  const modalElement = document.getElementById('jsonVersionDiffModal');
+  if (!modalElement || modalElement.dataset.diffReady === 'true') {
+    return;
+  }
+  modalElement.dataset.diffReady = 'true';
+
+  const statusElement = document.getElementById('json-version-diff-status');
+  const contentElement = document.getElementById('json-version-diff-content');
+  const summaryElement = document.getElementById('json-version-diff-summary');
+  const rowsElement = document.getElementById('json-version-diff-rows');
+  const changeLabels = {
+    added: modalElement.dataset.addedText,
+    removed: modalElement.dataset.removedText,
+    changed: modalElement.dataset.changedText
+  };
+  const changeClasses = {
+    added: 'bg-success',
+    removed: 'bg-danger',
+    changed: 'bg-primary'
+  };
+
+  function versionLabel(version) {
+    return version && version.version !== null && version.version !== undefined
+      ? `v${version.version}`
+      : '-';
+  }
+
+  function formatJsonValue(value, exists) {
+    if (!exists) {
+      return modalElement.dataset.notPresentText;
+    }
+    const formatted = JSON.stringify(value, null, 2);
+    return formatted === undefined ? String(value) : formatted;
+  }
+
+  modalElement.addEventListener('show.bs.modal', function (event) {
+    const trigger = event.relatedTarget;
+    const diffUrl = trigger && trigger.dataset.diffUrl;
+    if (!diffUrl) {
+      return;
+    }
+
+    const requestId = String(Date.now());
+    modalElement.dataset.requestId = requestId;
+    statusElement.textContent = modalElement.dataset.loadingText;
+    statusElement.classList.remove('text-danger');
+    contentElement.classList.add('d-none');
+    rowsElement.replaceChildren();
+
+    fetch(diffUrl, {
+      headers: { 'Accept': 'application/json' },
+      credentials: 'same-origin'
+    })
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(function (comparison) {
+        if (modalElement.dataset.requestId !== requestId) {
+          return;
+        }
+        if (!comparison.previous) {
+          statusElement.textContent = modalElement.dataset.oldestText;
+          return;
+        }
+
+        summaryElement.textContent = `${versionLabel(comparison.previous)} → ${versionLabel(comparison.selected)}`;
+        if (!comparison.changes.length) {
+          statusElement.textContent = modalElement.dataset.noChangesText;
+          return;
+        }
+
+        comparison.changes.forEach(function (change) {
+          const row = document.createElement('tr');
+          const pathCell = document.createElement('td');
+          const pathCode = document.createElement('code');
+          const typeCell = document.createElement('td');
+          const typeBadge = document.createElement('span');
+          const previousCell = document.createElement('td');
+          const previousValue = document.createElement('pre');
+          const selectedCell = document.createElement('td');
+          const selectedValue = document.createElement('pre');
+
+          pathCode.textContent = change.path;
+          pathCell.appendChild(pathCode);
+          typeBadge.className = `badge ${changeClasses[change.change_type] || 'bg-secondary'}`;
+          typeBadge.textContent = changeLabels[change.change_type] || change.change_type;
+          typeCell.appendChild(typeBadge);
+          previousValue.className = 'json-version-diff-value';
+          previousValue.textContent = formatJsonValue(change.previous, change.previous_exists);
+          previousCell.appendChild(previousValue);
+          selectedValue.className = 'json-version-diff-value';
+          selectedValue.textContent = formatJsonValue(change.selected, change.selected_exists);
+          selectedCell.appendChild(selectedValue);
+
+          row.appendChild(pathCell);
+          row.appendChild(typeCell);
+          row.appendChild(previousCell);
+          row.appendChild(selectedCell);
+          rowsElement.appendChild(row);
+        });
+
+        statusElement.textContent = '';
+        contentElement.classList.remove('d-none');
+      })
+      .catch(function () {
+        if (modalElement.dataset.requestId !== requestId) {
+          return;
+        }
+        statusElement.textContent = modalElement.dataset.errorText;
+        statusElement.classList.add('text-danger');
+      });
+  });
+}
+
+function initializeStudyUtilityDataTables() {
+  if (!window.DataTable) {
+    return;
+  }
+
+  const configurations = [
+    { id: 'qc_table', pageLength: 10, order: [] },
+    { id: 'study_audit_table', pageLength: 25, order: [[0, 'desc']] },
+    { id: 'study_json_versions_table', pageLength: 25, order: [[0, 'desc']] },
+    { id: 'survey_audit_table', pageLength: 25, order: [[0, 'desc']] }
+  ];
+
+  function initializeConfiguredTable(configuration) {
+    const tableElement = document.getElementById(configuration.id);
+    if (!tableElement || tableElement.dataset.dataTableInitialized === 'true') {
+      return;
+    }
+
+    const headers = Array.from(tableElement.querySelectorAll('thead th'));
+    const qcStatusColumn = headers.findIndex(header => header.classList.contains('qc-status-column'));
+    const columnDefs = [
+      { targets: '.no-sort', orderable: false }
+    ];
+    if (qcStatusColumn >= 0) {
+      columnDefs.push({ targets: qcStatusColumn, visible: false, searchable: true });
+    }
+
+    const dataTable = new window.DataTable(tableElement, {
+      autoWidth: false,
+      columnDefs: columnDefs,
+      layout: {
+        topStart: null,
+        topEnd: null,
+        bottomStart: ['pageLength', 'info'],
+        bottomEnd: 'paging'
+      },
+      order: configuration.order,
+      pageLength: configuration.pageLength,
+      lengthMenu: [10, 25, 50, 100, { label: 'All', value: -1 }],
+      scrollX: true
+    });
+
+    tableElement.dataset.dataTableInitialized = 'true';
+    tableElement.dataTableApi = dataTable;
+
+    if (configuration.id === 'qc_table') {
+      initializeQcTableFilters(dataTable, qcStatusColumn);
+    } else if (configuration.id === 'study_audit_table' || configuration.id === 'survey_audit_table') {
+      initializeAuditTableFilters(dataTable, headers);
+    }
+  }
+
+  configurations.forEach(function (configuration) {
+    const tableElement = document.getElementById(configuration.id);
+    const hiddenTabPane = tableElement && tableElement.closest('.tab-pane:not(.active)');
+    if (!hiddenTabPane) {
+      initializeConfiguredTable(configuration);
+    }
+  });
+
+  document.querySelectorAll('#study-history-tabs [data-bs-toggle="tab"]').forEach(function (tabButton) {
+    if (tabButton.dataset.tableResizeReady === 'true') {
+      return;
+    }
+    tabButton.dataset.tableResizeReady = 'true';
+    tabButton.addEventListener('shown.bs.tab', function () {
+      const pane = document.querySelector(tabButton.dataset.bsTarget);
+      const table = pane && pane.querySelector('table');
+      const configuration = table && configurations.find(function (candidate) {
+        return candidate.id === table.id;
+      });
+      window.requestAnimationFrame(function () {
+        if (configuration) {
+          initializeConfiguredTable(configuration);
+        }
+        if (table && table.dataTableApi) {
+          table.dataTableApi.columns.adjust().draw(false);
+        }
+      });
+    });
+  });
+}
+
+function populateDataTableFilter(dataTable, columnIndex, selectElement) {
+  if (columnIndex < 0 || !selectElement) {
+    return;
+  }
+
+  const values = new Set();
+  dataTable.column(columnIndex).data().each(function (value) {
+    const text = String(value === null || value === undefined ? '' : value).trim();
+    if (text && text !== '-') {
+      values.add(text);
+    }
+  });
+
+  Array.from(values).sort(function (left, right) {
+    return left.localeCompare(right, undefined, { sensitivity: 'base' });
+  }).forEach(function (value) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = value;
+    selectElement.appendChild(option);
+  });
+}
+
+function applyExactDataTableFilter(dataTable, columnIndex, value) {
+  if (columnIndex < 0) {
+    return;
+  }
+  const escapedValue = String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  dataTable.column(columnIndex).search(value ? `^${escapedValue}$` : '', true, false).draw();
+}
+
+function initializeQcTableFilters(dataTable, statusColumn) {
+  const searchInput = document.getElementById('qc-filter-search');
+  const statusSelect = document.getElementById('qc-filter-status');
+  const clearButton = document.getElementById('qc-filter-clear');
+
+  if (searchInput) {
+    searchInput.addEventListener('input', function () {
+      dataTable.search(searchInput.value).draw();
+    });
+  }
+  if (statusSelect && statusColumn >= 0) {
+    statusSelect.addEventListener('change', function () {
+      dataTable.column(statusColumn).search(statusSelect.value).draw();
+    });
+  }
+  if (clearButton) {
+    clearButton.addEventListener('click', function () {
+      if (searchInput) searchInput.value = '';
+      if (statusSelect) statusSelect.value = '';
+      dataTable.search('').columns().search('').page('first').draw();
+    });
+  }
+
+  initializeQcHeaderCheckboxes(dataTable);
+}
+
+function getQcFilteredCheckboxes(dataTable, checkboxClass) {
+  return dataTable.rows({ search: 'applied' }).nodes().toArray().flatMap(function (row) {
+    return Array.from(row.querySelectorAll(`.${checkboxClass}`));
+  }).filter(function (checkbox) {
+    return !checkbox.disabled;
+  });
+}
+
+function syncQcHeaderCheckboxes(dataTable) {
+  document.querySelectorAll('.qc-select-all').forEach(function (headerCheckbox) {
+    const checkboxes = getQcFilteredCheckboxes(dataTable, headerCheckbox.dataset.checkboxClass);
+    const checkedCount = checkboxes.filter(function (checkbox) {
+      return checkbox.checked;
+    }).length;
+
+    headerCheckbox.checked = checkboxes.length > 0 && checkedCount === checkboxes.length;
+    headerCheckbox.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+  });
+}
+
+function initializeQcHeaderCheckboxes(dataTable) {
+  const tableElement = document.getElementById('qc_table');
+
+  document.querySelectorAll('.qc-select-all').forEach(function (headerCheckbox) {
+    headerCheckbox.addEventListener('change', function () {
+      getQcFilteredCheckboxes(dataTable, headerCheckbox.dataset.checkboxClass).forEach(function (checkbox) {
+        checkbox.checked = headerCheckbox.checked;
+      });
+      syncQcHeaderCheckboxes(dataTable);
+    });
+  });
+
+  if (tableElement) {
+    tableElement.addEventListener('change', function (event) {
+      if (event.target.matches('.admin-checkbox, .owner-checkbox')) {
+        syncQcHeaderCheckboxes(dataTable);
+      }
+    });
+  }
+
+  dataTable.on('draw', function () {
+    syncQcHeaderCheckboxes(dataTable);
+  });
+  syncQcHeaderCheckboxes(dataTable);
+}
+
+function initializeAuditTableFilters(dataTable, headers) {
+  const searchInput = document.getElementById('audit-filter-search');
+  const actorSelect = document.getElementById('audit-filter-actor');
+  const actionSelect = document.getElementById('audit-filter-action');
+  const clearButton = document.getElementById('audit-filter-clear');
+  const actorColumn = headers.findIndex(header => header.classList.contains('audit-actor-column'));
+  const actionColumn = headers.findIndex(header => header.classList.contains('audit-action-column'));
+
+  populateDataTableFilter(dataTable, actorColumn, actorSelect);
+  populateDataTableFilter(dataTable, actionColumn, actionSelect);
+
+  if (searchInput) {
+    searchInput.addEventListener('input', function () {
+      dataTable.search(searchInput.value).draw();
+    });
+  }
+  if (actorSelect) {
+    actorSelect.addEventListener('change', function () {
+      applyExactDataTableFilter(dataTable, actorColumn, actorSelect.value);
+    });
+  }
+  if (actionSelect) {
+    actionSelect.addEventListener('change', function () {
+      applyExactDataTableFilter(dataTable, actionColumn, actionSelect.value);
+    });
+  }
+  if (clearButton) {
+    clearButton.addEventListener('click', function () {
+      if (searchInput) searchInput.value = '';
+      if (actorSelect) actorSelect.value = '';
+      if (actionSelect) actionSelect.value = '';
+      dataTable.search('').columns().search('').page('first').draw();
+    });
+  }
+}
+
+function initializeStudyIndexDataTable() {
+  const tableElement = document.getElementById('index_table');
+  if (!tableElement || !window.DataTable || tableElement.dataset.dataTableInitialized === 'true') {
+    return;
+  }
+
+  const headers = Array.from(tableElement.querySelectorAll('thead th'));
+  const createdColumn = headers.findIndex(header => header.classList.contains('index-created-column'));
+  const typesColumn = headers.findIndex(header => header.classList.contains('index-types-column'));
+  const columnDefs = [
+    { targets: '.no-sort', orderable: false },
+    { targets: '.index-enrolled-column', width: '220px' }
+  ];
+
+  if (createdColumn >= 0) {
+    columnDefs.push({ targets: createdColumn, visible: false, searchable: false });
+  }
+  if (typesColumn >= 0) {
+    columnDefs.push({ targets: typesColumn, visible: false, searchable: true });
+  }
+
+  const dataTable = new window.DataTable(tableElement, {
+    autoWidth: false,
+    columnDefs: columnDefs,
+    layout: {
+      topStart: null,
+      topEnd: null,
+      bottomStart: ['pageLength', 'info'],
+      bottomEnd: 'paging'
+    },
+    order: createdColumn >= 0 ? [[createdColumn, 'asc']] : [],
+    pageLength: 10,
+    lengthMenu: [10, 25, 50, 100, { label: 'All', value: -1 }],
+    scrollX: true
+  });
+
+  tableElement.dataset.dataTableInitialized = 'true';
+  window.studyIndexDataTable = dataTable;
+
+  const searchInput = document.getElementById('study-list-search');
+  const typeFilter = document.getElementById('study-type-filter');
+  const sortFilter = document.getElementById('study-sort-filter');
+  const clearButton = document.getElementById('study-filter-clear');
+  const countBadge = document.getElementById('study-visible-count');
+  const gridCards = document.getElementById('study-grid-cards');
+  const noResults = document.getElementById('no-results');
+  const cards = Array.from(document.querySelectorAll('#study-grid-cards .study-card'));
+  const cardsByKey = new Map(cards.map(card => [card.dataset.studyKey, card]));
+
+  function syncStudyGrid() {
+    if (!gridCards) {
+      return;
+    }
+
+    cards.forEach(card => {
+      card.style.display = 'none';
+    });
+
+    const visibleRows = dataTable.rows({ search: 'applied', page: 'current' }).nodes().toArray();
+    visibleRows.forEach(row => {
+      const card = cardsByKey.get(row.dataset.studyKey);
+      if (card) {
+        card.style.display = '';
+        gridCards.appendChild(card);
+      }
+    });
+
+    if (noResults) {
+      noResults.style.display = visibleRows.length ? 'none' : '';
+    }
+
+    if (countBadge) {
+      const info = dataTable.page.info();
+      const total = Number(countBadge.dataset.total || info.recordsTotal);
+      countBadge.textContent = info.recordsDisplay === total
+        ? `${total} ${total === 1 ? 'study' : 'studies'}`
+        : `${info.recordsDisplay} of ${total} studies`;
+    }
+  }
+
+  dataTable.on('draw', syncStudyGrid);
+
+  if (searchInput) {
+    searchInput.addEventListener('input', function () {
+      dataTable.search(searchInput.value).draw();
+    });
+    searchInput.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && searchInput.value) {
+        searchInput.value = '';
+        dataTable.search('').draw();
+      }
+    });
+  }
+
+  if (typeFilter && typesColumn >= 0) {
+    typeFilter.addEventListener('change', function () {
+      dataTable.column(typesColumn).search(typeFilter.value).draw();
+    });
+  }
+
+  if (sortFilter) {
+    const sortOrders = {
+      'created-desc': [createdColumn, 'asc'],
+      'created-asc': [createdColumn, 'desc'],
+      'name-asc': [0, 'asc'],
+      'name-desc': [0, 'desc'],
+      'subjects-desc': [1, 'desc'],
+      'subjects-asc': [1, 'asc']
+    };
+    sortFilter.addEventListener('change', function () {
+      const order = sortOrders[sortFilter.value];
+      if (order && order[0] >= 0) {
+        dataTable.order([order]).draw();
+      }
+    });
+  }
+
+  if (clearButton) {
+    clearButton.addEventListener('click', function () {
+      if (searchInput) searchInput.value = '';
+      if (typeFilter) typeFilter.value = '';
+      if (sortFilter) sortFilter.value = 'created-desc';
+
+      dataTable.search('').columns().search('');
+      dataTable.order(createdColumn >= 0 ? [[createdColumn, 'desc']] : [[0, 'asc']]);
+      dataTable.page('first').draw();
+    });
+  }
+
+  syncStudyGrid();
 }
 
 
@@ -909,7 +1504,9 @@ function validatePassiveCheckbox(it, box){
     show (it, box)
   }else{
     box.checked = false
-    alert("Please choose sensors in Passive monitoring ")
+    if (typeof window.showJdashMessage === 'function') {
+        window.showJdashMessage('Please choose sensors in Passive monitoring.', 'warning');
+    }
   }
 }
 
@@ -920,7 +1517,10 @@ function show (it, box) {
   if (!box.checked)
     document.getElementById("task_details_form").style.display = "none";
 
-    document.getElementById("labelling_0").checked = true;
+    const noLabelingOption = document.getElementById("labelling_0");
+    if (noLabelingOption) {
+      noLabelingOption.checked = true;
+    }
     
 
   }
@@ -946,6 +1546,135 @@ function remove_wbdevice_form(id){
   main.removeChild(wbdeviceFormEl)
   }
 }
+
+function initializeSensorSelectionTable(config) {
+  const storageSelect = document.getElementById(config.selectId);
+  const pickerSelect = document.getElementById(config.pickerSelectId);
+  const addButton = document.getElementById(config.addButtonId);
+  const tableBody = document.getElementById(config.tableBodyId);
+  const excludedSelect = config.excludedSelectId
+    ? document.getElementById(config.excludedSelectId)
+    : null;
+
+  if (!storageSelect || !pickerSelect || !addButton || !tableBody) {
+    return;
+  }
+
+  const renderSensorControls = function() {
+    const excludedValues = new Set(excludedSelect
+      ? Array.from(excludedSelect.selectedOptions).map(function(option) { return option.value; })
+      : []);
+
+    if (excludedValues.size > 0) {
+      Array.from(storageSelect.options).forEach(function(option) {
+        if (excludedValues.has(option.value)) {
+          option.selected = false;
+        }
+      });
+    }
+
+    pickerSelect.innerHTML = '';
+    Array.from(storageSelect.options).filter(function(option) {
+      return !option.selected && !excludedValues.has(option.value);
+    }).forEach(function(option) {
+      const availableOption = document.createElement('option');
+      availableOption.value = option.value;
+      availableOption.textContent = option.text;
+      pickerSelect.appendChild(availableOption);
+    });
+
+    tableBody.innerHTML = '';
+    Array.from(storageSelect.options).filter(function(option) {
+      return option.selected;
+    }).forEach(function(option) {
+      const row = document.createElement('tr');
+
+      const sensorCell = document.createElement('td');
+      sensorCell.textContent = option.text;
+      row.appendChild(sensorCell);
+
+      const actionCell = document.createElement('td');
+      const removeButton = document.createElement('button');
+      removeButton.type = 'button';
+      removeButton.className = 'btn btn-link text-danger p-0';
+      removeButton.setAttribute('aria-label', 'Remove ' + option.text);
+      removeButton.innerHTML = '<i class="fa fa-times-circle" aria-hidden="true"></i>';
+      removeButton.addEventListener('click', function() {
+        option.selected = false;
+        renderSensorControls();
+        document.dispatchEvent(new CustomEvent('study-sensors-changed'));
+      });
+      actionCell.appendChild(removeButton);
+      row.appendChild(actionCell);
+
+      tableBody.appendChild(row);
+    });
+  };
+
+  addButton.addEventListener('click', function() {
+    const selectedValues = new Set(Array.from(pickerSelect.selectedOptions).map(function(option) {
+      return option.value;
+    }));
+    Array.from(storageSelect.options).forEach(function(option) {
+      if (selectedValues.has(option.value)) {
+        option.selected = true;
+      }
+    });
+    renderSensorControls();
+    document.dispatchEvent(new CustomEvent('study-sensors-changed'));
+  });
+  if (excludedSelect) {
+    document.addEventListener('study-sensors-changed', renderSensorControls);
+  }
+  renderSensorControls();
+}
+
+function initializePassiveSensorPicker() {
+  initializeSensorSelectionTable({
+    selectId: 'id_sensor_list',
+    pickerSelectId: 'passive-sensor-picker',
+    addButtonId: 'add-passive-sensors',
+    tableBodyId: 'passive-sensor-tbody'
+  });
+}
+
+function initializeActiveSensorPicker() {
+  initializeSensorSelectionTable({
+    selectId: 'sensor_list_limited',
+    pickerSelectId: 'active-sensor-picker',
+    excludedSelectId: 'id_sensor_list',
+    addButtonId: 'add-active-sensors',
+    tableBodyId: 'active-sensor-tbody'
+  });
+}
+
+function initializeRecordingFrequencyEstimate() {
+  const frequencySelect = document.getElementById('id_recording_freq');
+  const estimate = document.getElementById('recording-frequency-storage-estimate');
+  if (!frequencySelect || !estimate) {
+    return;
+  }
+
+  const updateEstimate = function() {
+    const frequency = Number(frequencySelect.value || 0);
+    if (!frequency) {
+      estimate.textContent = 'Choose a frequency to see the estimated storage.';
+      return;
+    }
+
+    // Estimate scales from the project baseline: 50 Hz is up to ~1.5 GB
+    // per continuously sampled sensor per subject per day.
+    const storageMbPerMinute = (frequency * 0.03 * 1000) / (24 * 60);
+    const storageLabel = storageMbPerMinute < 1
+      ? `~${Number(storageMbPerMinute.toFixed(2))} MB`
+      : `~${Number(storageMbPerMinute.toFixed(1))} MB`;
+    estimate.textContent = `${frequency} Hz may use up to ${storageLabel} per sensor, per subject, per minute.`;
+  };
+
+  frequencySelect.addEventListener('change', updateEstimate);
+  updateEstimate();
+}
+
 function add_wbdevice_form(){
   
   
@@ -1001,14 +1730,18 @@ function add_task_form(){
   totalTaskForms.setAttribute('value', currentFormCount + 1)
   
   main.appendChild(taskFormEl)
-  const initialTaskForms = document.getElementById("id_form-INITIAL_FORMS")
-  if (initialTaskForms.value != 0 ){
-    document.getElementById("id_form-"+currentFormCount+"-task_name").value = ""
-    document.getElementById("id_form-"+currentFormCount+"-task_preparation").value = ""
-    document.getElementById("id_form-"+currentFormCount+"-task_duration").value = ""
-    document.getElementById("id_form-"+currentFormCount+"-task_description").value = ""
-    
-  }
+  [
+    'task_name',
+    'task_preparation',
+    'task_preparation_text',
+    'task_duration',
+    'task_description'
+  ].forEach(function(fieldName) {
+    const field = document.getElementById('id_form-' + currentFormCount + '-' + fieldName);
+    if (field) {
+      field.value = '';
+    }
+  });
   if (currentFormCount> 0){
     const removeBtn = document.getElementById("id_"+currentFormCount+"_remove_btn")
     if (removeBtn) {
@@ -1074,32 +1807,21 @@ $(document).on('change', '.file-input', function() {
 
 
 
-// QC methods
-// Toggle Select All Checkboxes
-function toggleSelectAll(type, button) {
-    // Get all checkboxes of the specified type
-    const checkboxes = document.querySelectorAll(`.${type}-checkbox`);
-    const shouldSelectAll = button.textContent === "Select All";
-    checkboxes.forEach((checkbox) => {
-        if (button.textContent == 'Select All'){
-            checkbox.checked = true
-        }else{
-            checkbox.checked = false
-        }
-    });
-
-    button.textContent = shouldSelectAll ? "Unselect All" : "Select All";
-}
-
 function sendCheckedFlagsToServer(study_name) {
-    // Get all rows in the table
-    const rows = document.querySelectorAll('tbody tr');
+    const qcTable = document.getElementById('qc_table');
+    const rows = qcTable && qcTable.dataTableApi
+      ? qcTable.dataTableApi.rows().nodes().toArray()
+      : Array.from(document.querySelectorAll('#qc_table tbody tr'));
 
     // Collect data for checked flags
     const testCaseFlags = [];
     rows.forEach((row) => {
         // Get the test case ID
-        const testCaseId = row.querySelector('.testcase-db-id').value.trim();
+        const testCaseIdInput = row.querySelector('.testcase-db-id');
+        if (!testCaseIdInput) {
+            return;
+        }
+        const testCaseId = testCaseIdInput.value.trim();
         // Check the state of admin and owner checkboxes
         const adminCheckbox = row.querySelector('.admin-checkbox');
         const ownerCheckbox = row.querySelector('.owner-checkbox');
@@ -1180,11 +1902,12 @@ function notifyQcComment(testCaseId, commentText, timestamp) {
             comment: commentText,
             timestamp: timestamp,
         }),
-    }).then((response) => {
+    }).then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
-            throw new Error(`QC comment notify failed: ${response.status}`);
+            throw new Error(payload.error || `QC comment notify failed: ${response.status}`);
         }
-        return response.json();
+        return payload;
     });
 }
 
@@ -1260,6 +1983,9 @@ function appendQcNote() {
     const text = (input.value || '').trim();
 
     if (!text) {
+        if (typeof window.showJdashMessage === 'function') {
+            window.showJdashMessage('Enter a comment before adding it.', 'warning');
+        }
         return;
     }
 
@@ -1281,9 +2007,18 @@ function appendQcNote() {
     input.focus();
 
     if (testCaseId) {
-        notifyQcComment(testCaseId, noteEntry.text, noteEntry.timestamp).catch((error) => {
-            console.error(error);
-        });
+        notifyQcComment(testCaseId, noteEntry.text, noteEntry.timestamp)
+            .then(() => {
+                if (typeof window.showJdashMessage === 'function') {
+                    window.showJdashMessage('QC comment saved successfully.', 'success');
+                }
+            })
+            .catch((error) => {
+                console.error(error);
+                if (typeof window.showJdashMessage === 'function') {
+                    window.showJdashMessage(error.message || 'The QC comment could not be saved or emailed.', 'error');
+                }
+            });
     }
 }
 
@@ -1711,35 +2446,32 @@ function addDeviceBlock() {
   block.dataset.devicePrefix = "devices";
   block.dataset.sensorPrefix = sensorPrefix;
 
-  block.innerHTML = ` <div class="row g-3 ">
-    <div class="d-flex align-items-center gap-3">
-      <div class="device-select form-group flex-grow-1  mb-4" "></div>
-      <div>
+  block.innerHTML = `<div class="row g-3 wearable-device-layout">
+    <div class="col-12 col-lg-5 wearable-device-controls">
+      <div class="d-flex align-items-center gap-3 mb-3">
+        <div class="device-select-slot form-group flex-grow-1 mb-0"></div>
         <a type="button" class="btn btn-outline-danger btn-sm remove-device-bt">
           <i class="fa fa-trash fa-lg"></i>
         </a>
       </div>
-    </div>
 
-    <input type="hidden" name="${sensorPrefix}-TOTAL_FORMS" value="0" id="id_${sensorPrefix}-TOTAL_FORMS">
-    <input type="hidden" name="${sensorPrefix}-INITIAL_FORMS" value="0" id="id_${sensorPrefix}-INITIAL_FORMS">
-    <input type="hidden" name="${sensorPrefix}-MIN_NUM_FORMS" value="0" id="id_${sensorPrefix}-MIN_NUM_FORMS">
-    <input type="hidden" name="${sensorPrefix}-MAX_NUM_FORMS" value="1000" id="id_${sensorPrefix}-MAX_NUM_FORMS">
+      <input type="hidden" name="${sensorPrefix}-TOTAL_FORMS" value="0" id="id_${sensorPrefix}-TOTAL_FORMS">
+      <input type="hidden" name="${sensorPrefix}-INITIAL_FORMS" value="0" id="id_${sensorPrefix}-INITIAL_FORMS">
+      <input type="hidden" name="${sensorPrefix}-MIN_NUM_FORMS" value="0" id="id_${sensorPrefix}-MIN_NUM_FORMS">
+      <input type="hidden" name="${sensorPrefix}-MAX_NUM_FORMS" value="1000" id="id_${sensorPrefix}-MAX_NUM_FORMS">
 
-    <div class="col-12 col-lg-5">
-      <div class="form-group">
+      <div class="form-group mb-2">
         <select class="form-control sensor-multi" multiple size="6"></select>
         <label class="text-primary">Wearable sensors for this device</label>
-        <small class="text-muted">Select one or more sensors, then click Add</small>
+        <small class="text-muted d-block">Select one or more sensors, then click Add</small>
       </div>
-    </div>
-    <div class="col-12 col-lg-2 d-flex align-items-start pt-lg-4">
-      <button type="button" class="btn btn-success add-selected-sensors-btn" >
+
+      <button type="button" class="btn btn-success add-selected-sensors-btn">
         Add
       </button>
     </div>
 
-    <div class="col-12 col-lg-5">
+    <div class="col-12 col-lg-7 wearable-device-table">
       <div class="table-responsive">
         <table class="table table-striped sensor-table mb-0">
           <thead>
@@ -1756,8 +2488,8 @@ function addDeviceBlock() {
     </div>
   </div>`;
 
-  block.querySelector(".device-select").appendChild(deviceSelect);
-  block.querySelector(".device-select").appendChild(label);
+  block.querySelector(".device-select-slot").appendChild(deviceSelect);
+  block.querySelector(".device-select-slot").appendChild(label);
 
   blocks.appendChild(block);
   totalDevicesEl.value = String(deviceIndex + 1);

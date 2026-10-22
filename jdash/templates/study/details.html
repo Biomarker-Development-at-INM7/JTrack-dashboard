@@ -10,7 +10,9 @@
 	<script src="{% static 'js/bootstrap-table.min.js' %}"></script>
 	<script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
 	<script src="{% static 'js/main.js' %}"></script>
+	<script src="{% static 'js/jdash_loading.js' %}"></script>
 	<link href="{% static 'css/form.css' %}" rel="stylesheet">
+	<link href="{% static 'css/jdash_loading.css' %}" rel="stylesheet">
 	{{ meta_data|get_dashboard_sensor_filter_values|json_script:"sensor-filter-defaults" }}
 	{{ meta_data|get_wearable_sensor_display_map|json_script:"wearable-sensor-display-map" }}
 {% trans "study_details_preparing_download" as study_details_preparing_download %}
@@ -30,8 +32,30 @@
     var deleteSubjectConfirmationValue = "";
     var deleteSubjectDataBackTarget = "";
 
+    function getStudyModal(modalId) {
+      const modalElement = document.getElementById(modalId);
+      if (!modalElement || !window.bootstrap || !window.bootstrap.Modal) {
+        return null;
+      }
+      return window.bootstrap.Modal.getOrCreateInstance(modalElement);
+    }
+
+    function showStudyModal(modalId) {
+      const modal = getStudyModal(modalId);
+      if (modal) {
+        modal.show();
+      }
+    }
+
+    function hideStudyModal(modalId) {
+      const modal = getStudyModal(modalId);
+      if (modal) {
+        modal.hide();
+      }
+    }
+
     function download_study_data(){
-      $("#downloadStudyDataModal").hide();
+      hideStudyModal("downloadStudyDataModal");
 
     }
 
@@ -45,7 +69,9 @@
         'input[name="type"]:checked, input[name="type"][type="hidden"]'
       );
       if (!selectedType) {
-        alert('{% translate "study_details_download_failed" %}');
+        if (typeof window.showJdashMessage === 'function') {
+          window.showJdashMessage('{% translate "study_details_download_failed" %}', 'error');
+        }
         return;
       }
       studyDataDownloadSubmitting = true;
@@ -121,7 +147,9 @@
             })
             .catch(function (error) {
               console.error(error);
-              alert('{% translate "study_details_download_failed" %}');
+              if (typeof window.showJdashMessage === 'function') {
+                window.showJdashMessage('{% translate "study_details_download_failed" %}', 'error');
+              }
             })
             .finally(function () {
               if (typeof hideJdashLoading === 'function') {
@@ -141,21 +169,23 @@
       downloadModal.addEventListener("show.bs.modal", function () {
         const processedCheckbox = document.getElementById("flexCheckDefault");
         const rawCheckbox = document.getElementById("flexCheckChecked");
-        if (processedCheckbox) {
-          processedCheckbox.checked = true;
-        }
         if (rawCheckbox) {
-          rawCheckbox.checked = false;
+          rawCheckbox.checked = true;
+        }
+        if (processedCheckbox) {
+          processedCheckbox.checked = false;
         }
       });
     });
 
-    function delete_subject_data(event){
+    function submitDeleteSubjectData(event){
       if (event) {
         event.preventDefault();
       }
       if (!isDeleteSubjectDataConfirmed()) {
-        alert("{{ study_details_delete_data_confirm_missing|escapejs }}");
+        if (typeof window.showJdashMessage === 'function') {
+          window.showJdashMessage("{{ study_details_delete_data_confirm_missing|escapejs }}", 'warning');
+        }
         return false;
       }
       const deletedataForm = document.forms.deletedataForm;
@@ -460,7 +490,7 @@
 	    //   if (dropoutDate) {
 	    //     dropoutDate.value = "{% now 'Y-m-d' %}";
 	    //   }
-	      $("#dropoutSubjectModal").modal('show');
+	      showStudyModal("dropoutSubjectModal");
 	    }
 
 	    function confirmDropoutSubject(event) {
@@ -477,13 +507,15 @@
 	        return;
 	      }
 	      if (!getSelectedSubjectForRemoval()) {
-	        alert("{% translate 'study_details_select_subject_to_delete' %}");
+	        if (typeof window.showJdashMessage === 'function') {
+	          window.showJdashMessage("{% translate 'study_details_select_subject_to_delete' %}", 'warning');
+	        }
 	        return;
 	      }
-	      $("#dropoutSubjectModal").modal('hide');
+	      hideStudyModal("dropoutSubjectModal");
 	      populateRemoveSubjectConfirmModal();
 	      window.setTimeout(function () {
-	        $("#removeSubjectConfirmModal").modal('show');
+	        showStudyModal("removeSubjectConfirmModal");
 	      }, 200);
 	    }
 
@@ -492,27 +524,27 @@
 	        event.preventDefault();
 	      }
 	      deleteSubjectDataBackTarget = "";
-	      $("#subjectActionModal").modal('show');
+	      showStudyModal("subjectActionModal");
 	    }
 
 	    function openRemoveSubjectFormModal() {
-	      $("#subjectActionModal").modal('hide');
+	      hideStudyModal("subjectActionModal");
 	      window.setTimeout(function () {
 	        openDropoutSubjectModal();
 	      }, 200);
 	    }
 
 	    function backToRemoveSubjectFormModal() {
-	      $("#removeSubjectConfirmModal").modal('hide');
+	      hideStudyModal("removeSubjectConfirmModal");
 	      window.setTimeout(function () {
-	        $("#dropoutSubjectModal").modal('show');
+	        showStudyModal("dropoutSubjectModal");
 	      }, 200);
 	    }
 
 	    function backToSubjectActionModalFromRemoveForm() {
-	      $("#dropoutSubjectModal").modal('hide');
+	      hideStudyModal("dropoutSubjectModal");
 	      window.setTimeout(function () {
-	        $("#subjectActionModal").modal('show');
+	        showStudyModal("subjectActionModal");
 	      }, 200);
 	    }
 
@@ -524,9 +556,9 @@
 	        reasonSelect.value = "";
 	      }
 	      populateDeleteSubjectDataModal([], "");
-	      $("#subjectActionModal").modal('hide');
+	      hideStudyModal("subjectActionModal");
 	      window.setTimeout(function () {
-	        $("#deleteDataModal").modal('show');
+	        showStudyModal("deleteDataModal");
 	      }, 200);
 	    }
 
@@ -535,10 +567,10 @@
 	    }
 
 	    function backToSubjectActionModalFromDeleteData() {
-	      $("#deleteDataModal").modal('hide');
+	      hideStudyModal("deleteDataModal");
 	      if (deleteSubjectDataBackTarget === "subjectActionModal") {
 	        window.setTimeout(function () {
-	          $("#subjectActionModal").modal('show');
+	          showStudyModal("subjectActionModal");
 	        }, 200);
 	      }
 	    }
@@ -554,12 +586,14 @@
               }
         }
         if (k==0)  {
-              alert("{% translate 'study_details_select_subject_to_delete' %}");
-              $("#deleteDataModal").modal('hide');
+              if (typeof window.showJdashMessage === 'function') {
+                window.showJdashMessage("{% translate 'study_details_select_subject_to_delete' %}", 'warning');
+              }
+              hideStudyModal("deleteDataModal");
         }else{
           deleteSubjectDataBackTarget = "";
           populateDeleteSubjectDataModal(normalizeSubjectIds(selectedItems), "{{ study_details_not_applicable|escapejs }}");
-          $("#deleteDataModal").modal('show');
+          showStudyModal("deleteDataModal");
         }
         
 
@@ -649,7 +683,7 @@
 		                      {% if member.display_name != member.username %}<small class="study-member-username">{{ member.username }}</small>{% endif %}
 		                    </td>
 		                    <td>{% if member.email %}{{ member.email }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
-		                    <td>{% if member.role %}{{ member.role }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+		                    <td>{% if member.role_key == "maintainer" or member.role == "maintainer" or member.role == "Maintainer" %}{% trans "profile_role_principal_investigator" %}{% elif member.role %}{{ member.role }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
 		                  </tr>
 		                  {% empty %}
 		                  <tr><td colspan="3" class="text-muted text-center py-4">{% trans "study_details_no_members" %}</td></tr>
@@ -752,6 +786,63 @@
 		        </div>
 		      </div>
 		    </div>
+
+		    {% if notification_delivery_results %}
+		    <div class="modal fade" id="notificationResultsModal" tabindex="-1" aria-labelledby="notificationResultsModalLabel" aria-hidden="true">
+		      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+		        <div class="modal-content">
+		          <div class="modal-header">
+		            <h5 class="modal-title" id="notificationResultsModalLabel">{% trans "Notification delivery results" %}</h5>
+		          </div>
+		          <div class="modal-body">
+		            <div class="study-info-note mb-3">
+		              <div><strong>{% trans "global_title" %}:</strong> {{ sent_notification_title }}</div>
+		              <div><strong>{% trans "global_desc" %}:</strong> {{ sent_notification_text }}</div>
+		            </div>
+		            <div class="table-responsive">
+		              <table class="table table-bordered align-middle mb-0">
+		                <thead>
+		                  <tr>
+		                    <th scope="col">{% trans "study_details_subjects_short" %}</th>
+		                    <th scope="col">{% trans "App" %}</th>
+		                    <th scope="col">{% trans "Status" %}</th>
+		                    <th scope="col">{% trans "Message ID" %}</th>
+		                  </tr>
+		                </thead>
+		                <tbody>
+		                  {% for delivery in notification_delivery_results %}
+		                  <tr>
+		                    <td>{{ delivery.subject_id }}</td>
+		                    <td>{{ delivery.modality|default:"—" }}</td>
+		                    <td>
+		                      {% if delivery.success %}
+		                      <span class="text-success">{% trans "Sent" %}</span>
+		                      {% else %}
+		                      <span class="text-danger">{% trans "Failed" %}</span>
+		                      {% endif %}
+		                    </td>
+		                    <td><code>{{ delivery.message_id|default:"—" }}</code></td>
+		                  </tr>
+		                  {% endfor %}
+		                </tbody>
+		              </table>
+		            </div>
+		          </div>
+		          <div class="modal-footer">
+		            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans "Done" %}</button>
+		          </div>
+		        </div>
+		      </div>
+		    </div>
+		    <script>
+		      document.addEventListener("DOMContentLoaded", function () {
+		        const resultsModal = document.getElementById("notificationResultsModal");
+		        if (resultsModal && window.bootstrap && window.bootstrap.Modal) {
+		          window.bootstrap.Modal.getOrCreateInstance(resultsModal).show();
+		        }
+		      });
+		    </script>
+		    {% endif %}
 		    {% endif %}
 		    {% if request.user|can_manage_study %}
 		    <div class="modal fade" id="changeSubjectStatusModal" tabindex="-1" aria-labelledby="changeSubjectStatusModalLabel" aria-hidden="true">
@@ -845,6 +936,50 @@
 		      </div>
 		    </div>
 		    {% endif %}
+		    {% if request.user|can_manage_subjects %}
+		    {% trans "Generating additional QR codes. Please wait…" as additional_qr_loading_message %}
+		    <div class="modal fade" id="additionalQrModal" tabindex="-1" aria-labelledby="additionalQrModalLabel" aria-hidden="true">
+		      <div class="modal-dialog">
+		        <div class="modal-content">
+		          <div class="modal-header">
+		            <h5 class="modal-title" id="additionalQrModalLabel">{% trans "Generate QR codes 5–8" %}</h5>
+		          </div>
+		          <form
+		            action="{% url 'generate_additional_qr_codes' study_name=meta_data.name %}"
+		            method="POST"
+		            onsubmit="if (typeof showJdashLoading === 'function') { showJdashLoading('{{ additional_qr_loading_message|escapejs }}'); }">
+		            {% csrf_token %}
+		            <div class="modal-body">
+		              {% if d %}
+		              <p class="text-muted mb-4">{% trans "Select the subjects that need four additional activation QR codes. Their existing PDF will receive a second page." %}</p>
+		              <div class="form-group required subject-chip-field"
+		                data-filter-placeholder="{% trans 'study_details_filter_subjects' %}"
+		                data-clear-label="{% trans 'study_details_clear_all_subjects' %}"
+		                data-remove-label="{% trans 'study_details_remove_selection' %}">
+		                <select id="additionalQrSubjectSelect" class="form-control" name="subject_ids" multiple size="6" required>
+		                  {% for subject_id, subject_rows in d.items %}
+		                  <option value="{{ subject_id }}">{{ subject_id }}</option>
+		                  {% endfor %}
+		                </select>
+		                <label for="additionalQrSubjectSelect">
+		                  {% trans "Subject IDs" %} <span class="text-danger">*</span>
+		                </label>
+		              </div>
+		              {% else %}
+		              <span class="study-no-subjects-message">{% trans "study_details_no_subjects_available" %}</span>
+		              {% endif %}
+		            </div>
+		            <div class="modal-footer">
+		              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+		              {% if d %}
+		              <button type="submit" class="btn btn-primary">{% trans "Generate" %}</button>
+		              {% endif %}
+		            </div>
+		          </form>
+		        </div>
+		      </div>
+		    </div>
+		    {% endif %}
 		    <div class="modal fade" id="subjectActionModal" tabindex="-1" aria-labelledby="subjectActionModalLabel" aria-hidden="true">
 		      <div class="modal-dialog modal-lg">
 		        <div class="modal-content">
@@ -875,7 +1010,7 @@
             </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'study_details_close' %}"></button>
           </div>
-          <form id ="deletedataForm" name="deletedataForm" action="{%url 'details' study_name=meta_data.name %}" method="POST" onsubmit="return delete_subject_data(event)">
+          <form id ="deletedataForm" name="deletedataForm" action="{%url 'details' study_name=meta_data.name %}" method="POST" onsubmit="return submitDeleteSubjectData(event)">
               {% csrf_token %}
               <input type="hidden" name="delete_subject_data" value="1">
 	          <div class="modal-body">
@@ -959,7 +1094,7 @@
 	              id="deleteDataSubmitButton"
 	              type="button"
 	              class="btn btn-danger"
-	              onclick="delete_subject_data(event)"
+	              onclick="submitDeleteSubjectData(event)"
 	              disabled>
 	              {% trans "study_details_delete_data_confirm" %}
 	            </button>
@@ -1026,7 +1161,6 @@
           <div class="modal-content">
             <div class="modal-header">
               <h5 class="modal-title" id="closeModalLabel">{% trans "study_details_close_study" %}</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'study_details_close' %}"></button>
             </div>
             <div class="modal-body">
               <div class="study-info-note mb-0" role="alert">
@@ -1034,6 +1168,7 @@
               </div>
             </div>
             <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{% trans "common_cancel" %}</button>
               <input type="button"  value="{% trans 'study_details_confirm' %}" type="submit" class="btn btn-primary" onclick="close_study()" >
             </div>
           </div>
@@ -1054,13 +1189,7 @@
       </div> 
 	      <div class="row mx-0">
 	        <div class="col-12">
-	          {% if messages %}
-	          <ul class="messages">
-	              {% for message in messages %}
-	              <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
-	              {% endfor %}
-	          </ul>
-	          {% endif %}
+	          
 
 		          <section class="study-details-shell">
 		            <div class="study-details-header">
@@ -1072,9 +1201,6 @@
 		                  </a></h3>
 		                  {% endif %}
 		                  <h3>{{meta_data.name}}</h3>
-		                  <span class="study-details-duration-badge">
-		                    {% trans "study_details_duration_short" %}: {{meta_data.duration}} {% trans "study_days" %}
-		                  </span>
 		                  <button
 		                    type="button"
 		                    name="study_data_download"
@@ -1087,8 +1213,46 @@
 		                  </button>
 		                </div>
 		                {% if meta_data.description %}
-		                <p class="study-details-description">{{meta_data.description}}</p>
+		                <div class="study-metadata-item study-description-card">
+		                  <span class="study-metadata-label">{% trans "study_description" %}</span>
+		                  <span class="study-description-value">{{ meta_data.description }}</span>
+		                </div>
 		                {% endif %}
+		                <div class="study-metadata-row">
+		                  <div class="study-metadata-item study-recording-duration-item">
+		                    <span class="study-metadata-label">{% trans "Recording duration per subject" %}</span>
+		                    <span class="study-metadata-value study-recording-duration-value">{{ meta_data.duration }} {% trans "study_days" %}</span>
+		                  </div>
+		                  <div class="study-metadata-item study-total-subjects-item">
+		                    <span class="study-metadata-label">{% trans "study_details_total_number_of_subjects" %}</span>
+		                    <span class="study-metadata-value study-total-subjects-value">{{ total_count }}</span>
+		                  </div>
+		                  <div class="study-metadata-item study-enrolled-subjects-item">
+		                    <button
+		                      class="study-enrolled-toggle collapsed"
+		                      type="button"
+		                      data-bs-toggle="collapse"
+		                      data-bs-target="#enrolledSubjectStatuses"
+		                      aria-expanded="false"
+		                      aria-controls="enrolledSubjectStatuses">
+		                      <span class="study-metadata-label">{% trans "study_details_enrolled_short" %}</span>
+		                      <span class="study-enrolled-toggle-meta">
+		                        <span class="study-metadata-value study-enrolled-total">{{ meta_data.number_of_enrolled_subjects|default:0 }}</span>
+		                        <i class="fas fa-chevron-down" aria-hidden="true"></i>
+		                      </span>
+		                    </button>
+		                    <div class="collapse" id="enrolledSubjectStatuses">
+		                      {% with stats=meta_data.stats %}
+		                      <div class="study-enrolled-statuses">
+		                        <span class="study-enrolled-status study-enrolled-status--active"><i></i><span>{% trans "study_details_subjects_in_study" %}</span><strong>{{ stats.instudy|default:0 }}</strong></span>
+		                        <span class="study-enrolled-status study-enrolled-status--left"><i></i><span>{% trans "study_details_subjects_left" %}</span><strong>{{ stats.leftstudy|default:0 }}</strong></span>
+		                        <span class="study-enrolled-status study-enrolled-status--removed"><i></i><span>{% trans "study_details_subjects_removed" %}</span><strong>{{ stats.removed|default:0 }}</strong></span>
+		                        <span class="study-enrolled-status study-enrolled-status--completed"><i></i><span>{% trans "study_details_subjects_completed" %}</span><strong>{{ stats.completed|default:0 }}</strong></span>
+		                      </div>
+		                      {% endwith %}
+		                    </div>
+		                  </div>
+		                </div>
 				<div class="study-members-sensors-row">
 				<div class="study-members-summary">
 				  <div class="study-members-summary-label">
@@ -1107,6 +1271,18 @@
 				</div>
 				                <div class="study-sensor-summary">
 				                  <div class="study-sensor-button-line">
+				                    {% if meta_data.survey %}
+				                      {% if meta_data.survey.id %}
+				                      <a class="btn btn-outline-primary btn-sm study-ema-link-button" href="{% url 'create_survey' survey_id=meta_data.survey.id %}">
+				                        EMA
+				                      </a>
+				                      {% elif request.user|can_manage_survey %}
+				                      <a class="btn btn-outline-primary btn-sm study-ema-link-button" href="{%url 'edit_survey' study_name=meta_data.name %}">
+				                        EMA
+				                      </a>
+				                      {% endif %}
+				                    {% endif %}
+
 				                    {% if meta_data.sensor_list %}
 				                    <button
 				                      class="study-sensor-toggle collapsed"
@@ -1155,17 +1331,6 @@
 				                    </button>
 				                    {% endif %}
 
-				                    {% if meta_data.survey %}
-				                      {% if meta_data.survey.id %}
-				                      <a class="btn btn-outline-primary btn-sm study-ema-link-button" href="{% url 'create_survey' survey_id=meta_data.survey.id %}">
-				                        EMA
-				                      </a>
-				                      {% elif request.user|can_manage_survey %}
-				                      <a class="btn btn-outline-primary btn-sm study-ema-link-button" href="{%url 'edit_survey' study_name=meta_data.name %}">
-				                        EMA
-				                      </a>
-				                      {% endif %}
-				                    {% endif %}
 				                  </div>
 
 				                  {% if meta_data.sensor_list %}
@@ -1194,17 +1359,19 @@
 				                      {{ meta_data.wearables|get_wearable_sensor_lines|safe }}
 			                    </div>
 			                  </div>
-			                  {% endif %}
+				                  {% endif %}
 			                </div>
 				</div>
 			              </div>
 
-		              <div class="study-details-actions">
-		                {% if request.user|can_manage_study %}
-		                <a class="btn btn-outline-primary" href="{% url 'qc_study' study_name=meta_data.name %}">
-		                  {% trans "global_qc" %}
-		                </a>
-		                <form name="closeForm" class="study-details-inline-form" action="{%url 'close' study_name=meta_data.name %}" method="POST">
+			              <div class="study-details-actions">
+			                {% if request.user|can_manage_study %}
+			                <a class="btn btn-outline-primary" href="{% url 'qc_study' study_name=meta_data.name %}">
+			                  {% trans "global_qc" %}
+			                </a>
+			                {% endif %}
+			                {% if can_conclude_study %}
+			                <form name="closeForm" class="study-details-inline-form" action="{%url 'close' study_name=meta_data.name %}" method="POST">
 		                  {% csrf_token %}
 		                  <input
 		                    name="close"
@@ -1213,49 +1380,18 @@
 		                    class="btn btn-outline-danger"
 		                    role="button"
 		                    data-bs-toggle="modal"
-		                    data-bs-target="#closeModal" />
-		                </form>
-		                {% endif %}
+			                    data-bs-target="#closeModal" />
+			                </form>
+			                {% endif %}
 			              </div>
+			
 			</div>
+			
 		  </section>
-
+		  
 		  <div class="study-subject-toolbar">
-		    <div class="study-subject-summary-content">
-		    <div class="study-summary-card-heading">
-		      <div class="study-summary-card-title-line">
-		        <div class="study-summary-card-title">{% trans "study_details_subjects_information" %}</div>
-		        <span class="study-summary-inline-metric">
-		          {% trans "study_details_enrolled_short" %}: {{ meta_data.number_of_enrolled_subjects|default:0 }}
-		        </span>
-		      </div>
-		      <span class="study-summary-corner-metric">
-		        {% trans "study_details_total_number_of_subjects" %}: {{ total_count }}
-		      </span>
-		    </div>
-		    {% with stats=meta_data.stats %}
-		    <div class="study-subject-status-grid">
-		      <div class="study-subject-status-item study-subject-status-item--active">
-		        <span class="study-subject-status-label">{% trans "study_details_subjects_in_study" %}</span>
-		        <span class="study-subject-status-value">{{ stats.instudy|default:0 }}</span>
-		      </div>
-		      <div class="study-subject-status-item study-subject-status-item--left">
-		        <span class="study-subject-status-label">{% trans "study_details_subjects_left" %}</span>
-		        <span class="study-subject-status-value">{{ stats.leftstudy|default:0 }}</span>
-		      </div>
-		      <div class="study-subject-status-item study-subject-status-item--removed">
-		        <span class="study-subject-status-label">{% trans "study_details_subjects_removed" %}</span>
-		        <span class="study-subject-status-value">{{ stats.removed|default:0 }}</span>
-		      </div>
-		      <div class="study-subject-status-item study-subject-status-item--completed">
-		        <span class="study-subject-status-label">{% trans "study_details_subjects_completed" %}</span>
-		        <span class="study-subject-status-value">{{ stats.completed|default:0 }}</span>
-		      </div>
-		    </div>
-		    {% endwith %}
-		    </div>
-
 		    <div class="study-table-toolbar">
+				
 					<div class="study-table-tools study-table-tools--subjects">
 		              <a
 		                name="user_unused_sheet"
@@ -1277,6 +1413,13 @@
 		                data-bs-toggle="modal"
 		                data-bs-target="#createSubjectModal">
 		                {% trans "study_details_create" %}
+		              </button>
+		              <button
+		                type="button"
+		                class="btn btn-outline-primary btn-sm"
+		                data-bs-toggle="modal"
+		                data-bs-target="#additionalQrModal">
+		                {% trans "Generate QR 5–8" %}
 		              </button>
 		              <button
 		                type="button"
@@ -1309,18 +1452,23 @@
 		                {% trans "study_details_change_status" %}
 		              </button>
 		              {% endif %}
-		              <a href="{%url 'details' study_name=meta_data.name %}" data-bs-toggle="tooltip" 
-					  title="{% trans 'study_details_refresh' %}">
-		                <img src="{% static 'icons/refresh-64.png' %}" height="35"></a>
 		              <a
-		                href="{% url 'export_study_csv' study_name=meta_data.name %}"
-		                data-bs-toggle="tooltip"
-		                title="{% trans 'study_details_export_csv' %}"
+		                href="{% url 'export_combined_study_csv' study_name=meta_data.name %}"
+		                class="btn btn-outline-primary btn-sm"
 		                data-jdash-file-download
 		                data-loading-message="{{ study_details_preparing_file_download|escape }}"
 		                data-download-filename="jutrack_dashboard_{{ meta_data.name }}.csv"
 		                download>
-		                <img src="{% static 'icons/export-csv.png' %}" height="35" alt="{% trans 'study_details_export_csv' %}"></a>
+		                {% trans "Export table to CSV" %}
+		              </a>
+		              <a
+		                href="{%url 'details' study_name=meta_data.name %}"
+		                class="btn btn-outline-primary btn-sm"
+		                data-bs-toggle="tooltip"
+		                title="{% trans 'study_details_refresh' %}"
+		                aria-label="{% trans 'study_details_refresh' %}">
+		                <i class="bi bi-arrow-clockwise study-refresh-icon" aria-hidden="true"></i>
+		              </a>
 		            </div>
 		    </div>
 		  </div>
@@ -1345,9 +1493,9 @@
                     </ul>
                 </div>
               </div>
-              
-              
-	          <div>
+
+
+	          <div class="metadata-table-shell">
               
                     <table id ="metadata_table" class=" table table-responsive"  
                     data-show-header="true" 
@@ -1378,15 +1526,16 @@
                             
                             {% if meta_data.sensor_size > 0  %}
                             
-                            <th colspan = '{{ meta_data.sensor_size |add:9  }}' data-visible="false">{% trans "study_details_more_details" %}</th>
+                            <th colspan = '{{ meta_data.sensor_size |add:10  }}' data-visible="false">{% trans "study_details_more_details" %}</th>
                             {% else%}
                             
-                            <th colspan = '9' data-visible="false">{% trans "study_details_more_details" %}</th>
+                            <th colspan = '10' data-visible="false">{% trans "study_details_more_details" %}</th>
                             {% endif %}
                               
                           </tr>
                           <tr >
                             <th data-field="device_id"  data-visible="false">{% trans "study_details_device_id" %}</th>
+                            <th data-field="device_brand" data-visible="false">device_brand</th>
                             <th data-field="date_registered"  data-visible="false">{% trans "study_details_date_registered" %}</th> 
                             <th data-field="date_left_study" data-visible="false">{% trans "study_details_date_left_study" %}</th>
                             <th data-field="n_batches_ema" data-visible="false">{% trans "study_details_n_batches_ema" %}</th>
@@ -1407,7 +1556,8 @@
                           <tr class="group" >
                             <td colspan="5">
                             <!-- <input class="form-check-input" type="checkbox" value="{{k}}" name="check-subject-id" > -->
-                            <a name='user_sheet' download href="{%url 'download' arg=k  %}" >{{k}}<img src="{% static 'icons/icon-qr-code.png' %}" alt="Download" width="20" height="20"></a></td>
+                            <a name='user_sheet' download href="{%url 'download' arg=k  %}" >{{k}}<img src="{% static 'icons/icon-qr-code.png' %}" alt="Download" width="20" height="20"></a>
+                          </td>
                             
                           </tr>
                           
@@ -1419,7 +1569,8 @@
                                 <td data-field="duration" data-filter-control="input">{{i.time_in_study}}</td>
                                 <td data-field="sensor_info" id="sensors_info" >{{ i | get_sensor_tag:meta_data|safe }}</td>
                                 <td data-field="status" data-filter-control="select" >{{ i | get_subject_status_tag:meta_data|safe}} </td>
-                                <td data-field="device_id" data-visible="false">{{i.device_brand}}</td>
+                                <td data-field="device_id" data-visible="false">{{i.device_id}}</td>
+                                <td data-field="device_brand" data-visible="false">{{i.device_brand}}</td>
                                 <td data-field="date_registered" data-visible="false"> {{i.date_registered}} </td>
                                 <td data-field="date_left_study" data-visible="false">{{i.date_left_study}}</td>
                                 <td data-field="n_batches_ema" data-visible="false">{{i | get_n_batches:"ema"|safe}}</td>

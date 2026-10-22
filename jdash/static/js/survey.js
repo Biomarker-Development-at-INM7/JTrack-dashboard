@@ -1,4 +1,4 @@
-console.log("Loaded survey.js version 2025-08-15");
+console.log("Loaded survey.js version 2026-09-10");
 
 var question_types = {
   'Instruction for questions' : '0',
@@ -14,9 +14,104 @@ var question_types = {
     'Location': '10',
     'Consent': '11'
 
+
 }
+
 var choiceQuestionTypes = ['1', '2'];
 var slidingQuestionType = '3';
+
+function initializeSurveyCommitLoadingForms() {
+  document.querySelectorAll('form[data-survey-commit-form]').forEach(function (form) {
+    form.addEventListener('submit', function (event) {
+      if (form.dataset.submitting === 'true') {
+        event.preventDefault();
+        return;
+      }
+
+      form.dataset.submitting = 'true';
+      if (typeof showJdashLoading === 'function') {
+        showJdashLoading(
+          form.getAttribute('data-loading-message') || 'Committing survey...'
+        );
+      }
+
+      const submitter = event.submitter;
+      window.setTimeout(function () {
+        if (submitter) submitter.disabled = true;
+      }, 0);
+    });
+  });
+}
+
+document.addEventListener('DOMContentLoaded', initializeSurveyCommitLoadingForms);
+
+function initializeSurveyCommitChangeDetails() {
+  const modal = document.getElementById('publishSurveyModal');
+  if (!modal) return;
+
+  const options = Array.from(modal.querySelectorAll('.publish-study-option'));
+
+  function renderItems(container, items) {
+    container.replaceChildren();
+    const list = document.createElement('ul');
+    list.className = 'mb-0 ps-3';
+    items.forEach(function (item) {
+      const listItem = document.createElement('li');
+      listItem.textContent = item;
+      list.appendChild(listItem);
+    });
+    container.appendChild(list);
+  }
+
+  async function loadChanges(option) {
+    if (option.dataset.changesLoaded === 'true' || option.dataset.changesLoading === 'true') {
+      return;
+    }
+    option.dataset.changesLoading = 'true';
+    const container = option.querySelector('.publish-change-details');
+    try {
+      const response = await fetch(option.dataset.changeUrl, {
+        headers: {'X-Requested-With': 'XMLHttpRequest'},
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || 'Unable to load pending changes.');
+      }
+      renderItems(container, payload.items || []);
+      option.dataset.changesLoaded = 'true';
+    } catch (error) {
+      container.replaceChildren();
+      const message = document.createElement('span');
+      message.className = 'text-danger';
+      message.textContent = error.message;
+      container.appendChild(message);
+      if (typeof window.showJdashMessage === 'function') {
+        window.showJdashMessage(error.message, 'error');
+      }
+    } finally {
+      option.dataset.changesLoading = 'false';
+    }
+  }
+
+  options.forEach(function (option) {
+    const toggle = option.querySelector('.publish-change-toggle');
+    const details = option.querySelector('.publish-change-details');
+    if (!toggle || !details) return;
+    toggle.addEventListener('click', function () {
+      const willOpen = details.classList.contains('d-none');
+      details.classList.toggle('d-none', !willOpen);
+      toggle.setAttribute('aria-expanded', String(willOpen));
+      toggle.textContent = willOpen ? toggle.dataset.hideLabel : toggle.dataset.showLabel;
+      if (willOpen) loadChanges(option);
+    });
+  });
+
+  modal.addEventListener('shown.bs.modal', function () {
+    options.forEach(loadChanges);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', initializeSurveyCommitChangeDetails);
 
 function normalizeQuestionTypeValue(value) {
   return String(value === null || value === undefined ? '' : value);
@@ -38,36 +133,331 @@ $(function() {
 
 })
 function initTable() {
-    $('#survey_quest_table').bootstrapTable({
-      detailViewAlign : 'right',
-      paginationParts: ['pageInfoshort', 'pageSize', 'pageList']
-    })
+    initializeQuestionDataTable()
+    initializeSurveyListDataTable()
 
-    $('#quest_table').bootstrapTable({
-      detailViewAlign : 'right',
-      exportTypes: ['json', 'csv'],
-      exportDataType: 'all',
-      onExportSaved: function (arg1) {  },
-      exportOptions: {
-        fileName: function () {
-           return 'survey'
-        }
-     },
-      paginationParts: ['pageInfoshort', 'pageSize', 'pageList']
-    })
-
-    $('#survey_table').bootstrapTable({
-      detailViewAlign : 'right',
-      paginationParts: ['pageInfoshort', 'pageSize', 'pageList']
-    })
-    $('#cat_table').bootstrapTable({
-      detailViewAlign : 'right',
-      paginationParts: ['pageInfoshort', 'pageSize', 'pageList']
-    })
-    $('#survey_audit_table').bootstrapTable({
-      paginationParts: ['pageInfoshort', 'pageSize', 'pageList']
-    })
+    if (typeof $.fn.bootstrapTable === 'function') {
+      $('#survey_table').bootstrapTable({
+        detailViewAlign : 'right',
+        paginationParts: ['pageInfoshort', 'pageSize', 'pageList']
+      })
+      $('#cat_table').bootstrapTable({
+        detailViewAlign : 'right',
+        paginationParts: ['pageInfoshort', 'pageSize', 'pageList']
+      })
+      $('#survey_audit_table').bootstrapTable({
+        paginationParts: ['pageInfoshort', 'pageSize', 'pageList']
+      })
+    }
   }
+
+function getQuestionTableColumnIndex(tableElement, className) {
+  return Array.from(tableElement.querySelectorAll('thead th')).findIndex(function (header) {
+    return header.classList.contains(className);
+  });
+}
+
+function initializeSurveyListDataTable() {
+  var tableElement = document.getElementById('survey_table');
+  if (!tableElement || !window.DataTable || tableElement.dataset.dataTableInitialized === 'true') {
+    return;
+  }
+
+  var categoryColumn = getQuestionTableColumnIndex(tableElement, 'survey-category-column');
+  var studyColumn = getQuestionTableColumnIndex(tableElement, 'survey-study-column');
+  var createdColumn = getQuestionTableColumnIndex(tableElement, 'survey-created-column');
+  var dataTable = new window.DataTable(tableElement, {
+    autoWidth: false,
+    columnDefs: [
+      { targets: '.no-sort', orderable: false }
+    ],
+    layout: {
+      topStart: null,
+      topEnd: null,
+      bottomStart: ['pageLength', 'info'],
+      bottomEnd: 'paging'
+    },
+    order: createdColumn >= 0 ? [[createdColumn, 'desc']] : [],
+    pageLength: 10,
+    lengthMenu: [10, 30, 50, 100, { label: 'All', value: -1 }]
+  });
+  tableElement.dataset.dataTableInitialized = 'true';
+  window.surveyListDataTable = dataTable;
+
+  var searchInput = document.getElementById('survey-filter-search');
+  var categorySelect = document.getElementById('survey-filter-category');
+  var studySelect = document.getElementById('survey-filter-study');
+  var clearButton = document.getElementById('survey-filter-clear');
+  var countBadge = document.getElementById('survey-visible-count');
+
+  function updateSurveyVisibleCount() {
+    if (!countBadge) {
+      return;
+    }
+    var info = dataTable.page.info();
+    var total = Number(countBadge.dataset.total || info.recordsTotal);
+    countBadge.textContent = info.recordsDisplay === total
+      ? total + ' ' + (total === 1 ? 'survey' : 'surveys')
+      : info.recordsDisplay + ' of ' + total + ' surveys';
+  }
+
+  dataTable.on('draw', updateSurveyVisibleCount);
+
+  addQuestionFilterOptions(dataTable, categoryColumn, categorySelect);
+  addQuestionFilterOptions(dataTable, studyColumn, studySelect);
+
+  if (searchInput) {
+    searchInput.addEventListener('input', function () {
+      dataTable.search(searchInput.value).draw();
+    });
+  }
+
+  function applyExactFilter(columnIndex, value) {
+    if (columnIndex < 0) {
+      return;
+    }
+    var pattern = value ? '^' + escapeQuestionFilterValue(value) + '$' : '';
+    dataTable.column(columnIndex).search(pattern, true, false).draw();
+  }
+
+  if (categorySelect) {
+    categorySelect.addEventListener('change', function () {
+      applyExactFilter(categoryColumn, categorySelect.value);
+    });
+  }
+  if (studySelect) {
+    studySelect.addEventListener('change', function () {
+      applyExactFilter(studyColumn, studySelect.value);
+    });
+  }
+  if (clearButton) {
+    clearButton.addEventListener('click', function () {
+      if (searchInput) searchInput.value = '';
+      if (categorySelect) categorySelect.value = '';
+      if (studySelect) studySelect.value = '';
+      dataTable.search('').columns().search('').draw();
+    });
+  }
+  updateSurveyVisibleCount();
+}
+
+function addQuestionFilterOptions(dataTable, columnIndex, selectElement) {
+  if (columnIndex < 0 || !selectElement) {
+    return;
+  }
+
+  var values = [];
+  dataTable.column(columnIndex).data().each(function (value) {
+    var text = String(value === null || value === undefined ? '' : value).trim();
+    if (text && values.indexOf(text) === -1) {
+      values.push(text);
+    }
+  });
+
+  values.sort(function (left, right) {
+    return left.localeCompare(right, undefined, { sensitivity: 'base' });
+  });
+  values.forEach(function (value) {
+    var option = document.createElement('option');
+    option.value = value;
+    option.textContent = value;
+    selectElement.appendChild(option);
+  });
+}
+
+function escapeQuestionFilterValue(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function initializeQuestionDataTable() {
+  var tableElement = document.getElementById('quest_table') || document.getElementById('survey_quest_table');
+  if (!tableElement || !window.DataTable || tableElement.dataset.dataTableInitialized === 'true') {
+    return;
+  }
+
+  var typeColumn = getQuestionTableColumnIndex(tableElement, 'question-type-column');
+  var categoryColumn = getQuestionTableColumnIndex(tableElement, 'question-category-column');
+  var conditionColumn = getQuestionTableColumnIndex(tableElement, 'condition-column');
+  var columnDefinitions = [
+    { targets: '.dt-hidden', visible: false, searchable: false },
+    { targets: '.no-sort', orderable: false },
+    {
+      targets: '.schedule-interval-column',
+      render: function (data, type) {
+        return type === 'display' ? scheduleIntervalFormatter(data) : data;
+      }
+    },
+    {
+      targets: '.schedule-window-column',
+      render: function (data, type) {
+        return type === 'display' ? scheduleTimeWindowsFormatter(data) : data;
+      }
+    },
+    {
+      targets: '.condition-column',
+      render: function (data, type) {
+        return type === 'display' ? conditionQuestionFormatter(data) : data;
+      }
+    },
+    {
+      targets: '.legacy-question-id-column',
+      render: function (data, type, row, meta) {
+        return type === 'display' ? legacyQuestionSortFormatter(data, row, meta.row) : data;
+      }
+    }
+  ];
+
+  var dataTable = new window.DataTable(tableElement, {
+    autoWidth: false,
+    columnDefs: columnDefinitions,
+    layout: {
+      topStart: null,
+      topEnd: null,
+      bottomStart: ['pageLength', 'info'],
+      bottomEnd: 'paging'
+    },
+    order: [],
+    pageLength: 10,
+    lengthMenu: [10, 30, 50, 100, { label: 'All', value: -1 }]
+  });
+  tableElement.dataset.dataTableInitialized = 'true';
+  if (tableElement.id === 'survey_quest_table') {
+    window.editSurveyQuestionTable = dataTable;
+  } else {
+    window.createSurveyQuestionTable = dataTable;
+  }
+
+  if (tableElement.id === 'survey_quest_table') {
+    tableElement.addEventListener('click', function (event) {
+      var action = event.target.closest('.edit, .view');
+      if (!action) {
+        return;
+      }
+
+      var rowData = dataTable.row(action.closest('tr')).data();
+      var legacyRow = {};
+      Array.from(tableElement.querySelectorAll('thead th')).forEach(function (header, index) {
+        var fieldName = header.dataset.field;
+        if (fieldName) {
+          legacyRow[fieldName] = rowData[index];
+        }
+      });
+      window.operateEvents['click .edit'](event, null, legacyRow, null);
+    });
+  }
+
+  var searchInput = document.getElementById('question-filter-search');
+  var typeSelect = document.getElementById('question-filter-type');
+  var categorySelect = document.getElementById('question-filter-category');
+  var conditionSelect = document.getElementById('question-filter-condition');
+  var clearButton = document.getElementById('question-filter-clear');
+  var questionCountBadge = document.getElementById('question-visible-count');
+  var conditionalCountBadge = document.getElementById('question-visible-conditional-count');
+  var categoryCountBadge = document.getElementById('question-visible-category-count');
+
+  function setQuestionSummaryBadge(element, count) {
+    if (!element) {
+      return;
+    }
+    var total = Number.parseInt(element.dataset.total, 10);
+    if (Number.isNaN(total)) {
+      total = count;
+    }
+    var label = total === 1 ? element.dataset.singular : element.dataset.plural;
+    element.textContent = count + ' of ' + total + ' ' + label;
+  }
+
+  function plainQuestionCellValue(value) {
+    var container = document.createElement('div');
+    container.innerHTML = String(value === null || value === undefined ? '' : value);
+    return container.textContent.trim();
+  }
+
+  function questionHasCondition(value) {
+    return String(value === null || value === undefined ? '' : value)
+      .split('||')
+      .some(function (part) {
+        var normalized = part.trim().toLowerCase();
+        return normalized && normalized !== 'none' && normalized !== 'null' && normalized !== '[]';
+      });
+  }
+
+  function updateQuestionFilterSummary() {
+    var visibleRows = [];
+    dataTable.rows({ search: 'applied' }).data().each(function (row) {
+      visibleRows.push(row);
+    });
+
+    var visibleCategories = new Set();
+    var visibleConditionalQuestions = 0;
+    visibleRows.forEach(function (row) {
+      if (categoryColumn >= 0) {
+        var category = plainQuestionCellValue(row[categoryColumn]);
+        if (category) {
+          visibleCategories.add(category);
+        }
+      }
+      if (conditionColumn >= 0 && questionHasCondition(row[conditionColumn])) {
+        visibleConditionalQuestions += 1;
+      }
+    });
+
+    setQuestionSummaryBadge(questionCountBadge, visibleRows.length);
+    setQuestionSummaryBadge(conditionalCountBadge, visibleConditionalQuestions);
+    setQuestionSummaryBadge(categoryCountBadge, visibleCategories.size);
+  }
+
+  dataTable.on('draw', updateQuestionFilterSummary);
+  updateQuestionFilterSummary();
+
+  addQuestionFilterOptions(dataTable, typeColumn, typeSelect);
+  addQuestionFilterOptions(dataTable, categoryColumn, categorySelect);
+
+  if (searchInput) {
+    searchInput.addEventListener('input', function () {
+      dataTable.search(searchInput.value).draw();
+    });
+  }
+
+  function applyExactColumnFilter(columnIndex, value) {
+    if (columnIndex < 0) {
+      return;
+    }
+    var pattern = value ? '^' + escapeQuestionFilterValue(value) + '$' : '';
+    dataTable.column(columnIndex).search(pattern, true, false).draw();
+  }
+
+  if (typeSelect) {
+    typeSelect.addEventListener('change', function () {
+      applyExactColumnFilter(typeColumn, typeSelect.value);
+    });
+  }
+  if (categorySelect) {
+    categorySelect.addEventListener('change', function () {
+      applyExactColumnFilter(categoryColumn, categorySelect.value);
+    });
+  }
+  if (conditionSelect && conditionColumn >= 0) {
+    conditionSelect.addEventListener('change', function () {
+      var pattern = '';
+      if (conditionSelect.value === 'with') {
+        pattern = '.+';
+      } else if (conditionSelect.value === 'without') {
+        pattern = '^$';
+      }
+      dataTable.column(conditionColumn).search(pattern, true, false).draw();
+    });
+  }
+  if (clearButton) {
+    clearButton.addEventListener('click', function () {
+      if (searchInput) searchInput.value = '';
+      if (typeSelect) typeSelect.value = '';
+      if (categorySelect) categorySelect.value = '';
+      if (conditionSelect) conditionSelect.value = '';
+      dataTable.search('').columns().search('').draw();
+    });
+  }
+}
 
 function parseScheduleInteger(value) {
   if (value === null || value === undefined) {
@@ -133,7 +523,7 @@ function formatScheduleFrequency(frequency) {
   if (interval && interval > 1) {
     return 'Every ' + interval + ' days';
   }
-  return 'Once';
+  return 'Anytime';
 }
 
 function formatScheduleWindows(starts, ends) {
@@ -453,42 +843,6 @@ window.operateEvents = {
 var selectedQuestionIds = new Set();
 var deleteQuestionSubmitting = false;
 
-function showJdashLoading(message) {
-  var overlay = document.getElementById('jdash-loading-overlay');
-  var messageElement = document.getElementById('jdash-loading-message');
-
-  if (!overlay) {
-    return;
-  }
-
-  if (messageElement && message) {
-    messageElement.textContent = message;
-  }
-
-  overlay.style.alignItems = 'center';
-  overlay.style.display = 'flex';
-  overlay.style.inset = '0';
-  overlay.style.justifyContent = 'center';
-  overlay.style.position = 'fixed';
-  overlay.style.zIndex = '2100';
-  overlay.hidden = false;
-  overlay.setAttribute('aria-hidden', 'false');
-  document.body.classList.add('jdash-loading-active');
-}
-
-function hideJdashLoading() {
-  var overlay = document.getElementById('jdash-loading-overlay');
-
-  if (!overlay) {
-    return;
-  }
-
-  overlay.hidden = true;
-  overlay.style.display = 'none';
-  overlay.setAttribute('aria-hidden', 'true');
-  document.body.classList.remove('jdash-loading-active');
-}
-
 function ensureDeleteQuestionSubmitValue(form) {
   var existingInput = form.querySelector('input[type="hidden"][name="delete_question"]');
 
@@ -624,7 +978,7 @@ function initializeQuestionBulkDelete() {
     });
   }
 
-  $('#quest_table, #survey_quest_table').on('post-body.bs.table page-change.bs.table search.bs.table', applySelectedQuestionState);
+  $('#survey_quest_table, #quest_table').on('draw.dt', applySelectedQuestionState);
   applySelectedQuestionState();
 }
 
@@ -642,19 +996,18 @@ function initializeQuestionDeleteLoading() {
     event.preventDefault();
     deleteQuestionSubmitting = true;
     ensureDeleteQuestionSubmitValue(deleteQuestionForm);
-    showJdashLoading(
-      deleteQuestionForm.getAttribute('data-loading-message') ||
-      'Deleting selected questions and updating order...'
-    );
+    if (typeof showJdashLoading === 'function') {
+      showJdashLoading(
+        deleteQuestionForm.getAttribute('data-loading-message') ||
+        'Deleting selected questions and updating order...'
+      );
+    }
 
     window.setTimeout(function () {
       deleteQuestionForm.submit();
     }, 80);
   });
 }
-
-window.showJdashLoading = showJdashLoading;
-window.hideJdashLoading = hideJdashLoading;
 
 $(function() {
   initializeQuestionBulkDelete();
@@ -701,7 +1054,6 @@ document.addEventListener('click', function (event) {
   }
 });
 
-
 window.survey_operateEvents = {
     'click .delete': function (e, value, row, index) {
       e.preventDefault();
@@ -714,6 +1066,8 @@ function remove_survey(){
     const deleteSurveyForm = document.getElementById("deleteSurveyForm");
     deleteSurveyForm.submit();
 }
+
+
 
 function show_answer_form(){
     const questionType = document.getElementById('questionType');
@@ -768,7 +1122,6 @@ function show_answer_form(){
       element.style.display = 'none';
     });
   }
-
 function initializeDefaultValueToggle() {
   const toggle = document.getElementById('flexSwitchCheckDefault');
 
@@ -878,16 +1231,46 @@ function makeAllEmptyValues(){
 
 ///////// Questions /////
 
+function addQuestionSubmitFlag(questionForm, name) {
+  questionForm
+    .querySelectorAll(`input[type="hidden"][data-submit-flag="${name}"]`)
+    .forEach((input) => input.remove());
+
+  var input = document.createElement('input');
+  input.type = 'hidden';
+  input.name = name;
+  input.value = '1';
+  input.dataset.submitFlag = name;
+  questionForm.appendChild(input);
+}
+
+function submitQuestionFormOnce(questionForm, name) {
+  if (!questionForm || questionForm.dataset.submitting === 'true') {
+    return false;
+  }
+
+  questionForm.dataset.submitting = 'true';
+  questionForm.setAttribute('aria-busy', 'true');
+  addQuestionSubmitFlag(questionForm, name);
+
+  document
+    .querySelectorAll('#updateModal button, #questionForm button, #questionForm input[type="submit"]')
+    .forEach((element) => {
+      element.disabled = true;
+    });
+
+  return true;
+}
+
 function editQuestion(){
   if (!validateAnswerChoiceSeparators() || !validateConditionQuestionCategories()) {
     return;
   }
 
   const questionForm = document.getElementById("questionForm");
-  var input = document.createElement('input');
-  input.type = 'hidden';
-  input.name = 'update_question';
-  questionForm.appendChild(input);
+  if (!submitQuestionFormOnce(questionForm, 'update_question')) {
+    return;
+  }
   questionForm.submit();
 }
 
@@ -896,7 +1279,10 @@ function display_info(event){
     event.preventDefault();
   }
   if (validateNecessaryFields() && validateClockTimes() && validateAnswerChoiceSeparators() && validateConditionQuestionCategories()) {
-    $('#updateModal').modal('show');
+    const updateModal = document.getElementById('updateModal');
+    if (updateModal && window.bootstrap && window.bootstrap.Modal) {
+      window.bootstrap.Modal.getOrCreateInstance(updateModal).show();
+    }
   }
 
 }
@@ -930,11 +1316,11 @@ function validateNecessaryFields() {
     qTypeEl.reportValidity();
     return false;
   } else if (frequencyEl && String(frequencyEl.value).trim() === '') {
-    frequencyEl.setCustomValidity('Please enter a repetition interval');
+    frequencyEl.setCustomValidity('Please enter a repetition interval or default values check the default switch');
     frequencyEl.reportValidity();
     return false;
   } else if (nextDayToAnswerEl && String(nextDayToAnswerEl.value).trim() === '') {
-    nextDayToAnswerEl.setCustomValidity('Please enter the first day to answer ');
+    nextDayToAnswerEl.setCustomValidity('Please enter the first day to answer or default values check the default switch');
     nextDayToAnswerEl.reportValidity();
     return false;
   }else{
@@ -970,7 +1356,7 @@ function validateClockTimes() {
       return false;
     }
 
-    // 3b) Each must be an integer, and end > start 
+    // 3b) Each must be an integer, and end > start
     for (let i = 0; i < starts.length; i++) {
         const s = starts[i];
         const e = ends[i];
@@ -985,10 +1371,9 @@ function validateClockTimes() {
         endEl.reportValidity();
         return false;
       }
-    const sNum = parseInt(s, 10);
-    const eNum = parseInt(e, 10);
+
       // Check ordering
-    if (eNum <= sNum) {
+      if (e <= s) {
         endEl.setCustomValidity(
           `Entry #${i+1}: end time (${e}) must be greater than start time (${s}).`
         );
@@ -1010,28 +1395,33 @@ function addQuestion(){
   if (!validateConditionQuestionCategories()) {
     return;
   }
-  quest_table = $('#quest_table')
+
   const questionForm = document.getElementById("questionForm");
-  var x = $('#quest_table').bootstrapTable('getData').length;
-  var rowCount = $('#quest_table tr').length;
-  var row = document.createElement('tr');
-  row.setAttribute('id',`tr-${rowCount -1}`)
-  for (var c=0;c<= 7; c++){
-  column = document.createElement('td');
-  column.innerHTML = "<span>"+ questionForm.elements['title'].value+ "</span>"
-  row.append(column)
+  if (!submitQuestionFormOnce(questionForm, 'add_question')) {
+    return;
   }
-  quest_table.append(row)
-  var input = document.createElement('input');
-  input.type = 'hidden';
-  input.name = 'add_question';
-  questionForm.appendChild(input);
-  $('#sort_id').val(x + 1 );
+
+  const quest_table = $('#quest_table');
+  var x = parseInt($('#sort_id').val(), 10) || 0;
+
+  if (quest_table.length && typeof quest_table.bootstrapTable === 'function') {
+    const tableData = quest_table.bootstrapTable('getData') || [];
+    x = tableData.length;
+    var rowCount = $('#quest_table tr').length;
+    var row = document.createElement('tr');
+    row.setAttribute('id',`tr-${rowCount -1}`);
+    for (var c=0;c<= 7; c++){
+      var column = document.createElement('td');
+      column.innerHTML = "<span>"+ questionForm.elements['title'].value+ "</span>";
+      row.append(column);
+    }
+    quest_table.append(row);
+    $('#sort_id').val(x + 1);
+  }
+
   questionForm.submit();
 
 }
-
-
 
 function getQuestionCategoryMap() {
   const script = document.getElementById('question-category-map');
@@ -1105,49 +1495,6 @@ function validateConditionQuestionCategories() {
   invalidResult.field.reportValidity();
   return false;
 }
-
-function validateAnswerChoiceSeparators() {
-  const answerInputs = Array.from(document.querySelectorAll('.choice-formset input[name$="-text"]'));
-  const questionType = document.getElementById('questionType');
-  if (!isChoiceQuestionType(questionType ? questionType.value : '')) {
-    answerInputs.forEach((input) => input.setCustomValidity(''));
-    return true;
-  }
-
-  const invalidInput = answerInputs.find((input) => /[,;]/.test(input.value || ''));
-
-  answerInputs.forEach((input) => input.setCustomValidity(''));
-
-  if (!invalidInput) {
-    return true;
-  }
-
-  invalidInput.setCustomValidity('Answer choices cannot contain commas or semicolons.');
-  invalidInput.reportValidity();
-  return false;
-}
-
-function clearAnswerChoiceSeparatorValidity(input) {
-  if (!input) {
-    return;
-  }
-  input.setCustomValidity(/[,;]/.test(input.value || '')
-    ? 'Answer choices cannot contain commas or semicolons.'
-    : '');
-}
-
-
-function delete_quest(){
-  const deleteQuestionForm = document.getElementById("deleteQuestionForm");
-  deleteQuestionForm.submit();
-}
-
-function remove_question(){
-  const removeQuestionForm = document.getElementById("removeQuestionForm");
-  removeQuestionForm.submit();
-}
-
-///////// Answers /////
 
 function validateAnswerChoiceSeparators() {
   const answerInputs = Array.from(document.querySelectorAll('.choice-formset input[name$="-text"]'));
@@ -1364,7 +1711,9 @@ function remove_category_form(id) {
     if (valueField) valueField.value = "1";
     if (checkbox) checkbox.checked = false;
 
-    alert("At least one category is required.");
+    if (typeof window.showJdashMessage === 'function') {
+      window.showJdashMessage('At least one category is required.', 'warning');
+    }
     return;
   }
 
@@ -1427,7 +1776,7 @@ function add_choices_form() {
 
   // Re-index all choice forms (sort IDs, visible numbers, etc.)
   renumberChoices();
-       refreshConditionOptionGroups();
+  refreshConditionOptionGroups();
 }
 
 function remove_choice_form(btnId) {
@@ -1452,7 +1801,7 @@ function remove_choice_form(btnId) {
 
   // Reindex all forms so Django can parse them
   renumberChoices();
-    refreshConditionOptionGroups();
+  refreshConditionOptionGroups();
 }
 
 function parseQuestionListValue(rawValue) {
@@ -1562,7 +1911,7 @@ function rebuildConditionOptions(fieldId, containerId) {
     inputWrap.style.display = useRadioOptions ? 'none' : 'block';
   }
   hiddenInput.style.display = useRadioOptions ? 'none' : '';
-  
+
   container.style.display = useRadioOptions ? 'block' : 'none';
   container.classList.toggle('condition-choice-multiselect', useRadioOptions);
   if (!useRadioOptions) {
@@ -1644,7 +1993,7 @@ function rebuildConditionOptions(fieldId, containerId) {
       const selected = Array.from(
         menu.querySelectorAll(`input[name="${fieldId}_choice"]:checked`)
       ).map((input) => input.value.trim()).filter((value) => value !== '');
-        hiddenInput.value = selected.join(', ');
+      hiddenInput.value = selected.join(', ');
       updateConditionDropdownSummary(summary, selected);
     });
 
@@ -1713,12 +2062,13 @@ function syncConditionSelectionsForChoiceRename(input) {
   input.dataset.previousChoiceText = newValue;
 }
 
+
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.choice-formset input[name$="-text"]').forEach((input) => {
     input.dataset.previousChoiceText = input.value || '';
   });
   refreshConditionOptionGroups();
-      document.addEventListener('input', (event) => {
+  document.addEventListener('input', (event) => {
     if (event.target && event.target.matches('.choice-formset input[name$="-text"]')) {
       clearAnswerChoiceSeparatorValidity(event.target);
       if (!event.target.checkValidity()) {
@@ -1893,5 +2243,3 @@ document.addEventListener("DOMContentLoaded", function () {
 //     setSlidingDefaults(template.sliding);
 //   }
 // }
-
-

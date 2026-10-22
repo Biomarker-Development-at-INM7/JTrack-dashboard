@@ -24,11 +24,13 @@ from jdash.services.datahelper import (
     get_question_form_data,
 )
 from jdash.services.survey import Survey
-from jdash.utils.fileutils import (
+from jdash.services.survey_publish import publish_survey_to_selected_studies
+from jdash.utils.legacy_survey_json import (
     delete_legacy_survey,
     delete_legacy_survey_question,
     delete_legacy_survey_questions,
     duplicate_legacy_survey_question,
+    publish_legacy_survey,
     update_legacy_survey_categories,
     update_legacy_survey_question,
     update_legacy_survey_question_order,
@@ -81,7 +83,9 @@ def create_question_answer_for_survey(survey_id, form, answer_formset):
         raise ValueError("Answer form data is invalid.")
     form_data = get_answer_form_data(answer_formset, int(question_obj["questionType"]))
     answers = form_data["answers"]
-    Survey.create_question_with_answers(survey_id, question_obj, answers)
+    with transaction.atomic():
+        question_obj[constants.key_name_sortId] = _next_question_sort_id_for_update(survey_id)
+        Survey.create_question_with_answers(survey_id, question_obj, answers)
     return context_for_create_survey_page(survey_id)
 
 
@@ -168,25 +172,32 @@ def delete_questions_from_survey(question_ids, survey_id):
     Delete one or more questions from a survey and return refreshed editor context.
     """
     try:
-        logger.info("delete_questions_from_survey %s", question_ids)
+        logger.info(
+            "delete_questions_from_survey survey_id=%s question_count=%s",
+            survey_id,
+            len(question_ids),
+        )
+        logger.debug("delete_questions_from_survey question_ids=%s", question_ids)
         Survey.delete_questions(question_ids, survey_id)
         return context_for_create_survey_page(survey_id)
     except ValueError as exc:
         logger.info(
-            "delete_questions_from_survey blocked for question_ids=%s survey_id=%s: %s",
-            question_ids,
+            "delete_questions_from_survey blocked survey_id=%s question_count=%s error=%s",
             survey_id,
+            len(question_ids),
             exc,
         )
+        logger.debug("delete_questions_from_survey blocked question_ids=%s", question_ids)
         context = context_for_create_survey_page(survey_id)
         context[constants.key_name_error_message] = str(exc)
         return context
     except Exception as exc:
         logger.exception(
-            "delete_questions_from_survey failed for question_ids=%s survey_id=%s",
-            question_ids,
+            "delete_questions_from_survey failed survey_id=%s question_count=%s",
             survey_id,
+            len(question_ids),
         )
+        logger.debug("delete_questions_from_survey failed question_ids=%s", question_ids)
         context = context_for_create_survey_page(survey_id)
         context[constants.key_name_error_message] = controller_error_message(exc)
         return context
@@ -232,6 +243,20 @@ def update_question_order_in_file(study_name, question_id, new_sort_id):
     Reorder a question in a legacy file-backed survey payload.
     """
     return update_legacy_survey_question_order(study_name, question_id, new_sort_id)
+
+
+def publish_survey_file(study_name):
+    """
+    Publish the current legacy file-backed survey by creating a versioned backup.
+    """
+    return publish_legacy_survey(study_name)
+
+
+def publish_survey_to_associated_study(survey_id, study_ids=None):
+    """
+    Publish the current DB-backed survey into linked study JSON files.
+    """
+    return publish_survey_to_selected_studies(survey_id, study_ids)
 
 
 def delete_survey_from_file(study_name):

@@ -1,16 +1,15 @@
 import json
 import logging
-import os
-from datetime import datetime
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError
 from django.forms.formsets import formset_factory
-from django.http import HttpResponseForbidden
+from django.http import JsonResponse
 from django.http.response import HttpResponse
 from django.shortcuts import render
 from django.utils.translation import gettext as _
+
 from jdash.audit.services import SurveyAuditService
 from jdash.services import permissions
 from jdash.services.controller import (
@@ -24,6 +23,8 @@ from jdash.services.controller import (
     duplicate_and_create_new_survey_id,
     duplicate_question_in_file,
     get_all_survey_details,
+    publish_survey_file,
+    publish_survey_to_associated_study,
     update_categories_in_file,
     update_old_survey_details,
     update_question_answer_for_survey,
@@ -32,9 +33,10 @@ from jdash.services.controller import (
     upload_survey_file,
 )
 from jdash.services.survey import Survey as SurveyService
+from jdash.services.survey_diff import build_survey_change_summary
+from jdash.services.survey_publish_state import get_publish_target_studies
 from jdash.forms import AnswerForm, CategoryForm, JSONUploadForm, QuestionForm, SurveyForm
 from jdash.config import constants as constants
-from jdash.config import runtime_config as config
 from jdash.services.context_builder import (
     context_for_create_survey_page,
     context_for_question_page,
@@ -47,21 +49,61 @@ from jdash.services.datahelper import (
     get_question_form_data,
     get_survey_form_data,
 )
-from jdash.repositories.survey_repository import (
-        delete_survey_for_user,
-        retrieve_all_questions_for_survey,
-        retrieve_all_categories_for_survey
+from jdash.repositories.survey_repository import delete_survey_for_user
+from jdash.repositories.survey_repository import retrieve_all_categories_for_survey
+from jdash.repositories.survey_repository import retrieve_all_questions_for_survey
+from jdash.utils.fileutils import get_json_data, open_study_json
+from jdash.utils.legacy_survey_json import (
+    get_legacy_survey_edit_json,
+    get_legacy_survey_edit_updated_at,
+    legacy_survey_draft_exists,
 )
-from jdash.utils.fileutils import get_json_data
-from jdash.interface.session_manager import SessionManager
-from jdash.models import Survey as SurveyModel
+from jdash.models import Study as StudyModel, Survey as SurveyModel
 from jdash.config.textmessages import TextMessages as textmessages
+from jdash.views.message_helpers import (
+    add_context_messages,
+    add_form_error,
+    forbidden_with_message,
+)
 
 logger = logging.getLogger("django")
 
 
-def _forbidden(message="You do not have permission to perform this action."):
-    return HttpResponseForbidden(message)
+def _survey_change_items(summary):
+    if summary["never_committed"]:
+        return [
+            _(
+                "Full survey will be committed: %(questions)s questions and "
+                "%(categories)s categories."
+            ) % {
+                "questions": summary["question_count"],
+                "categories": summary["category_count"],
+            }
+        ]
+
+    items = []
+    if summary["survey_details_changed"]:
+        items.append(_("Survey details updated"))
+    change_labels = (
+        ("questions_added", _("Questions added")),
+        ("questions_updated", _("Questions updated")),
+        ("questions_deleted", _("Questions deleted")),
+        ("categories_added", _("Categories added")),
+        ("categories_updated", _("Categories updated")),
+        ("categories_deleted", _("Categories deleted")),
+    )
+    for key, label in change_labels:
+        if summary[key]:
+            items.append(f"{label}: {summary[key]}")
+    if summary["questions_reordered"]:
+        items.append(_("Question order changed"))
+    if not items:
+        items.append(_("No content differences found"))
+    return items
+
+
+def _forbidden(request, message="You do not have permission to perform this action."):
+    return forbidden_with_message(request, message)
 
 
 def _is_legacy_file_survey_placeholder(survey):
@@ -94,6 +136,51 @@ def _normalize_survey_list_for_display(survey_list):
     return normalized_surveys
 
 
+@login_required
+def survey_commit_changes(request, survey_id, study_id):
+    """Return pending survey changes for one linked study."""
+    if request.method != "GET":
+        return JsonResponse({"error": _("Method not allowed")}, status=405)
+    study = next(
+        (
+            candidate
+            for candidate in get_publish_target_studies(survey_id)
+            if candidate.id == study_id
+        ),
+        None,
+    )
+    if study is None:
+        return JsonResponse({"error": _("Linked study not found")}, status=404)
+    if not permissions.can_manage_survey(request.user, study):
+        return JsonResponse(
+            {"error": _("You do not have permission to perform this action.")},
+            status=403,
+        )
+
+    try:
+        current_survey = SurveyService.generate_json_for_download(survey_id)
+        study_json = open_study_json(study.title)
+        committed_survey = study_json.get(constants.key_name_survey) or {}
+        summary = build_survey_change_summary(current_survey, committed_survey)
+    except Exception:
+        logger.exception(
+            "survey_commit_changes failed survey_id=%s study_id=%s",
+            survey_id,
+            study_id,
+        )
+        return JsonResponse(
+            {"error": _("The pending changes could not be loaded.")},
+            status=500,
+        )
+
+    return JsonResponse({
+        "study_id": study.id,
+        "study_name": study.title,
+        "summary": summary,
+        "items": _survey_change_items(summary),
+    })
+
+
 def _has_legacy_value(value):
     if value in (None, "", [], {}):
         return False
@@ -103,11 +190,7 @@ def _has_legacy_value(value):
 
 
 def _legacy_study_json_last_updated(study_name):
-    json_path = os.path.join(config.studies_folder, study_name, f"{study_name}.json")
-    try:
-        return datetime.fromtimestamp(os.path.getmtime(json_path))
-    except OSError:
-        return None
+    return get_legacy_survey_edit_updated_at(study_name)
 
 
 def _legacy_survey_summary(study_json, study_name=None):
@@ -170,6 +253,63 @@ def _legacy_category_post_data(post_data):
         )
     return categories
 
+def _add_db_survey_publish_message(request, publish_result):
+    if publish_result.get("published"):
+        study_names = publish_result.get("study_names") or []
+        published_count = publish_result.get("published_count") or len(study_names)
+        if published_count == 1:
+            messages.success(
+                request,
+                _("create_survey_commit_single_success")
+                % {"study_name": study_names[0]},
+            )
+        else:
+            messages.success(
+                request,
+                _("create_survey_commit_multiple_success")
+                % {
+                    "count": published_count,
+                    "study_names": ", ".join(study_names),
+                },
+            )
+        failed = publish_result.get("failed") or []
+        if failed:
+            failed_study_names = ", ".join(
+                failure.get("study_name", "")
+                for failure in failed
+                if failure.get("study_name")
+            )
+            messages.warning(
+                request,
+                _("create_survey_commit_partial_failure")
+                % {"study_names": failed_study_names},
+            )
+        return
+
+    if publish_result.get("reason") == "no_selection":
+        messages.warning(
+            request,
+            _("create_survey_commit_no_study_selected"),
+        )
+        return
+
+    if publish_result.get("failed"):
+        failed_study_names = ", ".join(
+            failure.get("study_name", "")
+            for failure in publish_result["failed"]
+            if failure.get("study_name")
+        )
+        messages.error(
+            request,
+            _("create_survey_commit_failed")
+            % {"study_names": failed_study_names},
+        )
+        return
+
+    messages.warning(
+        request,
+        _("create_survey_commit_no_linked_study"),
+    )
 
 def _clear_survey_list_cache(request):
     request.session.pop(constants.session_key_survey_details, None)
@@ -201,35 +341,75 @@ def create_survey(request, survey_id=0, question_id=0):
     Returns:
         HttpResponse: Survey editor page or survey list page on failure.
     """
-    context = context_for_create_survey_page(survey_id)
+    if request.method == constants.post_method:
+        try:
+            survey_id = int(request.POST.get(constants.key_name_survey_id, survey_id) or 0)
+        except (TypeError, ValueError):
+            survey_id = 0
+
     protected_posts = {
         constants.button_name_upload_survey,
         constants.button_name_create_survey,
         constants.button_name_update_survey_info,
         constants.button_name_delete_question,
         constants.button_name_update_question_sort,
+        constants.button_name_publish_survey,
     }
+    if survey_id and not permissions.can_view_survey(request.user, survey_id):
+        return _forbidden(request, "You do not have permission to view this survey.")
+
     if request.method == constants.post_method and any(name in request.POST for name in protected_posts):
-        if not permissions.can_manage_survey(request.user):
-            return _forbidden()
+        permission_target = survey_id or None
+        if not permissions.can_manage_survey(request.user, permission_target):
+            return _forbidden(request)
+
+    context = (
+        context_for_create_survey_page(survey_id)
+        if survey_id
+        else context_for_survey_list_page()
+    )
 
     try:
         if constants.button_name_upload_survey in request.POST:
             form = JSONUploadForm(request.POST, request.FILES)
             if form.is_valid():
                 context = upload_survey_file(request.FILES["json_file"], request.user)
+                logger.info(
+                    "User action=import_survey user=%s filename=%s",
+                    request.user.get_username(),
+                    request.FILES["json_file"].name,
+                )
+                add_context_messages(request, context, success="Survey imported successfully.")
+            else:
+                add_form_error(request, "import the survey")
         elif constants.button_name_create_survey in request.POST:
             form = SurveyForm(request.POST)
-            logger.info(form.errors)
+            logger.debug("create_survey form_errors=%s", form.errors)
             if form.is_valid():
                 form_data = get_survey_form_data(form)
                 context = create_survey_from_surveyForm(form_data, request.user)
+                logger.info(
+                    "User action=create_survey user=%s survey_id=%s",
+                    request.user.get_username(),
+                    context.get(constants.key_name_survey_id),
+                )
+                add_context_messages(request, context, success="Survey created successfully.")
+            else:
+                add_form_error(request, "create the survey")
         elif constants.button_name_update_survey_info in request.POST:
             form = SurveyForm(request.POST)
             logger.debug(form.errors)
             if form.is_valid():
                 form_data = get_survey_form_data(form)
                 context = update_survey_from_surveyForm(form_data, survey_id)
+                logger.info(
+                    "User action=update_survey user=%s survey_id=%s",
+                    request.user.get_username(),
+                    survey_id,
+                )
+                add_context_messages(request, context, success="Survey details updated successfully.")
+            else:
+                add_form_error(request, "update the survey")
         elif constants.button_name_delete_question in request.POST:
             survey_id = request.POST[constants.key_name_survey_id]
             question_ids = request.POST.getlist(constants.field_name_question_id)
@@ -238,6 +418,14 @@ def create_survey(request, survey_id=0, question_id=0):
                 error_message = context.pop(constants.key_name_error_message, None)
                 if error_message:
                     messages.error(request, error_message)
+                else:
+                    logger.info(
+                        "User action=delete_questions user=%s survey_id=%s question_count=%s",
+                        request.user.get_username(),
+                        survey_id,
+                        len(question_ids),
+                    )
+                    messages.success(request, f"{len(question_ids)} question(s) deleted successfully.")
             else:
                 messages.error(request, _("Please select at least one question to delete."))
                 context = context_for_create_survey_page(survey_id)
@@ -261,6 +449,19 @@ def create_survey(request, survey_id=0, question_id=0):
                 SurveyService.update_question_order(question_id, new_sort_id)
                 messages.success(request, _("create_survey_question_order_success"))
             context = context_for_create_survey_page(survey_id)
+        elif constants.button_name_publish_survey in request.POST:
+            survey_id = int(request.POST.get(constants.key_name_survey_id, survey_id))
+            selected_study_ids = request.POST.getlist(constants.field_name_publish_study_ids)
+            publish_result = publish_survey_to_associated_study(
+                survey_id,
+                selected_study_ids,
+            )
+            _add_db_survey_publish_message(
+                request,
+                publish_result,
+            )
+            context = context_for_create_survey_page(survey_id)
+            context["survey_publish_result"] = publish_result
         _clear_survey_list_cache(request)
     except TypeError as e:
         logger.info("TypeError: %s", e)
@@ -286,7 +487,12 @@ def create_survey(request, survey_id=0, question_id=0):
             constants.survey_page,
             context=get_all_survey_details(request.user, request.session.session_key),
         )
-    return render(request, constants.create_survey_page, context=context)
+    template_name = (
+        constants.create_survey_page
+        if context.get(constants.key_name_survey_id)
+        else constants.survey_page
+    )
+    return render(request, template_name, context=context)
 
 
 @login_required
@@ -302,21 +508,26 @@ def manage_question(request, survey_id=0, question_id=0):
     Returns:
         HttpResponse: Question editor or survey page.
     """
+    if not permissions.can_view_survey(request.user, survey_id):
+        return _forbidden(request, "You do not have permission to view this survey.")
     if request.method == constants.post_method or question_id == 0:
-        if not permissions.can_manage_questions(request.user):
-            return _forbidden()
+        if not permissions.can_manage_questions(request.user, survey_id):
+            return _forbidden(request)
 
     context = {}
     category_details = retrieve_all_categories_for_survey(survey_id)
     form = None
     answer_formset = None
+
     if request.method == constants.post_method:
         logger.info(
-            "manage_question POST received path=%s keys=%s data=%s",
-            request.path,
+            "User action=submit_question user=%s survey_id=%s question_id=%s keys=%s",
+            request.user.get_username(),
+            survey_id,
+            question_id,
             list(request.POST.keys()),
-            request.POST,
         )
+        logger.debug("manage_question POST path=%s data=%s", request.path, request.POST)
         form_post_data = request.POST.copy()
         form_initial = {}
 
@@ -335,10 +546,16 @@ def manage_question(request, survey_id=0, question_id=0):
             if constants.button_name_add_question in request.POST:
                 form_valid = form.is_valid()
                 answer_formset_valid = answer_formset.is_valid()
-                logger.info(form.errors)
-                logger.info(answer_formset.errors)
+                logger.debug("add_question form_errors=%s", form.errors)
+                logger.debug("add_question answer_formset_errors=%s", answer_formset.errors)
                 if form_valid and answer_formset_valid:
                     context = create_question_answer_for_survey(survey_id, form, answer_formset)
+                    logger.info(
+                        "User action=create_question user=%s survey_id=%s",
+                        request.user.get_username(),
+                        survey_id,
+                    )
+                    messages.success(request, "Question added successfully.")
                     return render(request, constants.create_survey_page, context=context)
                 if not form_valid:
                     messages.error(request, "Please correct the question fields before saving.")
@@ -347,10 +564,17 @@ def manage_question(request, survey_id=0, question_id=0):
             elif constants.button_name_update_question in request.POST:
                 form_valid = form.is_valid()
                 answer_formset_valid = answer_formset.is_valid()
-                logger.info(form.errors)
-                logger.info(answer_formset.errors)
+                logger.debug("update_question form_errors=%s", form.errors)
+                logger.debug("update_question answer_formset_errors=%s", answer_formset.errors)
                 if form_valid and answer_formset_valid:
                     context = update_question_answer_for_survey(question_id, form, answer_formset)
+                    logger.info(
+                        "User action=update_question user=%s survey_id=%s question_id=%s",
+                        request.user.get_username(),
+                        survey_id,
+                        question_id,
+                    )
+                    messages.success(request, "Question updated successfully.")
                     return render(request, constants.create_survey_page, context=context)
                 if not form_valid:
                     messages.error(request, "Please correct the question fields before saving.")
@@ -387,7 +611,13 @@ def download_survey_json(request, survey_id):
     Returns:
         HttpResponse: JSON attachment response.
     """
-    logger.info("download_survey_json %s", survey_id)
+    if not permissions.can_view_survey(request.user, survey_id):
+        return _forbidden(request, "You do not have permission to download this survey.")
+    logger.info(
+        "User action=download_survey_json user=%s survey_id=%s",
+        request.user.get_username(),
+        survey_id,
+    )
     data = json.dumps(SurveyService.generate_json_for_download(survey_id), indent=4, ensure_ascii=False)
     response = HttpResponse(data, content_type='application/json')
     response['Content-Disposition'] = 'attachment; filename="survey.json"'
@@ -399,11 +629,16 @@ def download_legacy_survey_json(request, study_name):
     """
     Downloads an embedded legacy file-backed survey JSON representation.
     """
-    if not permissions.can_manage_survey(request.user):
-        return _forbidden()
+    study = StudyModel.objects.filter(title=study_name, closed=False).first()
+    if study is None or not permissions.can_view_study(request.user, study):
+        return _forbidden(request, "You do not have permission to download this survey.")
 
-    logger.info("download_legacy_survey_json %s", study_name)
-    study_json = get_json_data(study_name)
+    logger.info(
+        "User action=download_legacy_survey_json user=%s study=%s",
+        request.user.get_username(),
+        study_name,
+    )
+    study_json = get_legacy_survey_edit_json(study_name)
     data = json.dumps(study_json.get("survey", {}), indent=4, ensure_ascii=False)
     response = HttpResponse(data, content_type="application/json")
     response["Content-Disposition"] = f'attachment; filename="{study_name}_survey.json"'
@@ -422,8 +657,8 @@ def manage_category_for_survey(request, survey_id):
     Returns:
         HttpResponse: Rendered survey creation page.
     """
-    if not permissions.can_manage_categories(request.user):
-        return _forbidden()
+    if not permissions.can_manage_categories(request.user, survey_id):
+        return _forbidden(request)
 
     context = {}
     try:
@@ -431,10 +666,19 @@ def manage_category_for_survey(request, survey_id):
         collect_flag = True if collect_subject_id == 'on' else False
         CategoryFormSet = formset_factory(CategoryForm)
         formset = CategoryFormSet(request.POST)
-        logger.info("manage_category_for_survey %s", formset.errors)
+        logger.debug("manage_category_for_survey formset_errors=%s", formset.errors)
         if formset.is_valid():
             category_data = get_category_form_data(formset)
             SurveyService.update_categories(survey_id, category_data["category_list"], collect_flag)
+            logger.info(
+                "User action=update_categories user=%s survey_id=%s category_count=%s",
+                request.user.get_username(),
+                survey_id,
+                len(category_data["category_list"]),
+            )
+            messages.success(request, "Categories updated successfully.")
+        else:
+            add_form_error(request, "update the categories")
         context = context_for_create_survey_page(survey_id)
     except Exception as e:
         context = context_for_create_survey_page(survey_id)
@@ -455,10 +699,11 @@ def duplicate_survey(request, survey_id):
     Returns:
         HttpResponse: Rendered survey list page.
     """
-    if not permissions.can_duplicate_survey(request.user):
-        return _forbidden()
+    if not permissions.can_duplicate_survey(request.user, survey_id):
+        return _forbidden(request)
 
     context = duplicate_and_create_new_survey_id(survey_id, request.user, request.session.session_key)
+    add_context_messages(request, context, success="Survey duplicated successfully.")
     return render(request, constants.survey_page, context)
 
 
@@ -467,8 +712,9 @@ def duplicate_legacy_survey(request, study_name):
     """
     Duplicates an embedded legacy file-backed survey into a database-backed survey.
     """
-    if not permissions.can_duplicate_survey(request.user):
-        return _forbidden()
+    study = StudyModel.objects.filter(title=study_name, closed=False).first()
+    if study is None or not permissions.can_duplicate_survey(request.user, study):
+        return _forbidden(request)
 
     try:
         study_json = get_json_data(study_name)
@@ -511,8 +757,9 @@ def delete_legacy_survey(request, study_name):
     """
     Deletes the embedded legacy file-backed survey from a study JSON file.
     """
-    if not permissions.can_delete_survey(request.user):
-        return _forbidden()
+    study = StudyModel.objects.filter(title=study_name, closed=False).first()
+    if study is None or not permissions.can_delete_survey(request.user, study):
+        return _forbidden(request)
 
     try:
         if request.method != constants.post_method or constants.button_name_delete_survey not in request.POST:
@@ -542,10 +789,11 @@ def duplicate_question(request, survey_id, question_id):
     Returns:
         HttpResponse: Rendered survey creation page.
     """
-    if not permissions.can_manage_questions(request.user):
-        return _forbidden()
+    if not permissions.can_manage_questions(request.user, survey_id):
+        return _forbidden(request)
 
     context = duplicate_and_create_new_question_id(survey_id, question_id)
+    add_context_messages(request, context, success="Question duplicated successfully.")
     return render(request, constants.create_survey_page, context=context)
 
 
@@ -557,20 +805,20 @@ def delete_survey(request):
     Returns:
         HttpResponse: Rendered survey list page after the deletion attempt.
     """
-    if not permissions.can_delete_survey(request.user):
-        return _forbidden()
-
     try:
         if constants.button_name_delete_survey in request.POST:
-            groupname = SessionManager.get_specific_session_data(
-                request.session.session_key,
-                constants.session_key_groupname,
-                None,
+            survey_id = request.POST.get("survey_id")
+            if not permissions.can_delete_survey(request.user, survey_id):
+                return _forbidden(request)
+            logger.info(
+                "User action=delete_survey user=%s survey_id=%s",
+                request.user.get_username(),
+                survey_id,
             )
-            logger.info("delete_survey:: id from request %s", request.POST['survey_id'])
-            result = delete_survey_for_user(groupname, request.user, request.POST['survey_id'])
+            result = delete_survey_for_user(request.user, survey_id)
             _clear_survey_list_cache(request)
             if result:
+                messages.success(request, "Survey deleted successfully.")
                 return render(
                     request,
                     constants.survey_page,
@@ -599,18 +847,19 @@ def edit_survey(request, study_name):
     Returns:
         HttpResponse: Rendered legacy survey edit page or error page.
     """
-    if not permissions.can_manage_survey(request.user):
-        return _forbidden()
+    study = StudyModel.objects.filter(title=study_name, closed=False).first()
+    if study is None or not permissions.can_manage_survey(request.user, study):
+        return _forbidden(request)
 
     context = {}
     context[constants.key_name_study_name] = study_name
     context[constants.key_name_survey_id] = "file"
     context[constants.key_name_survey_title] = study_name
-    study_json = get_json_data(study_name)
+    study_json = get_legacy_survey_edit_json(study_name)
     try:
         if "manage_categories" in request.POST:
-            if not permissions.can_manage_categories(request.user):
-                return _forbidden()
+            if not permissions.can_manage_categories(request.user, study):
+                return _forbidden(request)
 
             collect_flag = request.POST.get(constants.key_name_collect_subject_id_flag, False) == "on"
             update_categories_in_file(
@@ -648,7 +897,6 @@ def edit_survey(request, study_name):
                 legacy_question_fields = {
                     "title",
                     "active",
-                    "mandatory",
                     "subText",
                     "questionType",
                     "category",
@@ -704,8 +952,15 @@ def edit_survey(request, study_name):
             )
             messages.success(request, _("Question duplicated."))
 
+        if constants.button_name_publish_survey in request.POST:
+            _published_json, did_publish = publish_survey_file(study_name)
+            if did_publish:
+                messages.success(request, _("survey_commited_versioned_backup_created"))
+            else:
+                messages.info(request, _("No_uncommited_survey_commit"))
+
         if request.method == constants.post_method:
-            study_json = get_json_data(study_name)
+            study_json = get_legacy_survey_edit_json(study_name)
     except Exception as exc:
         logger.exception("edit_survey failed for study_name=%s", study_name)
         messages.error(request, f"{exc} : {textmessages.error_message_to_contact_support}")
@@ -718,6 +973,7 @@ def edit_survey(request, study_name):
     context["survey_summary"] = _legacy_survey_summary(study_json, study_name)
     context["legacy_category_rows"] = _legacy_category_rows(study_json)
     context["legacy_category_total"] = len(context["legacy_category_rows"])
+    context["has_unpublished_survey_changes"] = legacy_survey_draft_exists(study_name)
     context[constants.key_name_collect_flag] = _legacy_category_collect_flag(study_json)
     context[constants.key_name_category_help_text] = get_help_texts_for_category_form()
     context[constants.key_name_survey_form] = SurveyForm(request.POST)
@@ -730,17 +986,13 @@ def edit_survey(request, study_name):
 @login_required
 def survey_list(request):
     """
-    Renders the survey list page with session-based caching.
+    Render the survey list, rebuilding its cache after study/survey mutations.
 
     Returns:
         HttpResponse: Rendered survey list page.
     """
     session_key = request.session.session_key
-    session_data = SessionManager.get_specific_session_data(
-        session_key,
-        constants.session_key_survey_details,
-        default=None,
-    )
+    session_data = request.session.get(constants.session_key_survey_details)
 
     if _has_legacy_file_survey_placeholder(session_data):
         request.session.pop(constants.session_key_survey_details, None)
@@ -781,10 +1033,11 @@ def survey_audit(request, survey_id):
     Returns:
         HttpResponse: Rendered survey audit history page.
     """
-    survey = SurveyModel.objects.get(id=survey_id)
+    survey = SurveyModel.objects.filter(id=survey_id).first()
+    if survey is None or not permissions.can_view_survey(request.user, survey):
+        return _forbidden(request, "You do not have permission to view this survey's audit history.")
     context = {
         "survey": survey,
         "audit_history": SurveyAuditService.get_history(survey),
     }
     return render(request, constants.survey_audit_page, context)
-

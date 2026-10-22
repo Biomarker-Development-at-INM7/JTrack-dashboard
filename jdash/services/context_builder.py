@@ -25,6 +25,7 @@ from jdash.services.datahelper import (
     get_help_texts_for_question_form,
     get_help_texts_for_survey_form,
 )
+from jdash.services.survey_publish_state import get_survey_publish_summary
 from jdash.repositories.survey_repository import (
     retrieve_all_categories_for_survey,
     retrieve_all_questions_for_survey,
@@ -77,6 +78,15 @@ def context_for_home_page(user):
     context[constants.key_name_error_message] = error_message
     return context
 
+def _get_publish_summary_context(survey_id):
+    publish_summary = get_survey_publish_summary(survey_id)
+    return {
+        "associated_study_name": publish_summary["associated_study_label"],
+        "associated_study_names": publish_summary["associated_study_names"],
+        "associated_study_count": publish_summary["associated_study_count"],
+        "survey_publish_summary": publish_summary,
+        "has_unpublished_survey_changes": publish_summary["has_unpublished_changes"],
+    }
 
 def context_for_add_edit_study_page(study_name, form, task_formset, study_device_formset, sensor_formsets, json_meta):
     context = {}
@@ -165,6 +175,7 @@ def context_for_question_page(survey_id, question_id):
     }
     context[constants.key_name_survey_id] = survey_id
     context[constants.key_name_survey_title] = survey_details["title"]
+    context.update(_get_publish_summary_context(survey_id))
     context[constants.key_name_question_id] = question_id
     context[constants.key_name_question_help_text] = get_help_texts_for_question_form()
 
@@ -255,6 +266,7 @@ def context_for_create_survey_page(survey_id):
 
         context[constants.key_name_survey_id] = survey_id
         context[constants.key_name_survey_title] = survey_details["title"]
+        context.update(_get_publish_summary_context(survey_id))
         context[constants.key_name_questions] = question_details_list
         context[constants.key_name_categories] = category_details
         context["survey_summary"] = {

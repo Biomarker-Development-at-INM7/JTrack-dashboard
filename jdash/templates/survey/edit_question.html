@@ -13,8 +13,6 @@
 <script src="{% static 'js/bootstrap-table-export.min.js' %}"></script>
 <script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
 <script src="{% static 'js/survey.js' %}"></script>
-<script src="{% static 'js/popper.js' %}"></script>
-<script src="{% static 'js/bootstrap410.min.js' %}"></script>
 <script src="{% static 'js/sortable.js' %}"></script>
 <script>
   // Run on initial load
@@ -38,25 +36,35 @@
     }
   });
 </script>
-<div class="modal fade" id="updateModal" tabindex="-1" aria-labelledby="updateModalLabel" >
+<div
+  class="modal fade"
+  id="updateModal"
+  tabindex="-1"
+  aria-labelledby="updateModalLabel"
+  data-bs-backdrop="static"
+  data-bs-keyboard="false">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="updateModalLabel">Information</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <h5 class="modal-title" id="updateModalLabel">{% trans "question_save_changes_modal_title" %}</h5>
       </div>
 
       <div class="modal-body">
-          <p>If this survey is associated with a study, please follow these steps to update the study with the latest survey details:</p>
-          <ol>
-              <li>Navigate to the <strong>Studies</strong> section.</li>
-              <li>Select the relevant study linked to this survey and choose <strong>Edit</strong>.</li>
-              <li>Click on <strong>Update Study</strong> to ensure the study reflects the most recent survey information.</li>
-          </ol>
+        {% if associated_study_name %}
+          <p>{% trans "question_save_changes_modal_body" %}</p>
+          <p>{% trans "question_save_changes_commit_notice_linked_study" %}</p>
+        {% else %}
+          <p>{% trans "question_save_changes_modal_body" %}</p>
+          <p>{% trans "question_save_changes_no_linked_study" %}</p>
+        {% endif %}
       </div>
 
       <div class="modal-footer">
-        <button type="submit" name="update_question" onclick="editQuestion()" class="btn btn-secondary" data-dismiss="modal">Ok</button></div>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+          {% trans "common_cancel" %}
+        </button>
+        <button type="button" name="update_question" onclick="editQuestion()" class="btn btn-primary">{% trans "Save" %}</button>
+      </div>
     </div>
   </div>
 </div>
@@ -74,27 +82,18 @@
       </ul>
   </div>
 
-    <div class="d-flex justify-content-end mb-3">
-      <a class="btn btn-outline-primary d-flex align-items-center gap-2" href="{% url 'create_survey' survey_id=survey_id %}">
+  <div class="question-page-header">
+    <div class="question-page-title">
+      <h3>{{survey_title}}</h3>
+    </div>
+    <div class="question-page-actions">
+      <a class="btn btn-outline-primary btn-sm d-flex align-items-center gap-2"
+         href="{% url 'create_survey' survey_id=survey_id %}">
         <i class="fas fa-list"></i>
         <span>{% trans "global_back_overview" %}</span>
       </a>
     </div>
-
-  <div class="row">
-    <div class="col-lg-4">
-      <h3> {{survey_title}} </h3>
-    </div>
-    <div class="col-lg-6">
-      {% if messages %}
-          <ul class="messages">
-              {% for message in messages %}
-              <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
-              {% endfor %}
-          </ul>
-      {% endif %}
-    </div>
-</div>
+  </div>
 
 <form  id ="questionForm" action="{%url 'manage_question' survey_id=survey_id question_id=question_id  %}" method="POST" >
     {% csrf_token %}
@@ -115,12 +114,13 @@
                         <label class="form-check-label" for="mandatory">{% trans "Mandatory" %}</label>
                       </div>
                     </div>
-                      <div  class=" col form-group  required mb-4" >
-                      {{question_form.questionType }}
-                      <label >{% trans "question_type" %}*</label>
-                      <span><small><i>{{question_help_text.type}}</i></small></span>
-                  </div>
-                </div>
+	                    <div  class=" col form-group  required mb-4" >
+	                      {{question_form.questionType }}
+	                      <label >{% trans "question_type" %}*</label>
+	                      <span><small><i>{{question_help_text.type}}</i></small></span>
+	                  </div>
+                    
+	                </div>
                 <div class="form-group mb-4 " >
                   {{ question_form.title}} 
                   <label>{% trans "question_title" %}</label>
@@ -164,14 +164,14 @@
                   </div>
                 </div>
                 <div class="row">
-                  <div class="form-group  required mb-4" >
+                  <div class="form-group mb-4" >
                     {{ question_form.clockTime_start}}
                     <label >{% trans "question_activation_times" %}</label>
                     <span><small><i>{{question_help_text.clockTime_start}}</i></small></span>
                   </div>
                 </div>
                 <div class="row">
-                  <div class="form-group  required mb-4" >
+                  <div class="form-group mb-4" >
                     {{ question_form.clockTime_end}}
                     <label >{% trans "question_deactivation_times" %}</label>
                     <span><small><i>{{question_help_text.clockTime_end}}</i></small></span>
@@ -218,15 +218,19 @@
                 </div>
                 <div class="row">
                   <div id = "activate_condition_div" class="form-group  col mb-4" style="display:none">
+                   
                       {{ question_form.activation_condition}}
-                    <label>{% trans "question_activation_condition" %}</label>
-                    <div id="activation_condition_options" class="mt-2" style="display:none"></div>
+                    
+                    <label >{% trans "question_activation_condition" %}</label>
+                    <div id="activation_condition_options" class="mt-2"  style="display:none"></div>
                     <span><small><i>{{question_help_text.activation_condition}}</i></small></span>
                   </div>
 
                   <div id = "deactivate_condition_div" class=" form-group col mb-4" style="display:none">
+                      
                         {{ question_form.deactivation_condition}}
-                      <label>{% trans "question_deactivation_condition" %}</label>
+                      
+                      <label >{% trans "question_deactivation_condition" %}</label>
                       <div id="deactivation_condition_options" class="mt-2" style="display:none"></div>
                       <span><small><i>{{question_help_text.deactivation_condition}}</i></small></span>
                   </div>
@@ -331,10 +335,13 @@
     </div>
 </div>
 
-{% if request.user|can_manage_survey %}
+
 <!-- Update Button -->
-<div class="row mt-3">
-  <div class="col">
+{% if request.user|can_manage_survey %}
+<div class="question-form-actions mt-3">
+    <a class="btn btn-outline-secondary" href="{% url 'create_survey' survey_id=survey_id %}">
+      {% trans "common_cancel" %}
+    </a>
     <button
       type="button"
       name="update_button"
@@ -342,9 +349,9 @@
       class="btn btn-primary">
       {% trans "question_update_button" %}
     </button>
-  </div>
 </div>
 {% endif %}
+
 
 </form>
 
@@ -363,6 +370,7 @@
 
      initializeDefaultValueToggle();  // Uses code from survey.js
           show_answer_form();
+          refreshConditionOptionGroups();
   const toggleButton = document.getElementById("toggle-advanced-section");
   const advancedSection = document.getElementById("advanced-values-section");
 

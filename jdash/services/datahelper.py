@@ -18,6 +18,7 @@ def get_study_form_data(form,formset,request,study_device_formset, sensor_formse
     form_data['number-of-subjects'] = form.cleaned_data.get('number_of_subjects') #need to remove later after mobile changes
     form_data['number_of_subjects'] = form.cleaned_data.get('number_of_subjects')
     form_data['ema_checkbox'] = form.cleaned_data.get('ema_checkbox')
+    form_data['survey'] = None
     if form.cleaned_data.get('ema_checkbox'):
         if form.cleaned_data.get('survey') != '':
             form_data['survey'] = int(form.cleaned_data.get('survey'))
@@ -34,7 +35,7 @@ def get_study_form_data(form,formset,request,study_device_formset, sensor_formse
     form_data['is_test'] = form.cleaned_data.get('is_test')
     #form_data['passive_checkbox'] = form.cleaned_data.get('passive_checkbox')
     form_data['frequency'] = form.cleaned_data.get('recording_freq')
-    form_data['sensor_list_limited'] = form.cleaned_data.get('sensor_list_limited')
+    form_data['sensor_list_limited'] = form.cleaned_data.get('sensor_list_limited') or []
     form_data['sensor_list'] = form.cleaned_data.get('sensor_list') 
     if formset.is_valid():
         form_data['task_list'] = [] 
@@ -231,7 +232,7 @@ def get_survey_form_data(form):
     form_data['scrolling'] = form.cleaned_data.get('scrolling')
     form_data["topN"]= -1
 
-    logger.info("get_survey_form_data  cleaned date %s",form_data)
+    logger.debug("get_survey_form_data cleaned_data=%s", form_data)
     return form_data
 
 
@@ -248,8 +249,14 @@ def get_question_form_data(form):
     form_data['clockTime_end'] = form.cleaned_data.get('clockTime_end')
     form_data['activate_question'] = normalize_question_refs(form.cleaned_data.get('activate_question'))
     form_data['deactivate_question'] = normalize_question_refs(form.cleaned_data.get('deactivate_question'))
-    form_data['activation_condition'] = form.cleaned_data.get('activation_condition') if form.cleaned_data.get('activation_condition') != None else ""
-    form_data['deactivation_condition'] = form.cleaned_data.get('deactivation_condition') if form.cleaned_data.get('deactivation_condition') != None else ""
+    form_data['activation_condition'] = (
+        form.cleaned_data.get('activation_condition') or ""
+        if form_data['activate_question'] else ""
+    )
+    form_data['deactivation_condition'] = (
+        form.cleaned_data.get('deactivation_condition') or ""
+        if form_data['deactivate_question'] else ""
+    )
     form_data['nextDayToAnswer'] = form.cleaned_data.get('nextDayToAnswer') if form.cleaned_data.get('nextDayToAnswer') != None else 1
     form_data['category'] = form.cleaned_data.get('category')
     form_data['imageURL'] = form.cleaned_data.get('imageURL')
@@ -258,7 +265,7 @@ def get_question_form_data(form):
     form_data['deactivateOnAnswer'] = form.cleaned_data.get('deactivateOnAnswer')
     form_data['deactivateOnDate'] = form.cleaned_data.get('deactivateOnDate') if form.cleaned_data.get('deactivateOnDate') != None else 0
     form_data['clockTime_timezone'] = form.cleaned_data.get('clockTime_timezone') if form.cleaned_data.get('clockTime_timezone') != None else "Europe/Berlin"
-    logger.info("get_question_form_data  cleaned date %s",form_data)
+    logger.debug("get_question_form_data cleaned_data=%s", form_data)
     return form_data
 
 
@@ -284,8 +291,8 @@ def get_answer_form_data(formset, question_type=None) -> dict:
         logger.debug("Processing cleaned answer data: %s", cleaned)
 
         form_data = {
-            "text": cleaned.get("text", ""),
-            "answerSubText": cleaned.get("answerSubText", ""),
+            "text": cleaned.get("text") or "N",
+            "answerSubText": cleaned.get("answerSubText") or "N",
             "value": 0.1 if cleaned.get("value") is None else cleaned.get("value"),
             "defaultValue": 0.1 if cleaned.get("defaultValue") is None else cleaned.get("defaultValue"),
             "stepSize": 0.1 if cleaned.get("stepSize") is None else cleaned.get("stepSize"),

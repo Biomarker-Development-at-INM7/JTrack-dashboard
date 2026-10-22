@@ -21,6 +21,7 @@ def test_controller_exposes_study_download_functions():
     assert controller.dowload_unused_qr_code_files is study_workflows.dowload_unused_qr_code_files
     assert controller.download_subject_qr_file is study_workflows.download_subject_qr_file
     assert controller.download_dataset is study_workflows.download_dataset
+    assert controller.download_study_dashboard_csv is study_workflows.download_study_dashboard_csv
     assert controller.initiate_download_study_dataset is study_workflows.initiate_download_study_dataset
     assert controller.check_file_and_send_email is study_workflows.check_file_and_send_email
 
@@ -86,6 +87,52 @@ def test_download_study_dashboard_csv_missing(monkeypatch, tmp_path):
 
     with pytest.raises(study_workflows.Http404):
         controller.download_study_dashboard_csv("MissingStudy")
+
+
+def test_download_study_wearables_csv(monkeypatch, tmp_path):
+    csv_file = tmp_path / "jtrack_wearables_StudyX.csv"
+    csv_file.write_text("subject_name,steps\nA,42\n", encoding="utf-8")
+    monkeypatch.setattr(study_workflows.config, "storage_folder", str(tmp_path))
+
+    response = controller.download_study_wearables_csv("StudyX")
+
+    assert response.status_code == 200
+    assert response["Content-Type"] == "text/csv; charset=utf-8"
+    assert "jtrack_wearables_StudyX.csv" in response["Content-Disposition"]
+    assert b"".join(response.streaming_content) == b"subject_name,steps\nA,42\n"
+
+
+def test_download_study_wearables_csv_missing(monkeypatch, tmp_path):
+    monkeypatch.setattr(study_workflows.config, "storage_folder", str(tmp_path))
+
+    with pytest.raises(study_workflows.Http404):
+        controller.download_study_wearables_csv("MissingStudy")
+
+
+def test_download_combined_study_dashboard_csv(monkeypatch, tmp_path):
+    (tmp_path / "jutrack_dashboard_StudyX.csv").write_text(
+        "subject_name,app,status\nA,main,active\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "jtrack_wearables_StudyX.csv").write_text(
+        "subject_name,app,steps\nA,main,42\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(study_workflows.config, "storage_folder", str(tmp_path))
+    monkeypatch.setattr(study_workflows.config, "csv_prefix", "jutrack_dashboard_")
+    monkeypatch.setattr(
+        study_workflows,
+        "get_json_data",
+        lambda study_name: {"wearables": [{"sensorname": "Garmin", "sensors": []}]},
+    )
+
+    response = controller.download_combined_study_dashboard_csv("StudyX")
+    csv_bytes = b"".join(response.streaming_content)
+
+    assert response["Content-Type"] == "text/csv; charset=utf-8"
+    assert "jutrack_dashboard_StudyX.csv" in response["Content-Disposition"]
+    assert b"steps" in csv_bytes
+    assert b"42" in csv_bytes
 
 
 @pytest.fixture

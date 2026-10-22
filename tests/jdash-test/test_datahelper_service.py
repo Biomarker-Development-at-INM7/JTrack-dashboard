@@ -63,6 +63,36 @@ def test_get_study_form_data():
     assert result['device_sensor_rows'] == []
 
 
+def test_get_study_form_data_omits_survey_when_selection_is_cleared():
+    form = MagicMock()
+    form.cleaned_data = {
+        'study_label': 'Study 1',
+        'study_description': 'A description',
+        'study_duration': 5,
+        'number_of_subjects': 10,
+        'ema_checkbox': True,
+        'survey': '',
+        'is_test': False,
+        'recording_freq': 50,
+        'sensor_list_limited': [],
+        'sensor_list': [],
+    }
+    formset = MagicMock()
+    formset.is_valid.return_value = True
+    formset.__iter__.return_value = []
+    request = MagicMock()
+    request.FILES = {}
+    study_device_formset = MagicMock()
+    study_device_formset.forms = []
+
+    result = datahelper.get_study_form_data(
+        form, formset, request, study_device_formset, []
+    )
+
+    assert result['ema_checkbox'] is True
+    assert result['survey'] is None
+
+
 def test_get_study_device_config_builders_with_garmin_overrides():
     device = MagicMock()
     device.id = 11
@@ -241,6 +271,36 @@ def test_get_question_form_data():
     assert result['title'] == 'Question?'
     assert result['clockTime_timezone'] == 'Europe/Berlin'
 
+
+def test_get_question_form_data_clears_conditions_without_target_questions():
+    form = MagicMock()
+    form.cleaned_data = {
+        'activate_question': [],
+        'deactivate_question': None,
+        'activation_condition': 'stale activation condition',
+        'deactivation_condition': 'stale deactivation condition',
+    }
+
+    result = datahelper.get_question_form_data(form)
+
+    assert result['activation_condition'] == ''
+    assert result['deactivation_condition'] == ''
+
+
+def test_get_question_form_data_preserves_conditions_with_target_questions():
+    form = MagicMock()
+    form.cleaned_data = {
+        'activate_question': [2],
+        'deactivate_question': [3],
+        'activation_condition': 'yes',
+        'deactivation_condition': 'no',
+    }
+
+    result = datahelper.get_question_form_data(form)
+
+    assert result['activation_condition'] == 'yes'
+    assert result['deactivation_condition'] == 'no'
+
 def test_get_answer_form_data():
     answer = MagicMock()
     answer.cleaned_data = {
@@ -262,6 +322,22 @@ def test_get_answer_form_data():
     result = datahelper.get_answer_form_data(formset)
     assert result['answers'][0]['text'] == 'Yes'
     assert result['answers'][0]['value'] == 0.1
+
+
+def test_get_answer_form_data_uses_n_for_blank_text_and_subtext():
+    answer = MagicMock()
+    answer.cleaned_data = {
+        'text': '',
+        'answerSubText': '',
+    }
+
+    formset = MagicMock()
+    formset.forms = [answer]
+
+    result = datahelper.get_answer_form_data(formset, question_type=3)
+
+    assert result['answers'][0]['text'] == 'N'
+    assert result['answers'][0]['answerSubText'] == 'N'
 
 def test_get_category_form_data():
     category = MagicMock()

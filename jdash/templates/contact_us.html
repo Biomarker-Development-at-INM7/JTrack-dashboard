@@ -2,36 +2,47 @@
 {% load static %}
 {% load i18n %}
 {% block content %}
-<div class="login-page-shell">
-    <div class="contact-card-wrap">
-      <div class="card shadow contact-card">
-        <div class="card-body">
-            {% if error_message %}
-            <p class="alert alert-danger">{{ error_message }}</p>
-            {% endif %}
-            <div class="contact-card-header">
-              <h1>{% trans "contact_us_title" %}</h1>
-              <p>{% trans "contact_us_subtitle" %}</p>
-            </div>
-            <form action="{%url 'contact_email' %}" method="POST" class="contact-form">
-                {% csrf_token %}
-                <div class="mb-3">
-                  {{contact_form.fullname}}
-                </div>
-                <div class="mb-3">
-                  {{contact_form.email}}
-                </div>
-                <div class="mb-4">
-                  {{contact_form.message}}
-                </div>
-                <div class="d-grid">
-                    <input name="contact_message" type="submit" value="{% trans 'contact_us_submit' %}" role="button" class="btn btn-primary">
-                </div>
-            </form>
-        </div>
-      </div>
-    </div>
-</div>
- 
-{% endblock %}
+<main class="contact-page-shell">
+  <div class="contact-page-grid">
+    <section class="contact-page-intro" aria-labelledby="contact-page-title">
+      <p class="contact-page-eyebrow">{% trans "contact_page_eyebrow" %}</p>
+      <h1 id="contact-page-title">{% trans "contact_page_heading" %}</h1>
+      <p class="contact-page-lead">{% trans "contact_page_lead" %}</p>
+    </section>
 
+    <section class="contact-form-card" aria-labelledby="contact-form-title">
+      <div class="contact-form-header">
+        <h2 id="contact-form-title">{% trans "contact_page_form_title" %}</h2>
+        <p>{% trans "contact_page_form_text" %}</p>
+      </div>
+
+      {% if error_message %}
+      <p class="alert alert-danger">{{ error_message }}</p>
+      {% endif %}
+
+      <form action="{% url 'contact_email' %}" method="POST" class="contact-form">
+        {% csrf_token %}
+        <div class="contact-form-field">
+          <label for="{{ contact_form.fullname.id_for_label }}">{% trans "contact_page_name" %}</label>
+          {{ contact_form.fullname }}
+          {{ contact_form.fullname.errors }}
+        </div>
+        <div class="contact-form-field">
+          <label for="{{ contact_form.email.id_for_label }}">{% trans "contact_page_email" %}</label>
+          {{ contact_form.email }}
+          {{ contact_form.email.errors }}
+        </div>
+        <div class="contact-form-field">
+          <label for="{{ contact_form.message.id_for_label }}">{% trans "contact_page_message" %}</label>
+          {{ contact_form.message }}
+          {{ contact_form.message.errors }}
+        </div>
+        <button name="contact_message" type="submit" class="btn btn-primary contact-submit-button">
+          <span>{% trans "contact_us_submit" %}</span>
+          <i class="fas fa-arrow-right" aria-hidden="true"></i>
+        </button>
+      </form>
+    </section>
+  </div>
+</main>
+{% endblock %}

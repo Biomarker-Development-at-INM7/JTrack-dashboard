@@ -32,7 +32,7 @@ LOG_FILENAME = os.path.join(os.getenv("LOG_DIR", '/var/www/jdash.inm7.de/www/das
 SECRET_KEY = os.environ['DJANGO_SECRET_KEY']
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DEBUG", "True").lower() == "true"
+DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() == "true"
 
 ALLOWED_HOSTS = os.getenv(
     "DJANGO_ALLOWED_HOSTS",
@@ -190,9 +190,30 @@ EMAIL_HOST_PASSWORD = os.environ['EMAIL_HOST_PASSWORD']
 
 STORAGE_FOLDER = os.getenv("STORAGE_FOLDER", "")
 DASH_FOLDER = os.getenv("DASH_FOLDER", "")
+RAW_DATA_STORAGE_ROOT = os.getenv(
+    "RAW_DATA_STORAGE_ROOT",
+    os.path.join(STORAGE_FOLDER, "studies_bids"),
+)
+RAW_DATA_BACKEND = os.getenv("RAW_DATA_BACKEND", "local").strip().lower()
+RAW_DATA_API_BASE_URL = os.getenv("RAW_DATA_API_BASE_URL", "").rstrip("/")
+RAW_DATA_API_KEY = os.getenv("RAW_DATA_API_KEY", "")
+RAW_DATA_API_CONNECT_TIMEOUT_SECONDS = float(
+    os.getenv("RAW_DATA_API_CONNECT_TIMEOUT_SECONDS", "5")
+)
+RAW_DATA_API_READ_TIMEOUT_SECONDS = float(
+    os.getenv("RAW_DATA_API_READ_TIMEOUT_SECONDS", "30")
+)
+RAW_DATA_API_DOWNLOAD_TIMEOUT_SECONDS = float(
+    os.getenv("RAW_DATA_API_DOWNLOAD_TIMEOUT_SECONDS", "300")
+)
+RAW_DATA_API_VERIFY_SSL = os.getenv(
+    "RAW_DATA_API_VERIFY_SSL",
+    "true",
+).lower() == "true"
 FIREBASE_URL = os.getenv('FIREBASE_URL', 'https://fcm.googleapis.com/send')
 FIREBASE_URL_EMA = os.getenv("FIREBASE_URL_EMA", "https://fcm.googleapis.com/v1/projects/jtrackema/messages:send")
 FIREBASE_URL_MAIN = os.getenv("FIREBASE_URL_MAIN", "https://fcm.googleapis.com/v1/projects/jtrack-social/messages:send")
+FIREBASE_URL_MAIN_IOS = os.getenv("FIREBASE_URL_MAIN_IOS", "https://fcm.googleapis.com/v1/projects/jtrack-social-21946/messages:send")
 SMTP_SERVER = os.getenv("SMTP_SERVER", EMAIL_HOST)
 SMTP_PORT = int(os.getenv("SMTP_PORT", str(EMAIL_PORT)))
 SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", EMAIL_HOST_USER)
@@ -215,7 +236,11 @@ SERVICE_ACCOUNT_FILE_MAIN = os.getenv(
     'SERVICE_ACCOUNT_FILE_MAIN',
     str(SECRETS_DIR / 'jtracksocial-firebase-adminsdk.json')
 ) or str(SECRETS_DIR / 'jtracksocial-firebase-adminsdk.json')
- 
+SERVICE_ACCOUNT_FILE_MAIN_IOS = os.getenv(
+    'SERVICE_ACCOUNT_FILE_MAIN_IOS',
+    str(SECRETS_DIR / 'jtrack-social-21946-firebase-adminsdk.json')
+) or str(SECRETS_DIR / 'jtrack-social-21946-firebase-adminsdk.json')
+   
 # Internationalization
 # https://docs.djangoproject.com/en/3.2/topics/i18n/
 
@@ -243,6 +268,18 @@ SESSION_COOKIE_SECURE = True  # Required when SameSite=None
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR,  'static')
 ADMIN_MEDIA_PREFIX = '/static/admin/'   
+
+# Generate content-hashed static filenames during collectstatic. This lets
+# browsers cache assets aggressively while ensuring each changed CSS/JS file
+# receives a new URL on deployment.
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "jdash.storage.JDashManifestStaticFilesStorage",
+    },
+}
 
 CSRF_FAILURE_VIEW = 'jdash.views.csrf_failure'
 STATICFILES_FINDERS = (                                                          

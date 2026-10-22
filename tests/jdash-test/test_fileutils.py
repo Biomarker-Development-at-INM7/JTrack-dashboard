@@ -77,6 +77,7 @@ def test_get_json_data_transformations(mock_join, mock_read_df, mock_get_user_li
     assert result["number_of_enrolled_subjects"] == 2
     mock_sync_count.assert_called_once_with("StudyX", 2)
 
+
 # Test get_all_json_data calls get_json_data for each directory
 @patch("jdash.utils.fileutils.get_json_data")
 def test_get_all_json_data_calls_get_json_data(mock_get_json_data):
@@ -87,6 +88,131 @@ def test_get_all_json_data_calls_get_json_data(mock_get_json_data):
         "dir1": {"key": "dir1"},
         "dir2": {"key": "dir2"},
     }
+
+
+def test_list_study_json_versions_includes_current_and_backups(tmp_path, monkeypatch):
+    study_name = "StudyX"
+    study_directory = tmp_path / study_name
+    study_directory.mkdir()
+    (study_directory / f"{study_name}.json").write_text(
+        json.dumps({"version": 3}),
+        encoding="utf-8",
+    )
+    (study_directory / f"{study_name}_v1_20260101090000.json").write_text(
+        json.dumps({"version": 1}),
+        encoding="utf-8",
+    )
+    (study_directory / f"{study_name}_v2_20260201100000.json").write_text(
+        json.dumps({"version": 2}),
+        encoding="utf-8",
+    )
+    (study_directory / "unrelated.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(fileutils.config, "studies_folder", str(tmp_path))
+
+    versions = fileutils.list_study_json_versions(study_name)
+
+    assert [version["key"] for version in versions] == [
+        "current",
+        "v2_20260201100000",
+        "v1_20260101090000",
+    ]
+    assert versions[0]["version"] == 3
+    assert versions[0]["is_current"] is True
+
+
+def test_list_study_json_versions_hides_archive_matching_current_version(tmp_path, monkeypatch):
+    study_name = "StudyX"
+    study_directory = tmp_path / study_name
+    study_directory.mkdir()
+    (study_directory / f"{study_name}.json").write_text(
+        json.dumps({"version": 3}),
+        encoding="utf-8",
+    )
+    (study_directory / f"{study_name}_v3_20260301120000.json").write_text(
+        json.dumps({"version": 3}),
+        encoding="utf-8",
+    )
+    (study_directory / f"{study_name}_v2_20260201100000.json").write_text(
+        json.dumps({"version": 2}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(fileutils.config, "studies_folder", str(tmp_path))
+
+    versions = fileutils.list_study_json_versions(study_name)
+
+    assert [version["key"] for version in versions] == [
+        "current",
+        "v2_20260201100000",
+    ]
+
+
+def test_resolve_study_json_version_path_rejects_invalid_keys(tmp_path, monkeypatch):
+    study_name = "StudyX"
+    study_directory = tmp_path / study_name
+    study_directory.mkdir()
+    version_path = study_directory / f"{study_name}_v1_20260101090000.json"
+    version_path.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(fileutils.config, "studies_folder", str(tmp_path))
+
+    assert fileutils.resolve_study_json_version_path(
+        study_name,
+        "v1_20260101090000",
+    ) == str(version_path)
+    with pytest.raises(ValueError):
+        fileutils.resolve_study_json_version_path(study_name, "../secrets")
+
+
+def test_get_study_json_version_diff_compares_with_immediately_older_version(tmp_path, monkeypatch):
+    study_name = "StudyX"
+    study_directory = tmp_path / study_name
+    study_directory.mkdir()
+    (study_directory / f"{study_name}.json").write_text(
+        json.dumps({
+            "version": 3,
+            "title": "Updated",
+            "settings": {"enabled": True},
+            "items": ["first", "new"],
+        }),
+        encoding="utf-8",
+    )
+    (study_directory / f"{study_name}_v2_20260201100000.json").write_text(
+        json.dumps({
+            "version": 2,
+            "title": "Original",
+            "settings": {"enabled": False, "legacy": True},
+            "items": ["first", "old"],
+        }),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(fileutils.config, "studies_folder", str(tmp_path))
+
+    comparison = fileutils.get_study_json_version_diff(study_name, "current")
+
+    assert comparison["selected"]["version"] == 3
+    assert comparison["previous"]["version"] == 2
+    changes_by_path = {change["path"]: change for change in comparison["changes"]}
+    assert changes_by_path["title"]["previous"] == "Original"
+    assert changes_by_path["title"]["selected"] == "Updated"
+    assert changes_by_path["settings.enabled"]["change_type"] == "changed"
+    assert changes_by_path["settings.legacy"]["change_type"] == "removed"
+    assert changes_by_path["items[1]"]["selected"] == "new"
+    assert changes_by_path["version"]["selected"] == 3
+
+
+def test_get_study_json_version_diff_reports_oldest_version(tmp_path, monkeypatch):
+    study_name = "StudyX"
+    study_directory = tmp_path / study_name
+    study_directory.mkdir()
+    (study_directory / f"{study_name}.json").write_text(
+        json.dumps({"version": 1}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(fileutils.config, "studies_folder", str(tmp_path))
+
+    comparison = fileutils.get_study_json_version_diff(study_name, "current")
+
+    assert comparison["previous"] is None
+    assert comparison["changes"] == []
 
 # Test save_study_json writes JSON file
 @patch("builtins.open", new_callable=mock_open)

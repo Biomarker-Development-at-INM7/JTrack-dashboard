@@ -1,6 +1,8 @@
 import pytest
+import json
 from django.urls import reverse
 from django.contrib.auth.models import Group, User, AnonymousUser
+from django.contrib.auth.hashers import make_password
 from jdash.models import Survey
 from django.http import HttpRequest, HttpResponse
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -33,9 +35,47 @@ def logged_in_client(client):
     client.login(username="testuser", password="testpass")
     return client
 
+
+
+
+class TestStudyTitleAvailability(SimpleTestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.user = MagicMock(is_authenticated=True)
+
+    @patch("jdash.views.study_views.permissions.can_manage_study", return_value=True)
+    @patch("jdash.views.study_views.studymodel.objects.filter")
+    @patch("jdash.views.study_views.os.path.isdir", return_value=False)
+    def test_title_is_available(self, mock_isdir, mock_filter, mock_permission):
+        mock_filter.return_value.exists.return_value = False
+        request = self.factory.get("/add/check-title/", {"title": "New_Study"})
+        request.user = self.user
+
+        response = study_views.study_title_availability(request)
+
+        assert response.status_code == 200
+        assert json.loads(response.content)["available"] is True
+
+    @patch("jdash.views.study_views.permissions.can_manage_study", return_value=True)
+    @patch("jdash.views.study_views.studymodel.objects.filter")
+    @patch("jdash.views.study_views.os.path.isdir", side_effect=[True, False])
+    def test_existing_folder_makes_title_unavailable(
+        self, mock_isdir, mock_filter, mock_permission
+    ):
+        mock_filter.return_value.exists.return_value = False
+        request = self.factory.get("/add/check-title/", {"title": "Existing_Study"})
+        request.user = self.user
+
+        response = study_views.study_title_availability(request)
+
+        assert response.status_code == 200
+        payload = json.loads(response.content)
+        assert payload["available"] is False
+        assert payload["folder_exists"] is True
+
+
 @pytest.mark.django_db
 class TestPositiveViews:
-
     def test_index_view(self, logged_in_client):
         response = logged_in_client.get(reverse("home"))
         assert response.status_code in [200, 500]
@@ -46,8 +86,18 @@ class TestPositiveViews:
         assert b"Login" in response.content
 
     def test_logout_view(self, logged_in_client):
-        response = logged_in_client.get(reverse("logout"))
+        response = logged_in_client.post(reverse("logout"))
         assert response.status_code == 302
+
+    def test_logout_get_is_not_allowed(self, logged_in_client):
+        response = logged_in_client.get(reverse("logout"))
+        assert response.status_code == 405
+
+    def test_close_study_get_is_not_allowed(self, logged_in_client):
+        response = logged_in_client.get(
+            reverse("close", kwargs={"study_name": "any-study"})
+        )
+        assert response.status_code == 405
 
     def test_contact_email_get(self, client):
         response = client.get(reverse("contact_email"))
@@ -309,6 +359,145 @@ def test_get_request_renders_details(
     assert context_passed[constants.field_name_email] == 'test@example.com'
 
 
+@patch('jdash.views.study_views.download_study_dashboard_csv')
+def test_export_study_dashboard_csv_uses_service(mock_download, rf, user):
+    expected_response = HttpResponse("csv")
+    mock_download.return_value = expected_response
+    request = rf.get('/details/some_study/export.csv')
+    request.user = user
+
+    response = views.export_study_dashboard_csv(request, 'some_study')
+
+    assert response is expected_response
+    mock_download.assert_called_once_with('some_study')
+
+
+@patch('jdash.views.study_views.download_study_wearables_csv')
+def test_export_study_wearables_csv_uses_service(mock_download, rf, user):
+    expected_response = HttpResponse("csv")
+    mock_download.return_value = expected_response
+    request = rf.get('/details/some_study/export-wearables.csv')
+    request.user = user
+
+    response = views.export_study_wearables_csv(request, 'some_study')
+
+    assert response is expected_response
+    mock_download.assert_called_once_with('some_study')
+
+
+@patch('jdash.views.study_views.download_combined_study_dashboard_csv')
+def test_export_combined_study_dashboard_csv_uses_service(mock_download, rf, user):
+    expected_response = HttpResponse("csv")
+    mock_download.return_value = expected_response
+    request = rf.get('/details/some_study/export-combined.csv')
+    request.user = user
+
+    response = views.export_combined_study_dashboard_csv(request, 'some_study')
+
+    assert response is expected_response
+    mock_download.assert_called_once_with('some_study')
+
+
+@patch('jdash.views.study_views.render')
+@patch('jdash.views.study_views.StudyAuditService.get_history', return_value=[])
+@patch('jdash.views.study_views.list_study_json_versions')
+@patch('jdash.views.study_views.permissions.can_view_study', return_value=True)
+@patch('jdash.views.study_views.studymodel.objects.filter')
+def test_study_json_versions_lists_authorized_snapshots(
+    mock_filter, mock_can_view, mock_list_versions, mock_history, mock_render, rf, user
+):
+    study = MagicMock(title='some_study')
+    mock_filter.return_value.first.return_value = study
+    mock_list_versions.return_value = [{"key": "current", "version": 2}]
+    request = rf.get('/json-versions/some_study')
+    request.user = user
+
+    response = views.study_json_versions(request, 'some_study')
+
+    assert response is mock_render.return_value
+    context = mock_render.call_args.args[2]
+    assert context['show_json_versions'] is True
+    assert context['audit_history'] == []
+    assert context['json_versions'] == mock_list_versions.return_value
+    mock_can_view.assert_called_once_with(user, study)
+
+
+@patch('jdash.views.study_views.render')
+@patch('jdash.views.study_views.StudyAuditService.get_history', return_value=['audit-entry'])
+@patch('jdash.views.study_views.list_study_json_versions', return_value=[{'key': 'current'}])
+@patch('jdash.views.study_views.permissions.can_view_study', return_value=True)
+@patch('jdash.views.study_views.studymodel.objects.filter')
+def test_study_audit_loads_both_history_tabs(
+    mock_filter, mock_can_view, mock_list_versions, mock_history, mock_render, rf, user
+):
+    study = MagicMock(title='some_study')
+    mock_filter.return_value.first.return_value = study
+    request = rf.get('/audit/some_study')
+    request.user = user
+
+    response = views.study_audit(request, 'some_study')
+
+    assert response is mock_render.return_value
+    context = mock_render.call_args.args[2]
+    assert context['show_json_versions'] is True
+    assert context['audit_history'] == ['audit-entry']
+    assert context['json_versions'] == [{'key': 'current'}]
+    mock_can_view.assert_called_once_with(user, study)
+
+
+@patch('jdash.views.study_views.permissions.can_view_study', return_value=True)
+@patch('jdash.views.study_views.studymodel.objects.filter')
+def test_download_study_json_version_returns_attachment(
+    mock_filter, mock_can_view, tmp_path, monkeypatch, rf, user
+):
+    study_name = 'some_study'
+    study_directory = tmp_path / study_name
+    study_directory.mkdir()
+    version_path = study_directory / f'{study_name}_v1_20260101090000.json'
+    version_path.write_text('{"version": 1}', encoding='utf-8')
+    monkeypatch.setattr('jdash.utils.fileutils.config.studies_folder', str(tmp_path))
+    study = MagicMock(title=study_name)
+    mock_filter.return_value.first.return_value = study
+    request = rf.get('/json-versions/some_study/v1_20260101090000/download/')
+    request.user = user
+
+    response = views.download_study_json_version(
+        request,
+        study_name,
+        'v1_20260101090000',
+    )
+
+    assert response.status_code == 200
+    assert response['Content-Type'] == 'application/json'
+    assert f'filename="{version_path.name}"' in response['Content-Disposition']
+    assert b''.join(response.streaming_content) == b'{"version": 1}'
+    mock_can_view.assert_called_once_with(user, study)
+
+
+@patch('jdash.views.study_views.get_study_json_version_diff')
+@patch('jdash.views.study_views.permissions.can_view_study', return_value=True)
+@patch('jdash.views.study_views.studymodel.objects.filter')
+def test_study_json_version_diff_returns_authorized_comparison(
+    mock_filter, mock_can_view, mock_diff, rf, user
+):
+    study = MagicMock(title='some_study')
+    mock_filter.return_value.first.return_value = study
+    mock_diff.return_value = {
+        'selected': {'key': 'current', 'version': 3, 'is_current': True},
+        'previous': {'key': 'v2_20260201100000', 'version': 2, 'is_current': False},
+        'changes': [{'path': 'version', 'change_type': 'changed'}],
+    }
+    request = rf.get('/json-versions/some_study/current/diff/')
+    request.user = user
+
+    response = views.study_json_version_diff(request, 'some_study', 'current')
+
+    assert response.status_code == 200
+    assert json.loads(response.content) == mock_diff.return_value
+    mock_diff.assert_called_once_with('some_study', 'current')
+    mock_can_view.assert_called_once_with(user, study)
+
+
 @patch('jdash.views.study_views.request_study_csv_refresh', return_value=True)
 @patch('jdash.services.context_builder.Subject.count_pdfs', return_value=0)
 @patch('jdash.services.context_builder.SessionManager.get_specific_session_data')
@@ -326,13 +515,23 @@ def test_post_send_notification_valid_sends_notification(
     mock_form = MagicMock(is_valid=MagicMock(return_value=True))
     mock_form_class.return_value = mock_form
     mock_get_data.return_value = ("title", "text", ["receiver1"])
+    mock_send.return_value = (
+        [],
+        [{"subject_id": "receiver1", "modality": "main", "message_id": "message-1", "success": True}],
+    )
     request = rf.post('/study/some_study/', data={constants.button_name_send_notification: 'clicked'})
     add_session_to_request(request)
     request.user = user
 
     views.study_details(request, 'some_study')
 
-    mock_send.assert_called_once_with("title", "text", ["receiver1"], 'some_study')
+    mock_send.assert_called_once_with(
+        "title",
+        "text",
+        ["receiver1"],
+        'some_study',
+        include_results=True,
+    )
 
 
 @patch('jdash.views.study_views.request_study_csv_refresh', return_value=True)
@@ -356,9 +555,45 @@ def test_post_create_subjects_valid_creates(
     add_session_to_request(request)
     request.user = user
 
-    views.study_details(request, 'some_study')
+    response = views.study_details(request, 'some_study')
 
     mock_create_subjects.assert_called_once_with('some_study', 5)
+    assert response.status_code == 302
+    assert response.url.endswith('/details/some_study')
+    mock_render.assert_not_called()
+
+
+@patch('jdash.views.study_views.request_study_csv_refresh', return_value=True)
+@patch('jdash.services.context_builder.Subject.count_pdfs', return_value=0)
+@patch('jdash.services.context_builder.SessionManager.get_specific_session_data')
+@patch('jdash.views.study_views.Study')
+@patch('jdash.views.study_views.CreateSubjectForm')
+@patch('jdash.views.study_views.create_subjects_for_study')
+@patch('jdash.views.study_views.render', create=True)
+def test_post_create_subjects_failure_redirects_to_details_with_error(
+    mock_render, mock_create_subjects, mock_form_class, mock_study, mock_session,
+    mock_count_pdfs, mock_refresh, rf, user, default_context
+):
+    mock_study.return_value.display_context.return_value = default_context
+    mock_session.return_value = {constants.field_name_email: 'test@example.com'}
+    mock_form = MagicMock(is_valid=MagicMock(return_value=True))
+    mock_form.cleaned_data = {constants.field_name_number_of_subjects: 5}
+    mock_form_class.return_value = mock_form
+    mock_create_subjects.return_value = {
+        constants.key_name_error_message: 'Subject creation failed.'
+    }
+    request = rf.post('/study/some_study/', data={constants.button_name_create_subjects: 'clicked'})
+    add_session_to_request(request)
+    request.user = user
+
+    response = views.study_details(request, 'some_study')
+
+    assert response.status_code == 302
+    assert response.url.endswith('/details/some_study')
+    queued_messages = list(messages.get_messages(request))
+    assert [str(message) for message in queued_messages] == ['Subject creation failed.']
+    assert queued_messages[0].tags == 'error'
+    mock_render.assert_not_called()
 
 
 @patch('jdash.views.study_views.request_study_csv_refresh', return_value=True)
@@ -377,11 +612,14 @@ def test_post_remove_subjects_valid_removes(
     mock_form = MagicMock(is_valid=MagicMock(return_value=True))
     mock_form.cleaned_data = {constants.field_name_subject_to_remove: 'subj1'}
     mock_form_class.return_value = mock_form
+    mock_remove.return_value = {
+        constants.key_name_success_message: 'Subject removed successfully.'
+    }
     request = rf.post('/study/some_study/', data={constants.button_name_remove_subjects: 'clicked'})
     add_session_to_request(request)
     request.user = user
 
-    views.study_details(request, 'some_study')
+    response = views.study_details(request, 'some_study')
 
     mock_remove.assert_called_once_with(
         'some_study',
@@ -390,6 +628,9 @@ def test_post_remove_subjects_valid_removes(
         actor=user,
         dropout_reason='',
     )
+    assert response.status_code == 302
+    assert response.url.endswith('/details/some_study')
+    mock_render.assert_not_called()
 
 
 @patch('jdash.views.study_views.request_study_csv_refresh', return_value=True)
@@ -408,11 +649,14 @@ def test_post_delete_subject_data_valid_deletes(
     mock_form = MagicMock(is_valid=MagicMock(return_value=True))
     mock_form.cleaned_data = {constants.field_name_subjectId: 'id1,id2'}
     mock_form_class.return_value = mock_form
-    request = rf.post('/study/some_study/', data={constants.button_name_delete_subject_data: 'clicked'})
+    request = rf.post('/study/some_study/', data={
+        constants.button_name_delete_subject_data: 'clicked',
+        constants.field_name_subjectId: 'id1,id2',
+    })
     add_session_to_request(request)
     request.user = user
 
-    views.study_details(request, 'some_study')
+    response = views.study_details(request, 'some_study')
 
     mock_delete.assert_called_once_with(
         'some_study',
@@ -420,6 +664,9 @@ def test_post_delete_subject_data_valid_deletes(
         actor=user,
         dropout_reason='',
     )
+    assert response.status_code == 302
+    assert response.url.endswith('/details/some_study')
+    mock_render.assert_not_called()
 
 
 @patch('jdash.views.study_views.request_study_csv_refresh', return_value=True)
@@ -708,6 +955,35 @@ def test_edit_study_missing_study_calls_messages_error(
     mock_render.assert_called_once()
 
 
+@patch('jdash.views.study_views.context_for_home_page', return_value={'study_meta': []})
+@patch('jdash.views.study_views.messages.error')
+@patch('jdash.views.study_views.studymodel.objects.filter')
+@patch('jdash.views.study_views.studymodel.objects.get')
+@patch('jdash.views.study_views.get_json_data', return_value={})
+@patch('jdash.views.study_views.render', create=True)
+def test_edit_study_duplicate_titles_returns_safe_error(
+    mock_render, mock_get_json, mock_study_get, mock_filter,
+    mock_messages_error, mock_home_context, rf
+):
+    mock_study_get.side_effect = StudyModel.MultipleObjectsReturned
+    mock_filter.return_value.order_by.return_value.values_list.return_value = [2, 5]
+    request = rf.get('/edit/test')
+    request.session = DummySession()
+    request.user = MagicMock(is_authenticated=True)
+    request.user.groups.values_list.return_value = [constants.group_name_administrator]
+
+    response = views.edit_study(request, 'test')
+
+    assert response == mock_render.return_value
+    mock_messages_error.assert_called_once()
+    assert "duplicate database records" in mock_messages_error.call_args.args[1]
+    mock_render.assert_called_once_with(
+        request,
+        constants.home_page,
+        context={'study_meta': []},
+    )
+
+
 @pytest.mark.django_db
 class TestDownloadDatasetFromLink:
 
@@ -744,7 +1020,10 @@ class TestDownloadDatasetFromLink:
             response = views.download_dataset_from_link(request, "invalidtoken")
 
             mock_render.assert_called_once_with(request, constants.error_page, context={})
-            mock_messages_error.assert_not_called()
+            mock_messages_error.assert_called_once_with(
+                request,
+                "This download link is invalid or has expired.",
+            )
 
     @patch('jdash.views.study_views.messages.error')
     @patch('jdash.views.study_views.render', create=True)
@@ -760,7 +1039,10 @@ class TestDownloadDatasetFromLink:
             response = views.download_dataset_from_link(request, "expiredtoken")
 
             mock_render.assert_called_once_with(request, constants.error_page, context={})
-            mock_messages_error.assert_not_called()
+            mock_messages_error.assert_called_once_with(
+                request,
+                "This download link is invalid or has expired.",
+            )
 
     @patch('jdash.views.study_views.download_dataset')
     @patch('jdash.views.study_views.messages.error')
@@ -781,6 +1063,7 @@ class TestDownloadDatasetFromLink:
             mock_download_dataset.assert_called_once_with(valid_token.file_name)
             mock_messages_error.assert_not_called()
             mock_render.assert_not_called()  # Should not render any page on successful download
+            assert not FileDownloadToken.objects.filter(pk=valid_token.pk).exists()
 
     @patch('jdash.views.study_views.messages.error')
     @patch('jdash.views.study_views.render', create=True)
@@ -944,6 +1227,8 @@ class DownloadUnusedFilesTest(TestCase):
         middleware = SessionMiddleware(get_response=lambda req: None)
         middleware.process_request(request)
         request.session.save()
+        message_middleware = MessageMiddleware(get_response=lambda req: None)
+        message_middleware.process_request(request)
 
     def test_data_arg_branch_with_empty_email(self):
         request = self.factory.post('/some-url/', data={
@@ -1050,4 +1335,3 @@ class DownloadUnusedFilesTest(TestCase):
 
 #         self.assertEqual(response.status_code, 200)
 #         self.assertIn(constants.home_page, [t.name for t in response.templates])
-

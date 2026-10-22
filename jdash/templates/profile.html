@@ -1,0 +1,248 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load custom_tags %}
+{% load static %}
+
+{% block content %}
+<link href="{% static 'css/form.css' %}" rel="stylesheet">
+<script src="{% static 'js/main.js' %}"></script>
+<div class="profile-shell">
+  <section class="profile-workspace" aria-label="{% trans 'Profile' %}">
+    <div class="profile-content">
+      <div class="tab-content">
+        <div class="tab-pane fade{% if active_tab == 'profile' %} show active{% endif %}" id="profile-panel" role="tabpanel">
+          <div class="profile-summary-card">
+            <h1 class="profile-page-title">{% trans "Profile" %}</h1>
+            <dl class="profile-details">
+              <div class="profile-detail-row">
+                <dt>{% trans "Username" %}</dt>
+                <dd>{{ request.user.username }}</dd>
+              </div>
+              <div class="profile-detail-row">
+                <dt>{% trans "First name" %}</dt>
+                <dd>{{ request.user.first_name|default:"—" }}</dd>
+              </div>
+              <div class="profile-detail-row">
+                <dt>{% trans "Last name" %}</dt>
+                <dd>{{ request.user.last_name|default:"—" }}</dd>
+              </div>
+              <div class="profile-detail-row">
+                <dt>{% trans "Email" %}</dt>
+                <dd>{{ request.user.email|default:"—" }}</dd>
+              </div>
+              <div class="profile-detail-row">
+                <dt>{% trans "Role" %}</dt>
+                <dd>
+                  <span class="profile-role-pill">
+                    {% with profile_role=request.user|role_group_label %}
+                      {% if profile_role == "Maintainer" %}{% trans "profile_role_principal_investigator" %}{% else %}{{ profile_role|default:"—" }}{% endif %}
+                    {% endwith %}
+                  </span>
+                </dd>
+              </div>
+            </dl>
+            <div class="profile-summary-actions">
+              <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
+                <i class="fas fa-key me-2" aria-hidden="true"></i>{% trans "Change password" %}
+              </button>
+            </div>
+          </div>
+
+          <div class="modal fade" id="changePasswordModal" tabindex="-1" aria-labelledby="changePasswordModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+              <form method="post" class="modal-content study-form-page profile-password-form" novalidate>
+                {% csrf_token %}
+                <input type="hidden" name="access_action" value="change_password">
+                <div class="modal-header">
+                  <h5 class="modal-title" id="changePasswordModalLabel">{% trans "Change password" %}</h5>
+                </div>
+                <div class="modal-body">
+                  <p class="profile-password-instructions">{% trans "Enter your current password, then choose a new password." %}</p>
+
+                  {% if form.non_field_errors %}
+                  <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
+                  {% endif %}
+
+                  <div class="form-group">
+                    <input type="password" name="old_password" autocomplete="current-password" required placeholder=" " id="id_old_password" class="form-control{% if form.old_password.errors %} is-invalid{% endif %}">
+                    <label for="id_old_password">{% trans "Current password" %}</label>
+                    {% for error in form.old_password.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                  </div>
+
+                  <div class="form-group">
+                    <input type="password" name="new_password1" autocomplete="new-password" required placeholder=" " id="id_new_password1" class="form-control{% if form.new_password1.errors %} is-invalid{% endif %}">
+                    <label for="id_new_password1">{% trans "New password" %}</label>
+                    {% for error in form.new_password1.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                    {% if form.new_password1.help_text %}<div class="form-text">{{ form.new_password1.help_text|safe }}</div>{% endif %}
+                  </div>
+
+                  <div class="form-group mb-0">
+                    <input type="password" name="new_password2" autocomplete="new-password" required placeholder=" " id="id_new_password2" class="form-control{% if form.new_password2.errors %} is-invalid{% endif %}">
+                    <label for="id_new_password2">{% trans "Confirm new password" %}</label>
+                    {% for error in form.new_password2.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                  </div>
+                </div>
+
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+                  <button type="submit" class="btn btn-primary">{% trans "Change password" %}</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          {% if form.errors %}
+          <script>
+            document.addEventListener("DOMContentLoaded", function () {
+              const modalElement = document.getElementById("changePasswordModal");
+              if (modalElement && window.bootstrap && window.bootstrap.Modal) {
+                window.bootstrap.Modal.getOrCreateInstance(modalElement).show();
+              }
+            });
+          </script>
+          {% endif %}
+        </div>
+
+        <div class="tab-pane fade{% if active_tab == 'settings' %} show active{% endif %}" id="study-settings-panel" role="tabpanel">
+          {% if managed_studies %}
+          <div class="profile-summary-card study-access-card">
+            <div class="study-access-header">
+              <div>
+                <h2>{% trans "Study access" %}</h2>
+                <p>{% trans "Add registered users to a study and assign their study-specific role." %}</p>
+              </div>
+              <form method="get" class="study-access-study-picker">
+                <input type="hidden" name="tab" value="settings">
+                <div class="study-searchable-select-field"
+                     data-search-placeholder="{% trans 'study_filter_studies' %}"
+                     data-clear-label="{% trans 'study_details_remove_selection' %}"
+                     data-allow-clear="false">
+                  <label for="study-access-study">{% trans "Study" %}</label>
+                  <select id="study-access-study" name="study" class="form-select" onchange="this.form.submit()">
+                    {% for study in managed_studies %}
+                    <option value="{{ study.pk }}"{% if selected_study.pk == study.pk %} selected{% endif %}>{{ study.title }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </form>
+            </div>
+
+            <div class="study-access-role-info" aria-label="{% trans 'profile_study_role_permissions' %}">
+              <div>
+                <strong>{% trans "profile_role_principal_investigator" %}</strong>
+                <span>{% trans "profile_role_principal_investigator_info" %}</span>
+              </div>
+              <div>
+                <strong>{% trans "profile_role_investigator" %}</strong>
+                <span>{% trans "profile_role_investigator_info" %}</span>
+              </div>
+              <div>
+                <strong>{% trans "profile_role_viewer" %}</strong>
+                <span>{% trans "profile_role_viewer_info" %}</span>
+              </div>
+            </div>
+
+            <form method="post" class="study-access-add-form">
+              {% csrf_token %}
+              <input type="hidden" name="access_action" value="add_member">
+              <input type="hidden" name="study_id" value="{{ selected_study.pk }}">
+              <div>
+                <label for="study-access-user">{% trans "Registered user" %}</label>
+                <input
+                  id="study-access-user"
+                  name="username"
+                  type="search"
+                  class="form-control"
+                  placeholder="{% trans 'Search by username' %}"
+                  autocomplete="off"
+                  required
+                >
+              </div>
+              <div>
+                <label for="study-access-role">{% trans "Role" %}</label>
+                <select id="study-access-role" name="role" class="form-select" required>
+                  {% for value, label in assignable_roles %}<option value="{{ value }}">{% if value == "maintainer" %}{% trans "profile_role_principal_investigator" %}{% elif value == "investigator" %}{% trans "profile_role_investigator" %}{% else %}{% trans "profile_role_viewer" %}{% endif %}</option>{% endfor %}
+                </select>
+              </div>
+              <button type="submit" class="btn btn-primary">
+                <i class="fas fa-user-plus me-2" aria-hidden="true"></i>{% trans "Add user" %}
+              </button>
+            </form>
+
+            <div class="study-access-summary study-access-table-summary">
+              <span><strong>{{ selected_study.title }}</strong></span>
+              <span class="profile-role-pill">{{ study_memberships|length }} {% trans "members" %}</span>
+            </div>
+
+            <div class="study-access-table-wrap">
+              <table class="study-access-table">
+                <thead>
+                  <tr>
+                    <th>{% trans "User" %}</th>
+                    <th>{% trans "Email" %}</th>
+                    <th>{% trans "Study role" %}</th>
+                    <th>{% trans "Actions" %}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for membership in study_memberships %}
+                  <tr>
+                    <td>
+                      <strong>{{ membership.user.username }}</strong>
+                      {% if membership.user_id == selected_study.owner_id %}<span class="study-access-owner">{% trans "Owner" %}</span>{% endif %}
+                    </td>
+                    <td>{{ membership.user.email|default:"—" }}</td>
+                    <td>
+                      {% if membership.user_id == selected_study.owner_id or membership.role == "maintainer" and not can_assign_maintainer %}
+                      <span class="profile-role-pill">{% if membership.role == "maintainer" %}{% trans "profile_role_principal_investigator" %}{% elif membership.role == "investigator" %}{% trans "profile_role_investigator" %}{% else %}{% trans "profile_role_viewer" %}{% endif %}</span>
+                      {% else %}
+                      <form method="post" class="study-access-row-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="access_action" value="update_member">
+                        <input type="hidden" name="study_id" value="{{ selected_study.pk }}">
+                        <input type="hidden" name="membership_id" value="{{ membership.pk }}">
+                        <select name="role" class="form-select" aria-label="{% trans 'Study role' %}">
+                          {% for value, label in assignable_roles %}
+                          <option value="{{ value }}"{% if membership.role == value %} selected{% endif %}>{% if value == "maintainer" %}{% trans "profile_role_principal_investigator" %}{% elif value == "investigator" %}{% trans "profile_role_investigator" %}{% else %}{% trans "profile_role_viewer" %}{% endif %}</option>
+                          {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-outline-primary btn-sm">{% trans "Update" %}</button>
+                      </form>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if membership.user_id != selected_study.owner_id %}
+                      <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="access_action" value="remove_member">
+                        <input type="hidden" name="study_id" value="{{ selected_study.pk }}">
+                        <input type="hidden" name="membership_id" value="{{ membership.pk }}">
+                        <button type="submit" class="btn btn-outline-danger btn-sm">{% trans "Remove" %}</button>
+                      </form>
+                      {% else %}
+                      <span class="text-muted">—</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% empty %}
+                  <tr><td colspan="4" class="text-muted">{% trans "No members are assigned to this study." %}</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {% else %}
+            {% if request.user|is_default_viewer %}
+              {% include "includes/viewer_access_guidance.html" %}
+            {% else %}
+              <div class="profile-summary-card profile-empty-state">
+                <p class="mb-0 text-muted">{% trans "You do not maintain any studies yet." %}</p>
+              </div>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}

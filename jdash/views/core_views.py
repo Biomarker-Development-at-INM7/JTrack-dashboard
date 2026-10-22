@@ -2,27 +2,41 @@ import logging
 
 from django.conf import settings
 from django.contrib import messages, auth
-from django.contrib.auth import authenticate, login, logout,get_user_model
+from django.contrib.auth import authenticate, get_user_model, login, logout
+from django.contrib.auth.models import Group
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.forms import AuthenticationForm,PasswordResetForm, SetPasswordForm
+from django.contrib.auth.forms import (
+    AuthenticationForm,
+    PasswordChangeForm,
+    PasswordResetForm,
+    SetPasswordForm,
+)
+from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.tokens import default_token_generator
 from django.core.cache import cache
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils.encoding import force_str
+from django.utils import timezone
 from django.utils.http import urlsafe_base64_decode
+from django.utils.translation import gettext as _
 from django.views.decorators.cache import never_cache
-from jdash.services.notification import send_email
+from django.views.decorators.http import require_POST
+
 from jdash.services.study import get_all_study_details
+from jdash.services import study_access
 from jdash.forms import ContactUsForm
 from jdash.config import constants as constants
+
 from jdash.services.datahelper import get_contactus_form_data
-from jdash.repositories.study_repository import get_group_name_for_user
 from jdash.interface.session_manager import SessionManager
 from jdash.config.textmessages import TextMessages as textmessages
 
 logger = logging.getLogger("django")
+
 
 
 def server_error(request, template_name='500.html'):
@@ -43,7 +57,6 @@ def server_error(request, template_name='500.html'):
     return render(request, template_name, status=500)
 
 
-@login_required
 def session_check(request):
     """
     Checks whether the current authenticated session is still active.
@@ -61,6 +74,7 @@ def session_check(request):
         request.session.modified = True
 
     return JsonResponse({"active": True})
+
 
 @never_cache
 @login_required
@@ -86,7 +100,7 @@ def index(request):
                 constants.session_key_user_details,
                 [],
             )
-            logger.info("userdetail retrieving %s", user_detail)
+            logger.debug("userdetail retrieving %s", user_detail)
             study_meta = SessionManager.get_specific_session_data(
                 request.session.session_key,
                 constants.session_key_studies,
@@ -99,7 +113,10 @@ def index(request):
             )
 
             if not study_meta:
-                logger.info("storing values in session")
+                logger.info(
+                    "User action=load_dashboard user=%s source=database",
+                    request.user.get_username(),
+                )
                 study_meta, stats, error_message = get_all_study_details(logged_user)
                 list_of_studies = {
                     study[constants.key_name_study_title]: study[constants.key_name_study_title]
@@ -116,25 +133,32 @@ def index(request):
                             session_studies_ema.append(study[constants.key_name_study_title])
                         if "old_ema" in study:
                             session_old_studies_ema.append(study[constants.key_name_study_title])
-                    logger.info("ema studies %s", list(set(session_studies_ema)))
-                    logger.info("old ema studies %s", list(set(session_old_studies_ema)))
+                    logger.debug("ema studies %s", list(set(session_studies_ema)))
+                    logger.debug("old ema studies %s", list(set(session_old_studies_ema)))
                     request.session[constants.session_key_studies] = study_meta
                     request.session[constants.session_key_studies_stats] = stats
                     request.session[constants.session_key_studies_ema] = list(set(session_studies_ema))
                     request.session[constants.session_key_old_ema] = session_old_studies_ema
                     request.session.modified = True
                 else:
+                    messages.error(request, error_message)
                     return render(request, constants.error_page, context)
             else:
-                logger.info("accessing values from session")
+                logger.info(
+                    "User action=load_dashboard user=%s source=session",
+                    request.user.get_username(),
+                )
             context[constants.key_name_study_meta] = study_meta
             context[constants.key_name_stats] = stats
-            messages.error(request, error_message)
+            if error_message:
+                messages.error(request, error_message)
             return render(request, constants.home_page, context)
         except Exception as e:
             logger.exception("Loading Home Page error")
+            messages.error(request, "The dashboard could not be loaded. Please try again.")
             return render(request, constants.error_page, context)
     return render(request, constants.login_page)
+
 
 @never_cache
 def login_request(request):
@@ -153,6 +177,7 @@ def login_request(request):
     if request.method != constants.post_method and request.user.is_authenticated:
         return redirect(constants.url_name_for_logout)
 
+
     if request.method == constants.post_method:
         form = AuthenticationForm(request, data=request.POST)
         if form.is_valid():
@@ -161,13 +186,13 @@ def login_request(request):
             user = authenticate(username=username, password=password)
             if user is not None:
                 login(request, user)
+                logger.info("User action=login user=%s", user.get_username())
                 request.session[constants.session_key_user_details] = {
                     constants.session_key_username: user.username,
                     constants.session_key_email: user.email,
                     constants.session_key_first_name: user.first_name,
                     constants.session_key_last_name: user.last_name,
                 }
-                request.session[constants.session_key_groupname] = get_group_name_for_user(user)
                 request.session.modified = True
                 if getattr(settings, "MAINTENANCE_MODE", False) and username not in allowed_usernames:
                     return redirect(constants.url_name_for_home)
@@ -178,58 +203,6 @@ def login_request(request):
     context[constants.key_name_login_form] = AuthenticationForm()
     context[constants.key_name_contact_form] = ContactUsForm()
     return render(request=request, template_name=constants.login_page, context=context)
-
-
-def csrf_failure(request, reason=""):
-    """
-    Handles CSRF failures by redirecting the user back to login.
-
-    Args:
-        request (HttpRequest): The HTTP request object.
-        reason (str, optional): Django-provided explanation for the failure.
-
-    Returns:
-        HttpResponseRedirect: Redirect response to the login page.
-    """
-    messages.error(request, "Session expired. Please log in again.")
-    return redirect('/login/')
-
-@never_cache
-@login_required
-def logout_request(request):
-    """
-    Handles the logout process for the current user.
-
-    Returns:
-        HttpResponseRedirect: Redirect response to the login page.
-    """
-    logout(request)
-    auth.logout(request)
-    messages.success(request, textmessages.success_logged_out)
-    return redirect(constants.url_name_for_login)
-
-
-def contact_email(request):
-    """
-    Handles the contact email flow for the application.
-
-    This view validates the submitted contact form, sends the message by
-    email, and renders either a success page or the contact form again.
-
-    Returns:
-        HttpResponse: Success page or contact form page.
-    """
-    context = {}
-    if constants.button_name_contact_message in request.POST:
-        form = ContactUsForm(request.POST)
-        logger.info(form.errors)
-        if form.is_valid():
-            fullname, sender_email, message = get_contactus_form_data(form)
-            send_email(fullname, sender_email, message, "")
-            context[constants.key_name_text_message] = textmessages.success_contacting_message
-            return render(request, constants.success, context)
-    context[constants.key_name_contact_form] = ContactUsForm()
-    return render(request, constants.contact_us, context)
 
 
 
@@ -254,7 +227,14 @@ def password_reset_request(request):
             )
         else:
             logger.info("Password reset requested for an unknown or ineligible email address.")
+        messages.success(
+            request,
+            "If the email address is registered, password-reset instructions have been sent.",
+        )
         return redirect(constants.url_name_for_password_reset_done)
+
+    if request.method == constants.post_method:
+        messages.error(request, "Please enter a valid email address.")
 
     return render(request, constants.password_reset_form_page, {"form": form})
 
@@ -292,7 +272,10 @@ def password_reset_confirm(request, uidb64, token):
         form = SetPasswordForm(user, request.POST or None)
         if request.method == constants.post_method and form.is_valid():
             form.save()
+            messages.success(request, "Your password was reset successfully.")
             return redirect(constants.url_name_for_password_reset_complete)
+        if request.method == constants.post_method:
+            messages.error(request, "Please correct the highlighted password fields.")
 
     return render(
         request,
@@ -310,3 +293,136 @@ def password_reset_complete(request):
     return render(request, constants.password_reset_complete_page)
 
 
+@never_cache
+@login_required
+def profile(request):
+    """Render the current user's profile and handle password changes."""
+    access_action = request.POST.get("access_action", "")
+    password_submission = request.method == constants.post_method and (
+        access_action == "change_password" or "old_password" in request.POST
+    )
+    form = PasswordChangeForm(request.user, request.POST if password_submission else None)
+
+    if password_submission and form.is_valid():
+        user = form.save()
+        auth.update_session_auth_hash(request, user)
+        logger.info("User action=change_password user=%s", user.get_username())
+        messages.success(request, "Your password was changed successfully.")
+        return redirect(f"{reverse(constants.url_name_for_profile)}?tab=profile")
+    if password_submission:
+        messages.error(request, "Please correct the highlighted password fields.")
+
+    selected_study_id = request.POST.get("study_id") or request.GET.get("study")
+    if request.method == constants.post_method and access_action in {"add_member", "update_member", "remove_member"}:
+        try:
+            if access_action == "add_member":
+                study_access.add_membership_by_username(
+                    request.user,
+                    selected_study_id,
+                    request.POST.get("username"),
+                    request.POST.get("role", ""),
+                )
+                messages.success(request, "The user was added to the study.")
+            elif access_action == "update_member":
+                study_access.update_membership(
+                    request.user,
+                    selected_study_id,
+                    request.POST.get("membership_id"),
+                    request.POST.get("role", ""),
+                )
+                messages.success(request, "The study role was updated.")
+            else:
+                study_access.remove_membership(
+                    request.user,
+                    selected_study_id,
+                    request.POST.get("membership_id"),
+                )
+                messages.success(request, "The user was removed from the study.")
+            logger.info(
+                "User action=%s user=%s study_id=%s membership_id=%s target_username=%s",
+                access_action,
+                request.user.get_username(),
+                selected_study_id,
+                request.POST.get("membership_id", ""),
+                request.POST.get("username", ""),
+            )
+        except (ValidationError, PermissionDenied) as exc:
+            error_message = exc.messages[0] if isinstance(exc, ValidationError) else str(exc)
+            messages.error(request, error_message)
+        target = f"{reverse(constants.url_name_for_profile)}?tab=settings"
+        if selected_study_id:
+            target += f"&study={selected_study_id}"
+        return redirect(target)
+
+    requested_tab = request.GET.get("tab")
+    if password_submission:
+        active_tab = "profile"
+    elif requested_tab in {"profile", "settings"}:
+        active_tab = requested_tab
+    else:
+        active_tab = "profile"
+    context = {"form": form, "active_tab": active_tab}
+    context.update(study_access.membership_context(request.user, selected_study_id))
+    return render(
+        request,
+        constants.profile_page,
+        context,
+    )
+
+
+def csrf_failure(request, reason=""):
+    """
+    Handles CSRF failures by redirecting the user back to login.
+
+    Args:
+        request (HttpRequest): The HTTP request object.
+        reason (str, optional): Django-provided explanation for the failure.
+
+    Returns:
+        HttpResponseRedirect: Redirect response to the login page.
+    """
+    messages.error(request, "Session expired. Please log in again.")
+    return redirect('/login/')
+
+
+@never_cache
+@login_required
+@require_POST
+def logout_request(request):
+    """
+    Handles the logout process for the current user.
+
+    Returns:
+        HttpResponseRedirect: Redirect response to the login page.
+    """
+    username = request.user.get_username()
+    logger.info("User action=logout user=%s", username)
+    logout(request)
+    auth.logout(request)
+    messages.success(request, textmessages.success_logged_out)
+    return redirect(constants.url_name_for_login)
+
+
+def contact_email(request):
+    """
+    Handles the contact email flow for the application.
+
+    This view validates the submitted contact form, sends the message by
+    email, and renders either a success page or the contact form again.
+
+    Returns:
+        HttpResponse: Success page or contact form page.
+    """
+    context = {}
+    if constants.button_name_contact_message in request.POST:
+        form = ContactUsForm(request.POST)
+        logger.debug("contact_email form_errors=%s", form.errors)
+        if form.is_valid():
+            fullname, sender_email, message = get_contactus_form_data(form)
+            send_email(fullname, sender_email, message, "")
+            messages.success(request, textmessages.success_contacting_message)
+            context[constants.key_name_text_message] = textmessages.success_contacting_message
+            return render(request, constants.success, context)
+        messages.error(request, "Please correct the highlighted fields and send your message again.")
+    context[constants.key_name_contact_form] = ContactUsForm()
+    return render(request, constants.contact_us, context)

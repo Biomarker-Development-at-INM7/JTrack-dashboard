@@ -368,25 +368,28 @@ msgstr "Arbeitsgruppe Biomarkerentwicklung, INM-7"
 msgid "index_add"
 msgstr "Studie anlegen"
 
+msgid "index_viewer_create_study_access_info"
+msgstr "Sie haben keinen Zugriff, um Studien zu erstellen."
+
 #: jdash/templates/index.html:66
 
 msgid "index_overview1"
-msgstr "Teilnehmer aktiv"
+msgstr "Probanden aktiv"
 
 #: jdash/templates/index.html:70
 
 msgid "index_overview2"
-msgstr "Teilnehmer fertig"
+msgstr "Probanden fertig"
 
 #: jdash/templates/index.html:74
 
 msgid "index_overview3"
-msgstr "Teilnehmer hat verlassen"
+msgstr "Probanden hat verlassen"
 
 #: jdash/templates/index.html:77
 
 msgid "index_overview4"
-msgstr "Teilnehmer entfernt"
+msgstr "Probanden entfernt"
 
 #: jdash/templates/index.html:94
 
@@ -396,7 +399,7 @@ msgstr "Name"
 #: jdash/templates/index.html:95
 
 msgid "index_overview6"
-msgstr "aktive Teilnehmer"
+msgstr "aktive Probanden"
 
 #: jdash/templates/index.html:98
 
@@ -620,6 +623,9 @@ msgstr "Bitte Strg- bzw. Cmd-Taste für Mehrfachauswahl gedrückt halten"
 msgid "study_create_button"
 msgstr "Studie erstellen"
 
+msgid "study_create_intro"
+msgstr "Legen Sie die Studienstruktur und den Datenerhebungsplan fest. Definieren Sie Dauer und Probandenkapazität, wählen Sie passive Sensoren und Wearable-Geräte aus, konfigurieren Sie Aufgaben und verknüpfen Sie optional eine EMA-Umfrage, bevor Sie die Studie erstellen."
+
 #: jdash/templates/study/create_study.html:111 jdash/templates/study/details.html:275 jdash/templates/study/edit_study.html:112
 
 msgid "study_days"
@@ -645,10 +651,61 @@ msgstr "App"
 msgid "study_details_close"
 msgstr "Abbrechen"
 
+msgid "common_cancel"
+msgstr "Abbrechen"
+
+msgid "common_ok"
+msgstr "OK"
+
+msgid "View pending changes"
+msgstr "Ausstehende Änderungen anzeigen"
+
+msgid "Hide pending changes"
+msgstr "Ausstehende Änderungen ausblenden"
+
+msgid "Loading pending changes..."
+msgstr "Ausstehende Änderungen werden geladen..."
+
+msgid "Full survey will be committed: %(questions)s questions and %(categories)s categories."
+msgstr "Die vollständige Umfrage wird übernommen: %(questions)s Fragen und %(categories)s Kategorien."
+
+msgid "Survey details updated"
+msgstr "Umfragedetails aktualisiert"
+
+msgid "Questions added"
+msgstr "Fragen hinzugefügt"
+
+msgid "Questions updated"
+msgstr "Fragen aktualisiert"
+
+msgid "Questions deleted"
+msgstr "Fragen gelöscht"
+
+msgid "Categories added"
+msgstr "Kategorien hinzugefügt"
+
+msgid "Categories updated"
+msgstr "Kategorien aktualisiert"
+
+msgid "Categories deleted"
+msgstr "Kategorien gelöscht"
+
+msgid "Question order changed"
+msgstr "Reihenfolge der Fragen geändert"
+
+msgid "No content differences found"
+msgstr "Keine inhaltlichen Unterschiede gefunden"
+
+msgid "Linked study not found"
+msgstr "Verknüpfte Studie nicht gefunden"
+
+msgid "The pending changes could not be loaded."
+msgstr "Die ausstehenden Änderungen konnten nicht geladen werden."
+
 #: jdash/templates/study/details.html:206 jdash/templates/study/details.html:392 jdash/templates/study/details.html:395
 
 msgid "study_details_close_study"
-msgstr "Studie schließen"
+msgstr "Studie beenden"
 
 #: jdash/templates/study/details.html:177 jdash/templates/study/details.html:196 jdash/templates/study/details.html:214
 
@@ -658,7 +715,7 @@ msgstr "Bestätigen"
 #: jdash/templates/study/details.html:210
 
 msgid "study_details_confirm_close_study"
-msgstr "Beim Schließen wird der Studienordner archiviert und die Studie als geschlossen markiert. Teilnehmende sind in dieser Studie danach nicht mehr aktiv."
+msgstr "Beim Beenden wird der Studienordner archiviert und die Studie als beendet markiert. Teilnehmende sind in dieser Studie danach nicht mehr aktiv."
 
 #: jdash/templates/study/details.html:173
 
@@ -673,7 +730,7 @@ msgstr "Die Daten des Subjekts werden dauerhaft aus dieser Studie gelöscht. Nac
 #: jdash/templates/study/details.html:348
 
 msgid "study_details_create"
-msgstr "Fächer hinzufügen"
+msgstr "Probanden hinzufügen"
 
 msgid "study_details_change_status"
 msgstr "Status ändern"
@@ -709,7 +766,7 @@ msgid "study_details_qr_activations_and_status"
 msgstr "QR-Codes und Status"
 
 msgid "study_details_no_qr_activations"
-msgstr "Für diesen Teilnehmer sind keine QR-Code-Aktivierungen verfügbar."
+msgstr "Für diesen Probanden sind keine QR-Code-Aktivierungen verfügbar."
 
 msgid "study_details_filter_subjects"
 msgstr "Teilnehmende filtern"
@@ -719,6 +776,12 @@ msgstr "Auswahl entfernen"
 
 msgid "study_details_clear_all_subjects"
 msgstr "Alle ausgewählten Teilnehmenden entfernen"
+
+msgid "study_filter_surveys"
+msgstr "Umfragen durchsuchen"
+
+msgid "study_filter_studies"
+msgstr "Studien durchsuchen"
 
 msgid "study_details_create_subject_info"
 msgstr "Verwenden Sie dies, um neue Teilnehmende zur Studie hinzuzufügen. JDash erstellt neue Subject-IDs und QR-Codes für die Registrierung."
@@ -734,7 +797,7 @@ msgid "study_details_date_registered"
 msgstr "Registrierungsdatum"
 
 msgid "study_details_data_available_next_day"
-msgstr "Bitte beachten Sie, dass die Daten einen Tag nach der Synchronisierung des Geräts durch den Teilnehmer im Dashboard verfügbar sind."
+msgstr "Bitte beachten Sie, dass die Daten einen Tag nach der Synchronisierung des Geräts durch den Probanden im Dashboard verfügbar sind."
 
 #: jdash/templates/study/details.html:159
 
@@ -829,7 +892,7 @@ msgid "study_details_subjects_short"
 msgstr "Subjekte"
 
 msgid "study_details_enrolled_short"
-msgstr "Eingeschrieben"
+msgstr "Eingeschriebene Probanden"
 
 msgid "study_details_duration_short"
 msgstr "Dauer"
@@ -945,7 +1008,7 @@ msgid "study_details_select_reason_placeholder"
 msgstr "Grund auswählen"
 
 msgid "study_details_dropout_reason_withdrawn"
-msgstr "Teilnehmer hat zurückgezogen"
+msgstr "Probanden hat zurückgezogen"
 
 msgid "study_details_dropout_reason_lost_follow_up"
 msgstr "Nicht mehr erreichbar"
@@ -1001,7 +1064,7 @@ msgid "study_details_send_notification"
 msgstr "Benachrichtigung senden"
 
 msgid "study_details_send_notification_info"
-msgstr "Verwenden Sie dies, um eine Nachricht an ausgewählte Studienteilnehmende zu senden. Die Benachrichtigung wird über die Teilnehmer-App zugestellt."
+msgstr "Verwenden Sie dies, um eine Nachricht an ausgewählte Studienteilnehmende zu senden. Die Benachrichtigung wird über die Probanden-App zugestellt."
 
 #: jdash/templates/study/details.html:473
 
@@ -1082,6 +1145,9 @@ msgstr "Investigatoren"
 msgid "study_details_viewers"
 msgstr "Betrachter"
 
+msgid "study_details_viewer_subject_access_info"
+msgstr "Sie haben keinen Zugriff, um Probanden hinzuzufügen oder zu entfernen."
+
 msgid "study_details_no_members"
 msgstr "Keine Studienmitglieder"
 
@@ -1101,7 +1167,7 @@ msgstr "zur Bestätigung ein"
 #: jdash/templates/study/details.html:325
 
 msgid "study_details_total_number_of_subjects"
-msgstr "Gesamtzahl"
+msgstr "Gesamtzahl der Probanden"
 
 msgid "study_details_type_to_confirm"
 msgstr "Bitte geben Sie"
@@ -1138,12 +1204,12 @@ msgstr "Studienname"
 #: jdash/templates/study/create_study.html:101 jdash/templates/study/edit_study.html:102
 
 msgid "study_note"
-msgstr "Bitte keine Leerzeichen oder Sonderzeichen verwenden"
+msgstr "Eindeutiger Studientitel für das gesamte Dashboard. Leerzeichen und Sonderzeichen sind nicht zulässig."
 
 #: jdash/templates/study/create_study.html:118 jdash/templates/study/edit_study.html:119
 
 msgid "study_number_of_subjects"
-msgstr "Anzahl der Teilnehmenden"
+msgstr "Anzahl der Probanden"
 
 #: jdash/templates/study/create_study.html:139 jdash/templates/study/edit_study.html:140
 
@@ -1168,7 +1234,7 @@ msgstr "Alltägliche Momentaufnahme (EMA)"
 #: jdash/templates/study/create_study.html:160 jdash/templates/study/edit_study.html:161
 
 msgid "study_sel_ema_note"
-msgstr "Diese Studie verwendet die EMA-Anwendung, und die Bewertung und Ressourcen sollten während der Erstellung der Studie hochgeladen werden."
+msgstr "EMA-Fragebögen erfassen die Antworten der Probanden während der Studie."
 
 #: jdash/templates/study/create_study.html:88 jdash/templates/study/edit_study.html:89
 
@@ -1178,7 +1244,7 @@ msgstr "Teststudie"
 #: jdash/templates/study/create_study.html:296 jdash/templates/study/edit_study.html:303
 
 msgid "study_select_sensors_note"
-msgstr "Sensoren auswählen und anschließend auf Hinzufügen klicken"
+msgstr "Wählen Sie die im Studienprotokoll benötigten Messungen aus und klicken Sie anschließend auf Hinzufügen."
 
 #: jdash/templates/study/edit_study.html:309
 
@@ -1325,12 +1391,12 @@ msgid "survey_list_download_template"
 msgstr "Vorlage herunterladen"
 
 msgid "survey_list_manual_desc"
-msgstr "Wählen Sie Neue Umfrage und fügen Sie die Fragen auf der nächsten Seite einzeln über das Fragenformular hinzu."
+msgstr "Erstellen Sie eine Umfrage und fügen Sie anschließend die Fragen einzeln auf der Umfrageseite hinzu und konfigurieren Sie sie."
 
 #: jdash/templates/survey/survey_list.html:132
 
 msgid "survey_list_manual_label"
-msgstr "1. Manuell erstellen:"
+msgstr "Manuell erstellen"
 
 msgid "survey_list_template_desc"
 msgstr "Laden Sie die Fragenvorlage herunter, tragen Sie Ihre Umfragefragen ein und laden Sie die ausgefüllte Datei über die Upload-Funktion oben hoch."
@@ -1338,12 +1404,15 @@ msgstr "Laden Sie die Fragenvorlage herunter, tragen Sie Ihre Umfragefragen ein 
 #: jdash/templates/survey/survey_list.html:135
 
 msgid "survey_list_template_label"
-msgstr "2. Aus Vorlage hochladen:"
+msgstr "Aus Vorlage hochladen"
 
 #: jdash/templates/survey/survey_list.html:129
 
 msgid "survey_list_two_ways_title"
 msgstr "Zwei Wege, eine Umfrage zu erstellen"
+
+msgid "survey_list_viewer_create_access_info"
+msgstr "Sie haben keinen Zugriff, um Umfragen zu erstellen."
 
 #: jdash/templates/survey/survey_list.html:109
 
@@ -1360,13 +1429,13 @@ msgid "text_error_message_to_contact_support"
 msgstr "Ups! Etwas ist schiefgelaufen. Bitte versuchen Sie es später erneut oder kontaktieren Sie den Support."
 
 msgid "text_help_study_active_sensors"
-msgstr "Sensoren, die in der Studie aktiv aufzeichnen."
+msgstr "Aktives Tracking verbindet Aufgaben für Probanden mit den Sensoren, die während der jeweiligen Aufgabe aufgezeichnet werden."
 
 msgid "text_help_study_description"
-msgstr "Erläuterungen zur Studie."
+msgstr "Fassen Sie Forschungsziel, Probandengruppe und Datenerhebungsprotokoll für das Studienteam zusammen."
 
 msgid "text_help_study_duration"
-msgstr "Anzahl der Tage, an denen die Studie durchgeführt wird."
+msgstr "Voraussichtliche Anzahl der Tage, an denen Probanden Studiendaten bereitstellen."
 
 msgid "text_help_study_ema"
 msgstr "Zeit in Minuten, wann an die Beantwortung der Frage erinnert wird (480 = 08:00)."
@@ -1375,37 +1444,49 @@ msgid "text_help_study_frequency"
 msgstr "Nach wie vielen Tagen eine Frage wiederholt wird (0 = jederzeit, 1 = jeden Tag usw.)."
 
 msgid "text_help_study_is_test"
-msgstr "Falls ausgewählt, wird die Studie zu Testzwecken verwendet."
+msgstr "Kennzeichnet diese Studie als Pilot- oder Teststudie."
 
 msgid "text_help_study_number_of_subjects"
-msgstr "Anzahl der Teilnehmenden, die für die gesamte Studiendauer benötigt werden."
+msgstr "Die Gesamtzahl der erwarteten Probanden."
 
 msgid "text_help_study_passive_sensors"
-msgstr "Sensoren, die in der Studie passiv aufzeichnen."
+msgstr "Ausgewählte Sensordaten werden während des Studienzeitraums im Hintergrund erfasst."
+
+msgid "text_help_study_recording_frequency"
+msgstr "Standard-Abtastrate für kontinuierlich aufgezeichnete Sensoren. Höhere Raten verbrauchen mehr Akku und Speicherplatz."
 
 msgid "text_help_study_select_ema"
-msgstr "Hilfetext zur Auswahl der in der Studie verwendeten EMA-Umfrage."
+msgstr "Wählen Sie die Umfrage für die EMA-Fragebögen aus."
 
 msgid "text_help_study_task_description"
-msgstr "Aufgabenbeschreibung für die Teilnehmenden."
+msgstr "Beschreiben Sie, was die Probanden während dieser Aufgabe tun sollen."
 
 msgid "text_help_study_task_duration"
-msgstr "Dauer der Aufgabe in Sekunden."
+msgstr "Dauer der Sensoraufzeichnung während der Aufgabe in Sekunden."
 
 msgid "text_help_study_task_preparation"
-msgstr "Vorbereitungszeit vor Beginn der Aufgabe."
+msgstr "Vorbereitungszeit vor Beginn der Aufgabenaufzeichnung in Sekunden."
+
+msgid "text_help_study_task_preparation_description"
+msgstr "Geben Sie Einrichtungs- oder Sicherheitshinweise an, die vor Beginn der Aufgabe befolgt werden sollen."
 
 msgid "text_help_study_task_title"
-msgstr "Aufgabentitel für die Teilnehmenden."
+msgstr "Kurzer, eindeutiger Aufgabenname, der Probanden in der App angezeigt wird."
 
 msgid "text_help_study_title"
 msgstr "Der Name der Studie."
 
 msgid "text_help_study_upload_ema_images"
-msgstr "Laden Sie eine ZIP-Datei mit Bildern hoch, die in der EMA-Umfrage verwendet werden."
+msgstr "Optionale ZIP-Datei mit Bildern, auf die in der hochgeladenen Fragebogen-JSON-Datei verwiesen wird."
 
 msgid "text_help_study_upload_ema_json"
-msgstr "Laden Sie eine JSON-Datei mit der Definition der EMA-Umfrage hoch."
+msgstr "Fragebogen-JSON-Datei, die anstelle einer vorhandenen Umfrage verwendet wird."
+
+msgid "text_help_study_wearable_device"
+msgstr "Wählen Sie das Wearable-Modell der Probanden aus und konfigurieren Sie anschließend die daraus erfassten Messungen."
+
+msgid "text_help_study_wearables"
+msgstr "Wearable-Tracking erfasst Daten von einer Uhr, einem Armband oder einem anderen verbundenen Gerät im Studienprotokoll."
 
 msgid "text_help_survey_category_activate_question"
 msgstr "Liste der zu aktivierenden Fragen. Beispiele: [1] oder [2, 3]."
@@ -1559,6 +1640,12 @@ msgstr "Nach subject-id filtern:"
 
 msgid "Filter subjects"
 msgstr "Probanden filtern"
+
+msgid "Include"
+msgstr "Einschließen"
+
+msgid "Exclude"
+msgstr "Ausschließen"
 
 msgid "Graph"
 msgstr "Grafik"
@@ -1984,6 +2071,12 @@ msgstr "Aktuell"
 msgid "create_survey_commit_study_needs_update"
 msgstr "Aktualisierung erforderlich"
 
+msgid "create_survey_commit_study_never_committed"
+msgstr "Noch nie übernommen"
+
+msgid "create_survey_commit_failed_studies_label"
+msgstr "Übernahme fehlgeschlagen für:"
+
 msgid "create_survey_commit_loading_message"
 msgstr "Umfrage wird veröffentlicht..."
 
@@ -2007,7 +2100,7 @@ msgstr "Die Umfrage wurde in %(count)s verknüpften Studien veröffentlicht: %(s
 
 #: jdash/views/survey_views.py:196
 msgid "create_survey_commit_partial_failure"
-msgstr "Einige verknüpfte Studien konnten nicht veröffentlicht werden. Bitte prüfen Sie das Serverprotokoll."
+msgstr "Die Umfrage wurde in den erfolgreichen Studien übernommen. Übernahme fehlgeschlagen für: %(study_names)s."
 
 #: jdash/views/survey_views.py:202
 msgid "create_survey_commit_no_linked_study"
@@ -2017,7 +2110,7 @@ msgid "create_survey_commit_no_study_selected"
 msgstr "Bitte wählen Sie mindestens eine verknüpfte Studie zum Veröffentlichen aus."
 
 msgid "create_survey_commit_failed"
-msgstr "Die ausgewählten Studien konnten nicht veröffentlicht werden. Bitte prüfen Sie das Serverprotokoll."
+msgstr "Die Umfrage konnte nicht übernommen werden für: %(study_names)s."
 
 #: jdash/views/survey_views.py:733
 msgid "survey_commited_versioned_backup_created"
@@ -2509,3 +2602,443 @@ msgstr "Teilnehmende mit Aktivitaet an nur einem der letzten sieben Studientage"
 
 msgid "subjects with no recorded EMA activity"
 msgstr "Teilnehmende ohne erfasste EMA-Aktivitaet"
+msgid "Test"
+msgstr "Test"
+
+msgid "Enter your current password, then choose a new password."
+msgstr "Geben Sie Ihr aktuelles Passwort ein und wählen Sie anschließend ein neues Passwort."
+msgid "Create an account"
+msgstr "Konto erstellen"
+
+msgid "Register for JDash. Study access can be assigned after your account is created."
+msgstr "Registrieren Sie sich für JDash. Der Zugriff auf Studien kann nach der Kontoerstellung zugewiesen werden."
+
+msgid "Register"
+msgstr "Registrieren"
+
+msgid "Don't have an account?"
+msgstr "Noch kein Konto?"
+
+msgid "Already have an account?"
+msgstr "Sie haben bereits ein Konto?"
+
+msgid "Log in"
+msgstr "Anmelden"
+
+msgid "First name"
+msgstr "Vorname"
+
+msgid "Last name"
+msgstr "Nachname"
+
+msgid "Enter your first name"
+msgstr "Geben Sie Ihren Vornamen ein"
+
+msgid "Enter your last name"
+msgstr "Geben Sie Ihren Nachnamen ein"
+
+msgid "Enter your email address"
+msgstr "Geben Sie Ihre E-Mail-Adresse ein"
+
+msgid "Choose a username"
+msgstr "Wählen Sie einen Benutzernamen"
+
+msgid "Choose a password"
+msgstr "Wählen Sie ein Passwort"
+
+msgid "Confirm your password"
+msgstr "Bestätigen Sie Ihr Passwort"
+
+msgid "An account with this email address already exists."
+msgstr "Ein Konto mit dieser E-Mail-Adresse existiert bereits."
+
+msgid "Your account has been created. You can now log in."
+msgstr "Ihr Konto wurde erstellt. Sie können sich jetzt anmelden."
+msgid "Main navigation"
+msgstr "Hauptnavigation"
+
+msgid "Navigation"
+msgstr "Navigation"
+
+msgid "Collapse navigation"
+msgstr "Navigation einklappen"
+
+msgid "Profile and settings"
+msgstr "Profil und Einstellungen"
+msgid "Current user"
+msgstr "Aktueller Benutzer"
+
+msgid "General"
+msgstr "Allgemein"
+
+msgid "Recording duration per subject"
+msgstr "Aufzeichnungsdauer pro Proband"
+
+msgid "Sensors Recorded"
+msgstr "Aufgezeichnete Sensoren"
+
+msgid "Recorded Subject-days"
+msgstr "Aufgezeichnete Teilnehmendentage"
+
+msgid "Total Records"
+msgstr "Datensätze insgesamt"
+
+msgid "participants with at least one recorded sensor value"
+msgstr "Teilnehmende mit mindestens einem aufgezeichneten Sensorwert"
+
+msgid "sensors with recorded data across the study"
+msgstr "Sensoren mit aufgezeichneten Daten im gesamten Studienverlauf"
+
+msgid "participant-days containing sensor data"
+msgstr "Teilnehmendentage mit Sensordaten"
+
+msgid "sensor records collected across the study"
+msgstr "im gesamten Studienverlauf erfasste Sensordatensätze"
+
+msgid "Overall Completion"
+msgstr "Gesamtabschlussquote"
+
+msgid "participants with at least one EMA response"
+msgstr "Teilnehmende mit mindestens einer EMA-Antwort"
+
+msgid "EMA responses collected across the study"
+msgstr "im gesamten Studienverlauf erfasste EMA-Antworten"
+
+msgid "participant-days containing EMA responses"
+msgstr "Teilnehmendentage mit EMA-Antworten"
+
+msgid "average questionnaire completion across participants"
+msgstr "durchschnittliche Fragebogenabschlussquote aller Teilnehmenden"
+
+#: jdash/templates/profile.html
+msgid "profile_study_role_permissions"
+msgstr "Berechtigungen der Studienrollen"
+
+#: jdash/templates/profile.html
+msgid "profile_role_principal_investigator"
+msgstr "Hauptprüfer/in"
+
+#: jdash/templates/profile.html
+msgid "profile_role_principal_investigator_info"
+msgstr "Kann die Studienkonfiguration, Umfragen, Probanden, Daten, Benachrichtigungen sowie den Zugriff für Prüfende und Betrachter verwalten."
+
+#: jdash/templates/profile.html
+msgid "profile_role_investigator"
+msgstr "Prüfer/in"
+
+#: jdash/templates/profile.html
+msgid "profile_role_investigator_info"
+msgstr "Kann die Studienkonfiguration, Umfragen, Probanden, Daten und Benachrichtigungen verwalten."
+
+#: jdash/templates/profile.html
+msgid "profile_role_viewer"
+msgstr "Betrachter/in"
+
+#: jdash/templates/profile.html
+msgid "profile_role_viewer_info"
+msgstr "Kann Studieninformationen, Analysen, den Audit-Verlauf und verfügbare Downloads ansehen, ohne Änderungen vorzunehmen."
+msgid "contact_page_eyebrow"
+msgstr "Kontaktieren Sie das JDash-Team"
+
+msgid "contact_page_heading"
+msgstr "Gemeinsam bessere digitale Gesundheitsforschung gestalten."
+
+msgid "contact_page_lead"
+msgstr "Bringen Sie Ihre Forschungsfrage, Studienidee oder Ihren Kooperationsvorschlag mit. Gemeinsam können wir erkunden, wie JDash sinnvolle digitale Gesundheitsforschung unterstützen kann."
+
+msgid "contact_page_form_title"
+msgstr "Was möchten Sie gemeinsam mit uns erkunden?"
+
+msgid "contact_page_form_text"
+msgstr "Erzählen Sie uns von Ihrer Forschung, Ihrem Team und den Möglichkeiten einer Zusammenarbeit."
+
+msgid "contact_page_name"
+msgstr "Vollständiger Name"
+
+msgid "contact_page_email"
+msgstr "E-Mail"
+
+msgid "contact_page_message"
+msgstr "Nachricht"
+
+msgid "contact_form_name_placeholder"
+msgstr "Ihr Name"
+
+msgid "contact_form_email_placeholder"
+msgstr "sie@beispiel.de"
+
+msgid "contact_form_message_placeholder"
+msgstr "Beschreiben Sie Ihre Studie oder Ihre Frage"
+
+#: jdash/templates/profile.html
+msgid "Profile"
+msgstr "Profil"
+
+msgid "Email"
+msgstr "E-Mail"
+
+msgid "Role"
+msgstr "Rolle"
+
+msgid "Change password"
+msgstr "Passwort ändern"
+
+msgid "Current password"
+msgstr "Aktuelles Passwort"
+
+msgid "New password"
+msgstr "Neues Passwort"
+
+msgid "Confirm new password"
+msgstr "Neues Passwort bestätigen"
+
+msgid "Cancel"
+msgstr "Abbrechen"
+
+msgid "Study access"
+msgstr "Studienzugriff"
+
+msgid "Add registered users to a study and assign their study-specific role."
+msgstr "Fügen Sie registrierte Benutzer zu einer Studie hinzu und weisen Sie ihnen eine studienspezifische Rolle zu."
+
+msgid "Study"
+msgstr "Studie"
+
+msgid "Registered user"
+msgstr "Registrierter Benutzer"
+
+msgid "Search by username"
+msgstr "Nach Benutzername suchen"
+
+msgid "Add user"
+msgstr "Benutzer hinzufügen"
+
+msgid "members"
+msgstr "Mitglieder"
+
+msgid "User"
+msgstr "Benutzer"
+
+msgid "Study role"
+msgstr "Studienrolle"
+
+msgid "Actions"
+msgstr "Aktionen"
+
+msgid "Owner"
+msgstr "Eigentümer/in"
+
+msgid "Update"
+msgstr "Aktualisieren"
+
+msgid "Remove"
+msgstr "Entfernen"
+
+msgid "No members are assigned to this study."
+msgstr "Dieser Studie sind keine Mitglieder zugewiesen."
+
+msgid "You do not maintain any studies yet."
+msgstr "Sie verwalten noch keine Studien."
+msgid "study_title_checking"
+msgstr "Studientitel wird geprüft…"
+msgid "study_title_available"
+msgstr "Der Studienname ist verfügbar."
+
+msgid "study_title_exists"
+msgstr "Die Studie ist bereits vorhanden. Wählen Sie einen anderen Namen."
+
+msgid "study_title_check_error"
+msgstr "Der Studientitel konnte nicht geprüft werden."
+msgid "text_help_study_tasks"
+msgstr "Aufgaben, die Probanden in der App durchführen."
+
+msgid "Verification code"
+msgstr "Bestätigungscode"
+
+msgid "Enter the six-digit code from your email."
+msgstr "Geben Sie den sechsstelligen Code aus Ihrer E-Mail ein."
+
+msgid "Six-digit code"
+msgstr "Sechsstelliger Code"
+
+msgid "Verify your JDASH email address"
+msgstr "Bestätigen Sie Ihre JDASH-E-Mail-Adresse"
+
+msgid "An email verification is already pending for this email address."
+msgstr "Für diese E-Mail-Adresse steht bereits eine Bestätigung aus."
+
+msgid "An email verification is already pending for this username."
+msgstr "Für diesen Benutzernamen steht bereits eine E-Mail-Bestätigung aus."
+
+msgid "We could not send the verification code. Please try again."
+msgstr "Der Bestätigungscode konnte nicht gesendet werden. Bitte versuchen Sie es erneut."
+
+msgid "Please wait a minute before requesting another verification code."
+msgstr "Bitte warten Sie eine Minute, bevor Sie einen weiteren Bestätigungscode anfordern."
+
+msgid "Start registration to receive an email verification code."
+msgstr "Starten Sie die Registrierung, um einen Bestätigungscode per E-Mail zu erhalten."
+
+msgid "A new verification code has been sent."
+msgstr "Ein neuer Bestätigungscode wurde gesendet."
+
+msgid "This verification code has expired. Please register again."
+msgstr "Dieser Bestätigungscode ist abgelaufen. Bitte registrieren Sie sich erneut."
+
+msgid "Too many incorrect codes. Please register again."
+msgstr "Zu viele falsche Codes. Bitte registrieren Sie sich erneut."
+
+msgid "The verification code is incorrect."
+msgstr "Der Bestätigungscode ist nicht korrekt."
+
+msgid "An account with these details already exists. Please log in."
+msgstr "Ein Konto mit diesen Angaben existiert bereits. Bitte melden Sie sich an."
+
+msgid "Your email has been verified. You can now log in."
+msgstr "Ihre E-Mail-Adresse wurde bestätigt. Sie können sich jetzt anmelden."
+
+msgid "viewer_access_guidance_title"
+msgstr "Registrierter Benutzer"
+
+msgid "viewer_access_guidance_copy"
+msgstr "Ihr Konto kann noch keine Studien oder Umfragen erstellen. Um Forscherzugriff oder Zugriff auf eine bestehende Studie zu beantragen, schreiben Sie an:"
+
+msgid "To create studies, write to Biomarker to request Researcher access:"
+msgstr "Um Studien zu erstellen, schreiben Sie an Biomarker und beantragen Sie Forscherzugriff:"
+
+msgid "No studies are available for analytics yet."
+msgstr "Für die Analyse sind noch keine Studien verfügbar."
+
+msgid "Account type"
+msgstr "Kontotyp"
+
+msgid "Manage account types"
+msgstr "Kontotypen verwalten"
+
+msgid "Promote Registered Users to Researchers so they can create studies and surveys."
+msgstr "Stufen Sie registrierte Benutzer zu Forschern hoch, damit sie Studien und Umfragen erstellen können."
+
+msgid "Search users"
+msgstr "Benutzer suchen"
+
+msgid "Search by username, name, or email"
+msgstr "Nach Benutzername, Name oder E-Mail suchen"
+
+msgid "Search"
+msgstr "Suchen"
+
+msgid "Name"
+msgstr "Name"
+
+msgid "Promote to Researcher"
+msgstr "Zum Forscher hochstufen"
+
+msgid "No Registered Users are waiting for an upgrade."
+msgstr "Es gibt keine registrierten Benutzer, die hochgestuft werden können."
+
+msgid "Only Administrators can manage account types."
+msgstr "Nur Administratoren können Kontotypen verwalten."
+
+#, python-format
+msgid "%(username)s is now a Researcher."
+msgstr "%(username)s ist jetzt Forscher."
+
+msgid "The selected user does not exist."
+msgstr "Der ausgewählte Benutzer existiert nicht."
+
+msgid "Administrator accounts cannot be changed here."
+msgstr "Administratorkonten können hier nicht geändert werden."
+
+msgid "This account is already a Researcher."
+msgstr "Dieses Konto ist bereits ein Forscherkonto."
+
+msgid "Only Registered Users can be promoted to Researcher."
+msgstr "Nur registrierte Benutzer können zu Forschern hochgestuft werden."
+
+msgid "Send verification code"
+msgstr "Bestätigungscode senden"
+
+msgid "Verify your email"
+msgstr "E-Mail-Adresse bestätigen"
+
+#, python-format
+msgid "Enter the six-digit code sent to %(email)s to complete your registration."
+msgstr "Geben Sie den sechsstelligen Code ein, der an %(email)s gesendet wurde, um Ihre Registrierung abzuschließen."
+
+msgid "Verify email"
+msgstr "E-Mail bestätigen"
+
+msgid "Send a new code"
+msgstr "Neuen Code senden"
+
+msgid "Start over"
+msgstr "Neu beginnen"
+
+msgid "Audit history"
+msgstr "Audit-Verlauf"
+
+msgid "JSON versions"
+msgstr "JSON-Versionen"
+
+msgid "Version"
+msgstr "Version"
+
+msgid "Saved at"
+msgstr "Gespeichert am"
+
+msgid "Snapshot"
+msgstr "Schnappschuss"
+
+msgid "Size"
+msgstr "Größe"
+
+msgid "Current"
+msgstr "Aktuell"
+
+msgid "No JSON versions available."
+msgstr "Keine JSON-Versionen verfügbar."
+
+msgid "Details"
+msgstr "Details"
+
+msgid "Loading version differences..."
+msgstr "Versionsunterschiede werden geladen..."
+
+msgid "Unable to load version differences."
+msgstr "Versionsunterschiede konnten nicht geladen werden."
+
+msgid "No differences from the previous version."
+msgstr "Keine Unterschiede zur vorherigen Version."
+
+msgid "This is the oldest available version."
+msgstr "Dies ist die älteste verfügbare Version."
+
+msgid "Not present"
+msgstr "Nicht vorhanden"
+
+msgid "Added"
+msgstr "Hinzugefügt"
+
+msgid "Removed"
+msgstr "Entfernt"
+
+msgid "Changed"
+msgstr "Geändert"
+
+msgid "Changes from previous version"
+msgstr "Änderungen zur vorherigen Version"
+
+msgid "Close"
+msgstr "Schließen"
+
+msgid "Field"
+msgstr "Feld"
+
+msgid "Change"
+msgstr "Änderung"
+
+msgid "Previous"
+msgstr "Vorher"
+
+msgid "Selected version"
+msgstr "Ausgewählte Version"

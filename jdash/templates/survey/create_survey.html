@@ -7,14 +7,13 @@
 
 <script src="{% static 'js/jquery.min.js' %}"></script>
 <link href="{% static 'css/form.css' %}" rel="stylesheet">
-<link href="{% static 'css/bootstrap-table.min.css' %}" rel="stylesheet">
+<link href="{% static 'css/jdash_loading.css' %}" rel="stylesheet">
+<link href="{% static 'css/dataTables.bootstrap5.min.css' %}" rel="stylesheet">
 <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css">
-<script src="{% static 'js/bootstrap-table.min.js' %}"></script>
-<script src="{% static 'js/bootstrap-table-export.min.js' %}"></script>
-<script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
+<script src="{% static 'js/dataTables.min.js' %}"></script>
+<script src="{% static 'js/dataTables.bootstrap5.min.js' %}"></script>
 <script src="{% static 'js/survey.js' %}"></script>
-<script src="{% static 'js/popper.js' %}"></script>
-<script src="{% static 'js/bootstrap410.min.js' %}"></script>
+<script src="{% static 'js/jdash_loading.js' %}"></script>
 
 
 
@@ -24,7 +23,6 @@
 
       <div class="modal-header">
         <h5 class="modal-title" id="categoryModalLabel">{% trans "global_categories" %}</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
 
       <form action="{% url 'create_categories' survey_id=survey_id %}" method="POST">
@@ -47,6 +45,8 @@
           <button id="add-category" type="button" class="btn btn-secondary mb-4" onclick="add_category_form(this.id)">
             {% trans "create_survey_add_cat" %}
           </button>
+
+
           <!-- Category rows -->
           {% for category_form in category_formset %}
             <div id="category-form-{{ forloop.counter0 }}" class="category-formset mb-4">
@@ -62,11 +62,13 @@
                   <span class="form-text text-muted" id="display-value-{{ forloop.counter0 }}"></span>
                 </div>
 
+
                 <div class="col-sm-1">
                   <a id="id_{{ forloop.counter0 }}_remove_btn" type="button" class="btn btn-outline-danger btn-sm" onclick="remove_category_form(this.id)">
                     <i class="fa fa-trash fa-lg"></i>
                   </a>
                 </div>
+
                 <div class="col-sm-5">
                   </div>
               </div>
@@ -75,6 +77,9 @@
         </div>
 
         <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+            {% trans "common_cancel" %}
+          </button>
           <input name="manage_categories" type="submit" value="Update" role="button" class="btn btn-primary">
         </div>
       </form>
@@ -87,7 +92,6 @@
 	  <div class="modal-content">
 		<div class="modal-header">
 		  <h5 class="modal-title" id="updateSurveyLabel">{% trans "create_survey_update" %}</h5>
-		  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
 		</div>
 		<form action="{%url 'create_survey' survey_id=survey_id %}" method="POST" >
 			{% csrf_token %}
@@ -96,26 +100,33 @@
 
 				<div class="form-group required mb-4">
 					
-						{{survey_form.title}}	 <label >{% trans "global_title" %} </label>
+						{{survey_form.title}}	 <label>{% trans "global_title" %}</label>
+						<span><small><i>{{ survey_help_text.title }}</i></small></span>
 				</div>	
 				<div class="form-group required mb-4">	
 						{{survey_form.description}}
-						<label >{% trans "global_desc" %} </label>
+						<label>{% trans "global_desc" %}</label>
+						<span><small><i>{{ survey_help_text.description }}</i></small></span>
 				</div>
                 <div class="form-check form-check-inline mb-4"   >
                   <label class="form-check-label">{% trans "index_survey_modal_scroll" %}</label>
+                  <span><small><i>({{ survey_help_text.scrolling }})</i></small></span>
                   {{ survey_form.scrolling}}
                 </div>
             </div>
-            <input type="hidden" name="topN" value="-1">
+			<input type="hidden" name="topN" value="-1">
 			<div class="modal-footer">
+				<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+					{% trans "common_cancel" %}
+				</button>
 				<input name="update_survey_info" type="submit"  value="Update" role="button" class="btn btn-primary"  >
 			</div>
 		</form>
 	  </div>
 	
 	</div>
-</div>
+	</div>
+
 
 <div class="modal fade" id="sortIdModal" tabindex="-1" aria-labelledby="sortIdModalLabel">
   <div class="modal-dialog">
@@ -154,9 +165,12 @@
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="deleteModalLabel">{% trans "create_survey_delete" %}</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <form id = "deleteQuestionForm" action="{%url 'delete_question' %}" method="POST" >
+      <form
+        id="deleteQuestionForm"
+        action="{% url 'create_survey' survey_id=survey_id %}"
+        method="POST"
+        data-loading-message="{% trans 'Deleting selected questions and updating order...' %}">
         {% csrf_token %}
         <div class="modal-body">
           {% trans "create_survey_delete_conf" %}
@@ -167,6 +181,9 @@
       
       <div class="modal-footer">
         <input id = "survey_id" name="survey_id" type="hidden"  value="{{survey_id}}"   />
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+          {% trans "common_cancel" %}
+        </button>
         <button type="submit" name="delete_question" value="1" class="btn btn-primary">Confirm</button>
       </div>
     </form>
@@ -174,34 +191,233 @@
   </div>
 </div>
 
+{% if associated_study_count %}
 <div
-  id="jdash-loading-overlay"
-  class="jdash-loading-overlay"
-  role="status"
-  aria-live="polite"
-  aria-hidden="true"
-  hidden>
-  <div class="jdash-loading-panel">
-    <div class="jdash-loading-logo-animation" aria-hidden="true">
-      <div class="jdash-loading-logo-backdrop"></div>
-      <div class="jdash-loading-logo-grid">
-        <div class="jdash-loading-logo-square jdash-loading-logo-square-tl"></div>
-        <div class="jdash-loading-logo-square jdash-loading-logo-square-tr"></div>
-        <div class="jdash-loading-logo-square jdash-loading-logo-square-br"></div>
-        <div class="jdash-loading-logo-square jdash-loading-logo-square-bl"></div>
-      </div>
+  class="modal fade"
+  id="publishSurveyModal"
+  tabindex="-1"
+  aria-labelledby="publishSurveyModalLabel"
+  data-auto-show="{% if has_unpublished_survey_changes %}true{% else %}false{% endif %}">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form
+        action="{% url 'create_survey' survey_id=survey_id %}"
+        method="POST"
+        data-survey-commit-form
+        data-loading-message="{% trans 'create_survey_commit_loading_message' %}">
+        {% csrf_token %}
+        <input type="hidden" name="survey_id" value="{{ survey_id }}">
+        <div class="modal-header">
+          <h5 class="modal-title" id="publishSurveyModalLabel">
+            {% if has_unpublished_survey_changes %}
+              {% trans "create_survey_commit_update_needed_title" %}
+            {% else %}
+              {% trans "create_survey_commit_modal_title" %}
+            {% endif %}
+          </h5>
+        </div>
+        <div class="modal-body">
+          {% if survey_publish_result.failed %}
+          <div class="alert alert-danger" role="alert">
+            <strong>{% trans "create_survey_commit_failed_studies_label" %}</strong>
+            {% for failure in survey_publish_result.failed %}
+              {{ failure.study_name }}{% if not forloop.last %}, {% endif %}
+            {% endfor %}
+          </div>
+          {% endif %}
+          <p>
+            {% if has_unpublished_survey_changes %}
+              {% trans "create_survey_commit_update_needed_body" %}
+            {% else %}
+              {% trans "create_survey_commit_modal_body" %}
+            {% endif %}
+          </p>
+          {% if survey_publish_summary.publish_modal_study_options %}
+          <div class="d-flex justify-content-end mb-2">
+            <a href="#" id="publish-select-all-studies" class="small">{% trans "create_survey_commit_modal_select_all" %}</a>
+          </div>
+          <div class="list-group">
+            {% for study in survey_publish_summary.publish_modal_study_options %}
+            <div
+              class="list-group-item publish-study-option"
+              data-change-url="{% url 'survey_commit_changes' survey_id=survey_id study_id=study.id %}">
+              <div class="d-flex justify-content-between align-items-start gap-3">
+                <label class="mb-0 flex-grow-1">
+                  <input
+                    class="form-check-input me-2 publish-study-checkbox"
+                    type="checkbox"
+                    name="publish_study_ids"
+                    value="{{ study.id }}"
+                    {% if study.is_checked %}checked{% endif %}>
+                  {{ study.title }}
+                </label>
+                {% if study.has_never_been_committed %}
+                <span class="badge bg-secondary">{% trans "create_survey_commit_study_never_committed" %}</span>
+                {% elif study.has_unpublished_changes %}
+                <span class="badge bg-warning text-dark">{% trans "create_survey_commit_study_needs_update" %}</span>
+                {% endif %}
+              </div>
+              <button
+                type="button"
+                class="btn btn-link btn-sm p-0 mt-2 publish-change-toggle"
+                data-show-label="{% trans 'View pending changes' %}"
+                data-hide-label="{% trans 'Hide pending changes' %}"
+                aria-expanded="false">
+                {% trans "View pending changes" %}
+              </button>
+              <div class="publish-change-details small mt-2 d-none" aria-live="polite">
+                <span class="text-muted">{% trans "Loading pending changes..." %}</span>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="mb-0">{% trans "create_survey_commit_modal_no_studies" %}</p>
+          {% endif %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+            {% trans "common_cancel" %}
+          </button>
+          <button
+            id="publish-survey-submit"
+            type="submit"
+            name="publish_survey"
+            value="1"
+            class="btn btn-primary">
+            {% trans "commit_to_study" %}
+          </button>
+        </div>
+      </form>
     </div>
-    <div id="jdash-loading-message" class="jdash-loading-message">{% trans "Please wait..." %}</div>
   </div>
 </div>
 
+<div
+  class="modal fade"
+  id="noSurveyChangesModal"
+  tabindex="-1"
+  aria-labelledby="noSurveyChangesModalLabel"
+  aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="noSurveyChangesModalLabel">
+          {% trans "commit_to_study" %}
+        </h5>
+      </div>
+      <div class="modal-body">
+        {% trans "No_uncommited_survey_commit" %}
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
+          {% trans "common_ok" %}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const modal = document.getElementById("publishSurveyModal");
+    if (!modal) return;
+
+    const checkboxes = Array.from(modal.querySelectorAll(".publish-study-checkbox"));
+    const submitButton = document.getElementById("publish-survey-submit");
+    const selectAllLink = document.getElementById("publish-select-all-studies");
+    const openButton = document.getElementById("publish-survey-open");
+    const noChangesModal = document.getElementById("noSurveyChangesModal");
+
+    function updatePublishButton() {
+      if (!submitButton) return;
+      submitButton.disabled = !checkboxes.some((checkbox) => checkbox.checked);
+    }
+
+    async function hasContentDifferences() {
+      const options = Array.from(modal.querySelectorAll(".publish-study-option"));
+      if (!options.length) return false;
+
+      try {
+        const results = await Promise.all(options.map(async function (option) {
+          const response = await fetch(option.dataset.changeUrl, {
+            headers: {"X-Requested-With": "XMLHttpRequest"},
+          });
+          if (!response.ok) throw new Error("Unable to check pending survey changes.");
+          const payload = await response.json();
+          const hasChanges = Boolean(payload.summary && payload.summary.has_changes);
+          option.classList.toggle("d-none", !hasChanges);
+          const checkbox = option.querySelector(".publish-study-checkbox");
+          if (checkbox && !hasChanges) checkbox.checked = false;
+          return hasChanges;
+        }));
+        updatePublishButton();
+        return results.some(Boolean);
+      } catch (error) {
+        console.error(error);
+        if (typeof window.showJdashMessage === "function") {
+          window.showJdashMessage(error.message || "Unable to check pending survey changes.", "error");
+        }
+        return true;
+      }
+    }
+
+    async function openModalWhenChangesExist(showNoChangesMessage) {
+      if (!(await hasContentDifferences())) {
+        if (showNoChangesMessage && noChangesModal && window.bootstrap && window.bootstrap.Modal) {
+          const noChangesModalInstance = window.bootstrap.Modal.getOrCreateInstance
+            ? window.bootstrap.Modal.getOrCreateInstance(noChangesModal)
+            : new window.bootstrap.Modal(noChangesModal);
+          noChangesModalInstance.show();
+        }
+        return;
+      }
+      if (window.bootstrap && window.bootstrap.Modal) {
+        const modalInstance = window.bootstrap.Modal.getOrCreateInstance
+          ? window.bootstrap.Modal.getOrCreateInstance(modal)
+          : new window.bootstrap.Modal(modal);
+        modalInstance.show();
+      }
+    }
+
+    checkboxes.forEach((checkbox) => {
+      checkbox.addEventListener("change", updatePublishButton);
+    });
+
+    if (selectAllLink) {
+      selectAllLink.addEventListener("click", function (event) {
+        event.preventDefault();
+        checkboxes.forEach((checkbox) => {
+          const option = checkbox.closest(".publish-study-option");
+          checkbox.checked = !option || !option.classList.contains("d-none");
+        });
+        updatePublishButton();
+      });
+    }
+
+    updatePublishButton();
+    if (openButton) {
+      openButton.addEventListener("click", function () {
+        openModalWhenChangesExist(true);
+      });
+    }
+    if (modal.dataset.autoShow === "true") {
+      window.setTimeout(function () {
+        openModalWhenChangesExist(false);
+      }, 150);
+    }
+  });
+</script>
+{% endif %}
+
+{% include "includes/jdash_loading_overlay.html" %}
 
 <div class="row mb-4">
   <ul class="nav nav-tabs">
     <li class="nav-item">
       <a class="nav-link "  href="{%url 'home' %}">{% trans "index_tab1" %}</a>
     </li>
-	<li class="nav-item">
+    <li class="nav-item">
 	  <a class="nav-link active" aria-current="page" href="{%url 'survey' %}">{% trans "index_tab2" %}</a>
 	</li>
     <li class="nav-item">
@@ -209,93 +425,121 @@
     </li>
     </ul>
 </div>
-<div class="row">
-
-
-        <div class="col-lg-4">
+<div class="survey-page-header">
+        <div class="survey-title-line">
           {% if request.user|can_manage_survey %}
-          <h3>  <a class="edit"  href="" data-id="{{survey}}" data-bs-toggle="modal" data-bs-target="#updateSurveyModal" >
-            <i class="fas fa-pencil-alt "></i></a>{{survey_title}} </h3> 
-          {% else %}
+          <h3><a class="edit" href="" data-id="{{survey}}" data-bs-toggle="modal" data-bs-target="#updateSurveyModal">
+            <i class="fas fa-pencil-alt"></i></a></h3>
+          {% endif %}
           <h3>{{survey_title}}</h3>
+          {% if survey_summary.last_updated %}
+          <span class="survey-meta-pill">{% trans "Last updated" %}: {{ survey_summary.last_updated|date:"Y-m-d H:i" }}</span>
           {% endif %}
         </div>
-        <div class="col-lg-6">
-          {% if messages %}
-            <ul class="messages">
-                {% for message in messages %}
-                <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
-                {% endfor %}
-            </ul>
-            {% endif %}
-        </div>
-        <div class="col-lg-2">
-        <a name="survey_json" href="{%url 'download_json' survey_id=survey_id  %}" data-bs-toggle="tooltip" title="Export JSON" download >
-          <img src="{% static 'icons/json_download.png' %}" height="45" style="float: right;"> </a>
-      </div>
- 
-      
-
-
-</div>
-<div class="row">
-  <div id="toolbar" >
-      {% if request.user|can_manage_survey %}
-      <button  id="addCategory"  class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#categoryModal">
-      {% trans "global_categories" %}
-      </button>
-      
-      <a id="new_question" role="button" class="btn btn-outline-primary" href="{%url 'manage_question' survey_id=survey_id question_id=0 %}" >
-        {% trans "create_survey_new_question" %}
-      </a>
-      <span class="bulk-question-actions">
-        <button
-          id="bulk-delete-questions"
-          type="button"
-          class="btn btn-outline-danger"
-          data-bs-toggle="modal"
-          data-bs-target="#deleteModal"
-          disabled>
-          {% trans "Delete selected questions" %}
+        <div class="survey-page-header-actions">
+        {% if request.user|can_manage_survey %}
+        <button id="addCategory" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#categoryModal">
+          {% trans "global_categories" %}
         </button>
-        <span id="bulk-question-selected-count" class="bulk-question-selected-count"></span>
-      </span>
-      {% endif %}
-    
-  </div>
-
-  <!-- Information AT THE TOP -->
-  <div class="d-flex justify-content-between align-items-center mb-2">
-    <div id="question-count-top" class="fw-bold">
-      {% blocktrans count question_count=questions|length %}{{ question_count }} total question{% plural %}{{ question_count }} total questions{% endblocktrans %}
-      {% if survey_summary %}
-      <span class="survey-summary-meta">
-        &middot;
-        {% if survey_summary.conditional_question_count %}
-        {{ survey_summary.conditional_question_count }} {% trans "conditional question" %}{{ survey_summary.conditional_question_count|pluralize }}
-        &middot;
+        <a id="new_question" role="button" class="btn btn-outline-primary btn-sm" href="{%url 'manage_question' survey_id=survey_id question_id=0 %}">
+          {% trans "create_survey_new_question" %}
+        </a>
+        <span class="bulk-question-actions">
+          <button
+            id="bulk-delete-questions"
+            type="button"
+            class="btn btn-outline-danger btn-sm"
+            data-bs-toggle="modal"
+            data-bs-target="#deleteModal"
+            disabled>
+            {% trans "Delete selected questions" %}
+          </button>
+          <span id="bulk-question-selected-count" class="bulk-question-selected-count"></span>
+        </span>
         {% endif %}
-        {{ survey_summary.category_count }} categor{{ survey_summary.category_count|pluralize:"y,ies" }}
-        &middot;
-        {% trans "Last updated" %}: {{ survey_summary.last_updated|date:"Y-m-d H:i" }}
+        {% if request.user|can_manage_survey and associated_study_count %}
+        <button
+          id="publish-survey-open"
+          type="button"
+          class="btn btn-primary btn-sm"
+          title="{% trans 'create_survey_commit_linked_studies_title' %}">
+          {% trans "commit_to_study" %}
+        </button>
+        {% endif %}
+
+        <a
+          class="btn btn-outline-primary btn-sm survey-json-download"
+          name="survey_json"
+          href="{%url 'download_json' survey_id=survey_id  %}"
+          data-bs-toggle="tooltip"
+          title="{% trans 'Export JSON' %}"
+          aria-label="{% trans 'Export JSON' %}"
+          download>
+          <i class="fas fa-download" aria-hidden="true"></i>
+        </a>
+      </div>
+</div>
+
+<div class="survey-question-section">
+  <div class="survey-question-filters" aria-label="{% trans 'Filter survey questions' %}">
+    <div class="survey-question-filter-summary">
+      <span id="question-visible-count" class="survey-count-badge"
+            data-total="{{ questions|length }}"
+            data-singular="{% trans 'total question' %}"
+            data-plural="{% trans 'total questions' %}">
+        {% blocktrans count question_count=questions|length %}{{ question_count }} of {{ question_count }} total question{% plural %}{{ question_count }} of {{ question_count }} total questions{% endblocktrans %}
       </span>
+      {% if survey_summary %}
+      {% if survey_summary.conditional_question_count %}
+      <span id="question-visible-conditional-count" class="survey-meta-pill"
+            data-total="{{ survey_summary.conditional_question_count }}"
+            data-singular="{% trans 'conditional question' %}"
+            data-plural="{% trans 'conditional questions' %}">{{ survey_summary.conditional_question_count }} of {{ survey_summary.conditional_question_count }} {% trans "conditional question" %}{{ survey_summary.conditional_question_count|pluralize }}</span>
+      {% endif %}
+      <span id="question-visible-category-count" class="survey-meta-pill"
+            data-total="{{ survey_summary.category_count }}"
+            data-singular="{% trans 'category' %}"
+            data-plural="{% trans 'categories' %}">{{ survey_summary.category_count }} of {{ survey_summary.category_count }} categor{{ survey_summary.category_count|pluralize:"y,ies" }}</span>
       {% endif %}
     </div>
+    <div class="survey-question-filter survey-question-filter--search">
+      <label for="question-filter-search">{% trans "Search questions" %}</label>
+      <input id="question-filter-search" class="form-control" type="search" placeholder="{% trans 'Search title, text, type or category' %}">
+    </div>
+    <div class="survey-question-filter">
+      <label for="question-filter-type">{% trans "Question type" %}</label>
+      <select id="question-filter-type" class="form-select">
+        <option value="">{% trans "All types" %}</option>
+      </select>
+    </div>
+    <div class="survey-question-filter">
+      <label for="question-filter-category">{% trans "Category" %}</label>
+      <select id="question-filter-category" class="form-select">
+        <option value="">{% trans "All categories" %}</option>
+      </select>
+    </div>
+    {% if survey_summary.conditional_question_count %}
+    <div class="survey-question-filter">
+      <label for="question-filter-condition">{% trans "Condition" %}</label>
+      <select id="question-filter-condition" class="form-select">
+        <option value="">{% trans "All questions" %}</option>
+        <option value="with">{% trans "Conditional only" %}</option>
+        <option value="without">{% trans "Without conditions" %}</option>
+      </select>
+    </div>
+    {% endif %}
+    <button id="question-filter-clear" type="button" class="btn btn-outline-secondary">
+      {% trans "Clear filters" %}
+    </button>
   </div>
-
   <!-- use a button to save all question to database or while exporting to json-->
-  <table id ="quest_table" class="table-responsive"
-  data-toolbar="#toolbar"
-  data-search="true"
-  data-pagination="true"
-  data-id-field="quest_id"
-  data-page-list="[10, 30, 50, 100, all]"
-  >
+  <div class="table-responsive survey-question-table-shell">
+  <table id="quest_table" class="table table-striped align-middle w-100">
     <thead >
       <tr >
-        <th  data-visible="false">dbid</th>
+        <th class="dt-hidden">dbid</th>
         {% if request.user|can_manage_survey %}
-        <th class="question-select-cell" data-sortable="false">
+        <th class="question-select-cell no-sort">
           <input
             id="select-all-questions"
             class="form-check-input"
@@ -303,28 +547,29 @@
             aria-label="{% trans 'Select all visible questions' %}">
         </th>
         {% endif %}
-        <th  >Id</th>
-        <th  >title</th>
-        <th  >subText</th>
-        <th  >questionType</th>
-        <th  >category</th>
-        <th data-formatter="scheduleIntervalFormatter">day of first ask/repetition interval</th>
-        <th data-formatter="scheduleTimeWindowsFormatter">activation -
-            deactivation times</th>
-        <th data-visible="false">frequency</th>
-        <th data-visible="false">clockTimeStart </th>
-        <th data-visible="false">clockTimeEnd</th>
-        <th data-visible="false">nextDayToAnswer</th>
-        <th  data-visible="false" >imageURL</th>
-        <th  data-visible="false" >url</th>  
-        <th  data-visible="false" >deactivateOnDate</th>
-        <th  data-visible="false"  >deactivateOnAnswer</th>
-        <th  data-visible="false"  >activation_condition</th>
-        <th  data-visible="false"  >deactivation_condition</th>
-        {% if survey_summary.conditional_question_count %}
-        <th data-formatter="conditionQuestionFormatter">Condition</th>
+        <th>Id</th>
+        <th>title</th>
+        <th>subText</th>
+        <th class="question-type-column">type</th>
+        <th class="question-category-column">category</th>
+        <th class="schedule-interval-column">day of first ask/repetition interval</th>
+        {% if survey_summary.has_time_windows %}
+        <th class="schedule-window-column">activation - deactivation times</th>
         {% endif %}
-        <th  data-events="createOperateEvents" >actions</th>
+        <th class="dt-hidden">frequency</th>
+        <th class="dt-hidden">clockTimeStart </th>
+        <th class="dt-hidden">clockTimeEnd</th>
+        <th class="dt-hidden">nextDayToAnswer</th>
+        <th class="dt-hidden">imageURL</th>
+        <th class="dt-hidden">url</th>
+        <th class="dt-hidden">deactivateOnDate</th>
+        <th class="dt-hidden">deactivateOnAnswer</th>
+        <th class="dt-hidden">activation_condition</th>
+        <th class="dt-hidden">deactivation_condition</th>
+        {% if survey_summary.conditional_question_count %}
+        <th class="condition-column">condition</th>
+        {% endif %}
+        <th class="no-sort">actions</th>
       </tr>
       
     </thead>
@@ -342,8 +587,8 @@
         </td>
         {% endif %}
         <td id="quest_id">
-            {% if request.user|can_manage_survey %}
-            <div class="question-sort-cell">
+          {% if request.user|can_manage_survey %}
+          <div class="question-sort-cell">
             <span>{{question.id}}</span>
             <button
               class="btn btn-link btn-sm p-0"
@@ -363,7 +608,6 @@
               {% endif %}
             </button>
           </div>
-
           {% else %}
           {{question.id}}
           {% endif %}
@@ -383,7 +627,9 @@
           {% endif %}
         </td>
         <td>{{ question.frequency }}||{{ question.nextDayToAnswer }}</td>
+        {% if survey_summary.has_time_windows %}
         <td>{{ question.clockTime_start }}||{{ question.clockTime_end }}</td>
+        {% endif %}
         <td id='frequency'>{{ question.frequency}}</td>
         <td id='clockTimeStart'>{{ question.clockTime_start}}</td>
         <td id='clockTimeEnd'>{{ question.clockTime_end}}</td>
@@ -402,7 +648,7 @@
           <a class="edit" name="edit_question" title="Edit" href="{%url 'manage_question' survey_id=survey_id question_id=question.db_id %}"  ><i class="fa fa-edit fa-lg"></i></a>
           <a class="copy" name="copy_question" href="{%url 'duplicate_question' survey_id=survey_id question_id=question.db_id %}" title="Duplicate"  data-id="{{question}}"  ><i class="fa fa-copy fa-lg"></i></i></a>
           <!-- <a class="delete" href="#" title="Delete" data-id="{{question}}" data-question-id="{{question.db_id}}" data-bs-toggle="modal" data-bs-target="#deleteModal"  ><i class="fa fa-trash fa-lg"></i></a>-->
-          {% else %} 
+          {% else %}
           <a class="view"  name="edit_question" title="View"  href="{%url 'manage_question' survey_id=survey_id question_id=question.db_id %}"  ><i class="fa fa-eye fa-lg"></i></a>
           {% endif %}
       </td>
@@ -411,8 +657,8 @@
       {% endfor  %}
     </tbody>
   </table>
+  </div>
 
       
 </div>
 {% endblock %}	
-

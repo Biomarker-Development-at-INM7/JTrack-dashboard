@@ -590,6 +590,51 @@ def test_update_study_db_details_success():
 
 
 @pytest.mark.django_db
+def test_update_study_db_details_removes_survey_relationship():
+    user = User.objects.create_user(username="ema_owner", password="password")
+    survey = Survey.objects.create(
+        title="Survey to remove",
+        description="base",
+        topN=3,
+        scrolling="H",
+        owner=user,
+    )
+    study = Study.objects.create(
+        title="EMA Study",
+        description="Description",
+        duration=10,
+        numberOfSubjects=5,
+        is_test=False,
+        enrolled_subjects="0",
+        owner=user,
+        passive_monitoring=False,
+        frequency=50,
+        labeling=0,
+        sensor_list=[],
+        ecological_momentary_assessment=True,
+        survey=survey,
+    )
+    form_data = {
+        "name": "EMA Study",
+        "description": "Description",
+        "duration": 10,
+        "number_of_subjects": 5,
+        constants.field_name_is_test: False,
+        "enrolled_subjects": [],
+        constants.field_name_sensor_list: [],
+        constants.field_name_frequency: 50,
+        constants.field_name_labeling: 0,
+        "ema_checkbox": True,
+    }
+
+    utils.update_study_db_details(form_data)
+    study.refresh_from_db()
+
+    assert study.ecological_momentary_assessment is True
+    assert study.survey is None
+
+
+@pytest.mark.django_db
 def test_update_study_db_details_invalid_key():
     user = User.objects.create_user(username="study_owner2", password="password")
     Study.objects.create(

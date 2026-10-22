@@ -144,6 +144,43 @@ def test_get_all_study_details_sorts_newest_first(
         "OlderStudy",
     ]
 
+
+@patch("jdash.services.study.calculate_stats_of_number_of_subjects", return_value={})
+@patch("jdash.services.study.get_latest_received_study_sensor_details", return_value=[])
+@patch("jdash.services.study._get_study_group_members", return_value=([], [], []))
+@patch(
+    "jdash.services.study.get_json_data",
+    return_value={
+        "number_of_subjects": 10,
+        "sensor_list": [],
+        "sensor_list_limited": ["accelerometer", "gyroscope"],
+        "active_labeling": 1,
+        "survey": {},
+    },
+)
+@patch(
+    "jdash.services.study.Study.list_all_for_user",
+    return_value=[{
+        constants.key_name_study_title: "ActiveTrackingQC",
+        constants.key_name_created_date: "2026-10-22",
+    }],
+)
+def test_get_all_study_details_does_not_mix_active_marker_into_passive_sensors(
+    mock_list_studies,
+    mock_json,
+    mock_group_members,
+    mock_latest_sensors,
+    mock_stats,
+):
+    studies, _stats, error = study.get_all_study_details(MagicMock())
+
+    assert error == ""
+    assert studies[0][constants.key_name_sensor_list] == []
+    assert studies[0][constants.field_name_sensor_list_limited] == [
+        "accelerometer",
+        "gyroscope",
+    ]
+
 @patch("jdash.services.study.open_study_json")
 @patch("jdash.services.study.save_study_json")
 def test_update_study_details(mock_save, mock_open):
@@ -266,6 +303,36 @@ def test_update_details_restores_missing_survey_key(
     mock_save_study_json.assert_called_once()
     saved_payload = mock_save_study_json.call_args.args[1]
     assert saved_payload["survey"] == {}
+
+
+@patch("jdash.services.study.create_backup_json_file")
+@patch("jdash.services.study.open_study_json")
+@patch("jdash.services.study.save_study_json")
+def test_update_details_clears_existing_survey_when_selection_is_removed(
+    mock_save_study_json,
+    mock_open_study_json,
+    mock_create_backup_json_file,
+):
+    mock_open_study_json.return_value = {
+        "name": "TestStudy",
+        "duration": 5,
+        "description": "desc",
+        "is_test": False,
+        "images": False,
+        "version": 1,
+        "survey": {"id": 42, "title": "Old survey"},
+    }
+
+    result = study.Study("TestStudy", None).update_details({
+        "duration": 5,
+        "description": "desc",
+        "is_test": False,
+        "images": False,
+        "ema_checkbox": True,
+    })
+
+    assert result["survey"] == {}
+    assert mock_save_study_json.call_args.args[1]["survey"] == {}
 
 
 @pytest.mark.django_db

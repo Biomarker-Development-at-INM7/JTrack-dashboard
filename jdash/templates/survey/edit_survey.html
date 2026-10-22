@@ -6,20 +6,17 @@
 {% block content %}
 <script src="{% static 'js/jquery.min.js' %}"></script>
 <link href="{% static 'css/form.css' %}" rel="stylesheet">
-<link href="{% static 'css/bootstrap-table.min.css' %}" rel="stylesheet">
+<link href="{% static 'css/dataTables.bootstrap5.min.css' %}" rel="stylesheet">
 <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css">
-<script src="{% static 'js/bootstrap-table.min.js' %}"></script>
-<script src="{% static 'js/bootstrap-table-export.min.js' %}"></script>
-<script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
+<script src="{% static 'js/dataTables.min.js' %}"></script>
+<script src="{% static 'js/dataTables.bootstrap5.min.js' %}"></script>
 <script src="{% static 'js/survey.js' %}"></script>
-<script src="{% static 'js/popper.js' %}"></script>
 
 <div class="modal fade" id="categoryModal" tabindex="-1" aria-labelledby="categoryModalLabel">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="categoryModalLabel">{% trans "global_categories" %}</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
 
       <form action="{% url 'edit_survey' study_name=study_name %}" method="POST">
@@ -81,6 +78,9 @@
         </div>
 
         <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+            {% trans "common_cancel" %}
+          </button>
           <input name="manage_categories" type="submit" value="Update" role="button" class="btn btn-primary">
         </div>
       </form>
@@ -93,7 +93,6 @@
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="deleteModalLabel">Delete Question</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <form
         id="deleteQuestionForm"
@@ -108,12 +107,17 @@
           <div id="delete-question-ids"></div>
       </div>
       <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+          {% trans "common_cancel" %}
+        </button>
         <button type="submit" class="btn btn-primary">Confirm</button>
       </div>
       </form>
     </div>
   </div>
 </div>
+
+{% include "includes/jdash_loading_overlay.html" %}
 
 <div class="modal fade" id="sortIdModal" tabindex="-1" aria-labelledby="sortIdModalLabel">
   <div class="modal-dialog">
@@ -177,12 +181,12 @@
                   <span><small><i>{{ question_help_text.description }}</i></small></span>
                 </div>
                 <div style="display:none;">{{ question_form.clockTime }}</div>
-                <div class="form-group required mb-4">
+                <div class="form-group mb-4">
                   {{ question_form.clockTime_start}}
                   <label>{% trans "question_activation_times" %}</label>
                   <span><small><i>{{ question_help_text.clockTime_start }}</i></small></span>
                 </div>
-                <div class="form-group required mb-4">
+                <div class="form-group mb-4">
                   {{ question_form.clockTime_end}}
                   <label>{% trans "question_deactivation_times" %}</label>
                   <span><small><i>{{ question_help_text.clockTime_end }}</i></small></span>
@@ -346,46 +350,31 @@
 <div class="row mb-4">
   <ul class="nav nav-tabs">
     <li class="nav-item">
-      <a class="nav-link "  href="{%url 'home' %}">Studies</a>
+      <a class="nav-link" href="{% url 'home' %}">{% trans "index_tab1" %}</a>
     </li>
 	<li class="nav-item">
-	  <a class="nav-link active" aria-current="page" href="{%url 'survey' %}">Survey</a>
+	  <a class="nav-link active" aria-current="page" href="{% url 'survey' %}">{% trans "index_tab2" %}</a>
 	</li>
     <li class="nav-item">
-      <a class="nav-link" href="{%url 'analytics' study_name='all' %}">Analytics</a>
+      <a class="nav-link" href="{% url 'analytics' study_name='all' %}">{% trans "index_tab3" %}</a>
     </li>
     </ul>
 </div>
-<div class="row">
-    <div class="col-lg-4">
-      <h3>{{survey_id}}:  {{survey_title}}</h3>
-    </div>
-    <div class="col-lg-6">
-      {% if messages %}
-        <ul class="messages">
-          {% for message in messages %}
-          <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
-          {% endfor %}
-        </ul>
-      {% endif %}
-      {% if error_message %}
-        <p class="text-danger">{{ error_message}}</p>
-      {% endif %}
-    </div>
-    <div class="col-lg-2">
-      <a name="survey_json" href="{% url 'download_legacy_survey_json' study_name=study_name %}" data-bs-toggle="tooltip" title="Export JSON" download>
-        <img src="{% static 'icons/json_download.png' %}" height="45" style="float: right;">
-      </a>
-    </div>
- </div>
+<div class="survey-page-header">
+  <div class="survey-title-line">
+    <h3>{{ survey_id }}: {{ survey_title }}</h3>
+    {% if survey_summary.last_updated %}
+    <span class="survey-meta-pill">{% trans "Last updated" %}: {{ survey_summary.last_updated|date:"Y-m-d H:i" }}</span>
+    {% endif %}
+  </div>
 
- <div id="toolbar">
+  <div class="survey-page-header-actions">
     {% if request.user|can_manage_survey %}
     <span class="bulk-question-actions">
       <button
         id="bulk-delete-questions"
         type="button"
-        class="btn btn-outline-danger"
+        class="btn btn-outline-danger btn-sm"
         data-bs-toggle="modal"
         data-bs-target="#deleteModal"
         disabled>
@@ -393,47 +382,98 @@
       </button>
       <span id="bulk-question-selected-count" class="bulk-question-selected-count"></span>
     </span>
+    <form class="d-inline" action="{% url 'edit_survey' study_name=study_name %}" method="POST">
+      {% csrf_token %}
+      <button
+        type="submit"
+        name="publish_survey"
+        value="1"
+        class="btn btn-primary btn-sm">
+        {% trans "commit_to_study" %}
+      </button>
+    </form>
     {% endif %}
- </div>
-
- <!-- Information AT THE TOP -->
-  <div class="d-flex justify-content-between align-items-center mb-2">
-    <div id="question-count-top" class="fw-bold">
-      {% blocktrans count question_count=questions|length %}{{ question_count }} total question{% plural %}{{ question_count }} total questions{% endblocktrans %}
-      {% if survey_summary %}
-      <span class="survey-summary-meta">
-        &middot;
-        {% if survey_summary.conditional_question_count %}
-        {{ survey_summary.conditional_question_count }} {% trans "conditional question" %}{{ survey_summary.conditional_question_count|pluralize }}
-        &middot;
-        {% endif %}
-        {{ survey_summary.category_count }} categor{{ survey_summary.category_count|pluralize:"y,ies" }}
-        {% if survey_summary.last_updated %}
-        &middot;
-        {% trans "Last updated" %}: {{ survey_summary.last_updated|date:"Y-m-d H:i" }}
-        {% endif %}
-      </span>
-      {% endif %}
-    </div>
+    {% if has_unpublished_survey_changes %}
+    <span class="badge bg-warning text-dark">{% trans "create_survey_uncommited_changes_badge" %}</span>
+    {% endif %}
+    <a
+      class="btn btn-outline-primary btn-sm survey-json-download"
+      name="survey_json"
+      href="{% url 'download_legacy_survey_json' study_name=study_name %}"
+      data-bs-toggle="tooltip"
+      title="{% trans 'Export JSON' %}"
+      aria-label="{% trans 'Export JSON' %}"
+      download>
+      <i class="fas fa-download" aria-hidden="true"></i>
+    </a>
   </div>
-    <div class="row">
-      <div class="col-md-12">
-        <script>
-          window.legacyQuestionCanSort = {% if request.user|can_manage_survey %}true{% else %}false{% endif %};
-          window.legacyQuestionCount = {{ questions|length }};
-        </script>
-        <table id ="survey_quest_table" class="table-responsive"
-        data-toolbar="#toolbar"
-        data-search="true"
-        data-pagination="true"
-        data-id-field="id"
-        data-page-list="[10, 30, 50, 100, ALL]"
-        data-pagination-h-align="right"
-        data-pagination-detail-h-align="left">
-          <thead>
-            <tr>
-              {% if request.user|can_manage_survey %}
-              <th class="question-select-cell" data-field="select" data-sortable="false">
+</div>
+
+<div class="survey-question-section">
+  {% if error_message %}
+  <div class="d-flex justify-content-end align-items-center mb-2">
+    <p class="text-danger mb-0 ms-auto text-end">{{ error_message }}</p>
+  </div>
+	  {% endif %}
+		      <div class="survey-question-filters" aria-label="{% trans 'Filter survey questions' %}">
+		        <div class="survey-question-filter-summary">
+		          <span id="question-visible-count" class="survey-count-badge"
+		                data-total="{{ questions|length }}"
+		                data-singular="{% trans 'total question' %}"
+		                data-plural="{% trans 'total questions' %}">
+		            {% blocktrans count question_count=questions|length %}{{ question_count }} of {{ question_count }} total question{% plural %}{{ question_count }} of {{ question_count }} total questions{% endblocktrans %}
+		          </span>
+		          {% if survey_summary %}
+		          {% if survey_summary.conditional_question_count %}
+		          <span id="question-visible-conditional-count" class="survey-meta-pill"
+		                data-total="{{ survey_summary.conditional_question_count }}"
+		                data-singular="{% trans 'conditional question' %}"
+		                data-plural="{% trans 'conditional questions' %}">{{ survey_summary.conditional_question_count }} of {{ survey_summary.conditional_question_count }} {% trans "conditional question" %}{{ survey_summary.conditional_question_count|pluralize }}</span>
+		          {% endif %}
+		          <span id="question-visible-category-count" class="survey-meta-pill"
+		                data-total="{{ survey_summary.category_count }}"
+		                data-singular="{% trans 'category' %}"
+		                data-plural="{% trans 'categories' %}">{{ survey_summary.category_count }} of {{ survey_summary.category_count }} categor{{ survey_summary.category_count|pluralize:"y,ies" }}</span>
+		          {% endif %}
+		        </div>
+		        <div class="survey-question-filter survey-question-filter--search">
+	          <label for="question-filter-search">{% trans "Search questions" %}</label>
+	          <input id="question-filter-search" class="form-control" type="search" placeholder="{% trans 'Search title, text, type or category' %}">
+	        </div>
+	        <div class="survey-question-filter">
+	          <label for="question-filter-type">{% trans "Question type" %}</label>
+	          <select id="question-filter-type" class="form-select">
+	            <option value="">{% trans "All types" %}</option>
+	          </select>
+	        </div>
+	        <div class="survey-question-filter">
+	          <label for="question-filter-category">{% trans "Category" %}</label>
+	          <select id="question-filter-category" class="form-select">
+	            <option value="">{% trans "All categories" %}</option>
+	          </select>
+	        </div>
+	        {% if survey_summary.conditional_question_count %}
+	        <div class="survey-question-filter">
+	          <label for="question-filter-condition">{% trans "Condition" %}</label>
+	          <select id="question-filter-condition" class="form-select">
+	            <option value="">{% trans "All questions" %}</option>
+	            <option value="with">{% trans "Conditional only" %}</option>
+	            <option value="without">{% trans "Without conditions" %}</option>
+	          </select>
+	        </div>
+	        {% endif %}
+	        <button id="question-filter-clear" type="button" class="btn btn-outline-secondary">{% trans "Clear filters" %}</button>
+	      </div>
+	      <div class="table-responsive survey-question-table-shell">
+	        <script>
+	          window.legacyQuestionCanSort = {% if request.user|can_manage_survey %}true{% else %}false{% endif %};
+	          window.legacyQuestionCount = {{ questions|length }};
+	        </script>
+	        <table id="survey_quest_table" class="table table-striped align-middle w-100">
+	          <thead>
+	            <tr>
+	              {% if request.user|can_manage_survey %}
+	              <th class="question-select-cell no-sort" data-field="select">
                 <input
                   id="select-all-questions"
                   class="form-check-input"
@@ -441,53 +481,53 @@
                   aria-label="{% trans 'Select all visible questions' %}">
               </th>
               {% endif %}
-              <th data-field="id" {% if request.user|can_manage_survey %}data-formatter="legacyQuestionSortFormatter"{% endif %}>Id</th>
-              <th data-field="title">title</th>
-              <th data-field="subText">subText</th>
-              <th data-field="questionType">type</th>
-              <th data-field="category">category</th>
-              <th data-field="categoryValue" data-visible="false">categoryValue</th>
-              <th data-field="scheduleInterval" data-formatter="scheduleIntervalFormatter">day of first ask/repetition interval</th>
-              <th
-                data-field="scheduleWindows"
-                data-formatter="scheduleTimeWindowsFormatter"
-                data-visible="{% if survey_summary.has_time_windows %}true{% else %}false{% endif %}">
-                activation - deactivation times
-              </th>
-              <th data-field="frequency" data-visible="false">frequency</th>
-              <th data-field="clockTime" data-visible="false">clockTime</th>
-              <th data-field="nextDayToAnswer" data-visible="false">nextDayToAnswer</th>
-              <th data-field="imageURL" data-visible="false">imageURL</th>
-              <th data-field="url" data-visible="false">url</th>
-              <th data-field="deactivateOnDate" data-visible="false">deactivateOnDate</th>
-              <th data-field="deactivateOnAnswer" data-visible="false">deactivateOnAnswer</th>
-              <th data-field="active" data-visible="false">active</th>
-              <th data-field="mandatory" data-visible="false">mandatory</th>
-              <th data-field="clockTimeStart" data-visible="false">clockTimeStart</th>
-              <th data-field="clockTimeEnd" data-visible="false">clockTimeEnd</th>
-              <th data-field="activateQuestion" data-visible="false">activateQuestion</th>
-              <th data-field="deactivateQuestion" data-visible="false">deactivateQuestion</th>
-              <th data-field="activationCondition" data-visible="false">activationCondition</th>
-              <th data-field="deactivationCondition" data-visible="false">deactivationCondition</th>
-              <th
-                data-field="condition"
-                data-formatter="conditionQuestionFormatter"
-                data-visible="{% if survey_summary.conditional_question_count %}true{% else %}false{% endif %}">
-                Condition
-              </th>
-              <th data-field="answerSize" data-visible="false">Answer size</th>
-              <th data-field="answerText" data-visible="false">text</th>
-              <th data-field="answerValue" data-visible="false">value</th>
-              <th data-field="answerDefaultValue" data-visible="false">defaultValue</th>
-              <th data-field="answerStepSize" data-visible="false">stepSize</th>
-              <th data-field="answerMinValue" data-visible="false">minVal</th>
-              <th data-field="answerMaxValue" data-visible="false">maxVal</th>
-              <th data-field="answerMinText" data-visible="false">minText</th>
-              <th data-field="answerMaxText" data-visible="false">maxText</th>
-              <th data-field="answerSubText" data-visible="false">answerSubText</th>
-              <th data-field="answerSortId" data-visible="false">answerSortId</th>
-              <th data-field="answerId" data-visible="false">answer_id</th>
-              <th data-field="actions" data-events="operateEvents">actions</th>
+	              <th class="legacy-question-id-column" data-field="id">Id</th>
+	              <th data-field="title">title</th>
+	              <th data-field="subText">subText</th>
+	              <th class="question-type-column" data-field="questionType">type</th>
+	              <th class="question-category-column" data-field="category">category</th>
+	              <th class="dt-hidden" data-field="categoryValue">categoryValue</th>
+	              <th class="schedule-interval-column" data-field="scheduleInterval">day of first ask/repetition interval</th>
+	              <th
+	                class="schedule-window-column{% if not survey_summary.has_time_windows %} dt-hidden{% endif %}"
+	                data-field="scheduleWindows"
+	                >
+	                activation - deactivation times
+	              </th>
+	              <th class="dt-hidden" data-field="frequency">frequency</th>
+	              <th class="dt-hidden" data-field="clockTime">clockTime</th>
+	              <th class="dt-hidden" data-field="nextDayToAnswer">nextDayToAnswer</th>
+	              <th class="dt-hidden" data-field="imageURL">imageURL</th>
+	              <th class="dt-hidden" data-field="url">url</th>
+	              <th class="dt-hidden" data-field="deactivateOnDate">deactivateOnDate</th>
+	              <th class="dt-hidden" data-field="deactivateOnAnswer">deactivateOnAnswer</th>
+	              <th class="dt-hidden" data-field="active">active</th>
+	              <th class="dt-hidden" data-field="mandatory">mandatory</th>
+	              <th class="dt-hidden" data-field="clockTimeStart">clockTimeStart</th>
+	              <th class="dt-hidden" data-field="clockTimeEnd">clockTimeEnd</th>
+	              <th class="dt-hidden" data-field="activateQuestion">activateQuestion</th>
+	              <th class="dt-hidden" data-field="deactivateQuestion">deactivateQuestion</th>
+	              <th class="dt-hidden" data-field="activationCondition">activationCondition</th>
+	              <th class="dt-hidden" data-field="deactivationCondition">deactivationCondition</th>
+	              <th
+	                class="condition-column{% if not survey_summary.conditional_question_count %} dt-hidden{% endif %}"
+	                data-field="condition"
+	                >
+	                Condition
+	              </th>
+	              <th class="dt-hidden" data-field="answerSize">Answer size</th>
+	              <th class="dt-hidden" data-field="answerText">text</th>
+	              <th class="dt-hidden" data-field="answerValue">value</th>
+	              <th class="dt-hidden" data-field="answerDefaultValue">defaultValue</th>
+	              <th class="dt-hidden" data-field="answerStepSize">stepSize</th>
+	              <th class="dt-hidden" data-field="answerMinValue">minVal</th>
+	              <th class="dt-hidden" data-field="answerMaxValue">maxVal</th>
+	              <th class="dt-hidden" data-field="answerMinText">minText</th>
+	              <th class="dt-hidden" data-field="answerMaxText">maxText</th>
+	              <th class="dt-hidden" data-field="answerSubText">answerSubText</th>
+	              <th class="dt-hidden" data-field="answerSortId">answerSortId</th>
+	              <th class="dt-hidden" data-field="answerId">answer_id</th>
+	              <th class="no-sort" data-field="actions">actions</th>
             </tr>
           </thead>
           <tbody>
@@ -565,10 +605,9 @@
             </tr>
             {% endfor %}
           </tbody>
-        </table>
-      </div>
-    </div>
-</div>
+	        </table>
+	      </div>
+	    </div>
 
 <script>
   document.addEventListener("DOMContentLoaded", function () {
@@ -602,5 +641,3 @@
 </script>
 
 {% endblock %}
-
-

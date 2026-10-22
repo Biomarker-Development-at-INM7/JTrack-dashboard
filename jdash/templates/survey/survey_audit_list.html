@@ -5,12 +5,11 @@
 {% block content %}
 
 <script src="{% static 'js/jquery.min.js' %}"></script>
-<link href="{% static 'css/bootstrap-table.min.css' %}" rel="stylesheet">
+<link href="{% static 'css/dataTables.bootstrap5.min.css' %}" rel="stylesheet">
 <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css">
-<script src="{% static 'js/bootstrap-table.min.js' %}"></script>
-<script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
-<script src="{% static 'js/survey.js' %}"></script>
-<script src="{% static 'js/popper.js' %}"></script>
+<script src="{% static 'js/dataTables.min.js' %}"></script>
+<script src="{% static 'js/dataTables.bootstrap5.min.js' %}"></script>
+<script src="{% static 'js/main.js' %}"></script>
 
 <div class="row mb-4">
   <ul class="nav nav-tabs">
@@ -30,51 +29,53 @@
   <div class="col-md-6 col-lg-6">
    
   </div>
-  <div class="col-md-6 col-lg-6">
-    {% if messages %}
-      <ul class="messages">
-        {% for message in messages %}
-          <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
-        {% endfor %}
-      </ul>
-    {% endif %}
-  </div>
 </div>
 
 <div class="row">
-  <div class="d-flex justify-content-between align-items-center">
-    <div class="d-flex justify-content-start align-items-center">
-    <a class="" href="{% url 'create_survey' survey_id=survey.id %}"  >
-      <h3 >{{survey.title}}</h3></a>
-    
-    </div>
-    <div class="d-flex justify-content-end align-items-center">
-      <a class="btn btn-outline-primary" href="{% url 'survey' %}">
-        {% trans "global_back_overview" %}
-      </a>
-    </div>
-</div>
+  <div class="study-subpage-header">
+    <a class="study-subpage-title" href="{% url 'create_survey' survey_id=survey.id %}">
+      <h3>{{ survey.title }}</h3>
+    </a>
+    <a class="btn btn-outline-primary" href="{% url 'survey' %}">
+      {% trans "global_back_overview" %}
+    </a>
+  </div>
   <div class="col-12">
         {% if audit_history %}
-          <div class="table-responsive">
-	            <table id="survey_audit_table" class="table table-striped table-hover align-middle audit-table"
-                data-search="true"
-                data-pagination="true"
-                data-page-list="[10, 25, 50, 100, all]"
-                data-page-size="25">
-	              <thead class="table-dark">
+          <div class="data-table-filters audit-table-filters">
+            <div class="data-table-filter data-table-filter--search">
+              <label for="audit-filter-search">{% trans "Search" %}</label>
+              <input id="audit-filter-search" class="form-control" type="search" placeholder="{% trans 'Search audit history' %}">
+            </div>
+            <div class="data-table-filter">
+              <label for="audit-filter-actor">{% trans "Actor" %}</label>
+              <select id="audit-filter-actor" class="form-select">
+                <option value="">{% trans "All actors" %}</option>
+              </select>
+            </div>
+            <div class="data-table-filter">
+              <label for="audit-filter-action">{% trans "Action" %}</label>
+              <select id="audit-filter-action" class="form-select">
+                <option value="">{% trans "All actions" %}</option>
+              </select>
+            </div>
+            <button id="audit-filter-clear" type="button" class="btn btn-outline-secondary">{% trans "Clear filters" %}</button>
+          </div>
+          <div class="table-responsive survey-question-table-shell jdash-data-table-shell">
+	            <table id="survey_audit_table" class="table table-striped align-middle audit-table w-100">
+	              <thead>
 	                <tr>
 	                  <th scope="col">{% trans "Timestamp" %}</th>
-	                  <th scope="col">{% trans "Actor" %}</th>
+	                  <th scope="col" class="audit-actor-column">{% trans "Actor" %}</th>
 	                  <th scope="col">{% trans "Object" %}</th>
-	                  <th scope="col">{% trans "Action" %}</th>
+	                  <th scope="col" class="audit-action-column">{% trans "Action" %}</th>
 	                  <th scope="col">{% trans "Changes" %}</th>
 	                </tr>
 	              </thead>
               <tbody>
                 {% for entry in audit_history %}
                   <tr>
-                    <td>{{ entry.timestamp }}</td>
+                    <td data-order="{{ entry.timestamp|date:'c' }}">{{ entry.timestamp }}</td>
                     <td>{% if entry.actor %}{{ entry.actor }}{% else %}-{% endif %}</td>
                     <td>{{ entry.object_repr }}</td>
                     <td>{{ entry.action_label }}</td>
@@ -107,4 +108,3 @@
 </div>
 
 {% endblock %}
-
