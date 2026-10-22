@@ -1,0 +1,44 @@
+{% load i18n %}
+<aside class="dashboard-sidebar" id="dashboardSidebar" aria-label="{% trans 'Main navigation' %}">
+  <div class="dashboard-sidebar-header">
+    <span class="dashboard-sidebar-title">JDash</span>
+    <button type="button" class="dashboard-sidebar-collapse" id="dashboardSidebarCollapse" aria-label="{% trans 'Collapse navigation' %}" aria-expanded="true">
+      <i class="fas fa-chevron-left" aria-hidden="true"></i>
+    </button>
+  </div>
+
+  <nav class="dashboard-sidebar-nav">
+    <a class="dashboard-sidebar-link{% if request.resolver_match.url_name == 'home' or request.resolver_match.url_name == 'add_study' or request.resolver_match.url_name == 'edit_study' or request.resolver_match.url_name == 'details' or request.resolver_match.url_name == 'qc_study' or request.resolver_match.url_name == 'study_audit' or request.resolver_match.url_name == 'study_json_versions' or request.resolver_match.url_name == 'download_study_json_version' %} active{% endif %}" href="{% url 'home' %}" title="{% trans 'index_tab1' %}">
+      <i class="fas fa-flask" aria-hidden="true"></i>
+      <span>{% trans "index_tab1" %}</span>
+    </a>
+    <a class="dashboard-sidebar-link{% if request.resolver_match.url_name == 'survey' or 'survey' in request.resolver_match.url_name or 'question' in request.resolver_match.url_name or 'categories' in request.resolver_match.url_name %} active{% endif %}" href="{% url 'survey' %}" title="{% trans 'index_tab2' %}">
+      <i class="fas fa-clipboard-list" aria-hidden="true"></i>
+      <span>{% trans "index_tab2" %}</span>
+    </a>
+    <a class="dashboard-sidebar-link{% if request.resolver_match.url_name == 'analytics' %} active{% endif %}" href="{% url 'analytics' study_name='all' %}" title="{% trans 'index_tab3' %}">
+      <i class="fas fa-chart-line" aria-hidden="true"></i>
+      <span>{% trans "index_tab3" %}</span>
+    </a>
+  </nav>
+
+  <div class="dashboard-sidebar-footer">
+    <details class="dashboard-sidebar-settings"{% if request.resolver_match.url_name == 'profile' and active_tab == 'profile' or request.resolver_match.url_name == 'profile' and active_tab == 'settings' and not request.GET.study %} open{% endif %}>
+      <summary class="dashboard-sidebar-link{% if request.resolver_match.url_name == 'profile' %} active{% endif %}" title="{% trans 'Profile' %}">
+        <i class="fas fa-user-cog" aria-hidden="true"></i>
+        <span>{% trans "Profile" %}</span>
+        <i class="fas fa-chevron-down dashboard-sidebar-submenu-icon" aria-hidden="true"></i>
+      </summary>
+      <div class="dashboard-sidebar-submenu">
+        <a class="dashboard-sidebar-sublink{% if active_tab == 'profile' %} active{% endif %}" href="{% url 'profile' %}?tab=profile">
+          <i class="fas fa-user" aria-hidden="true"></i>
+          <span>{% trans "Profile" %}</span>
+        </a>
+        <a class="dashboard-sidebar-sublink{% if active_tab == 'settings' %} active{% endif %}" href="{% url 'profile' %}?tab=settings">
+          <i class="fas fa-users-cog" aria-hidden="true"></i>
+          <span>{% trans "Study access" %}</span>
+        </a>
+      </div>
+    </details>
+  </div>
+</aside>

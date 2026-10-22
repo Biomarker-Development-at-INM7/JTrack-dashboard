@@ -131,13 +131,6 @@
           <img class="login-bb-logo" src="{% static 'icons/bb-icon.png' %}" alt="{% trans 'branding_bb_alt' %}">
         </a>
       </div>
-      {% if messages %}
-      <ul class="messages">
-        {% for message in messages %}
-        <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
-        {% endfor %}
-      </ul>
-      {% endif %}
       <form action="{% url 'login' %}" method="post">
         {% csrf_token %}
         <div class="mb-4">
@@ -171,26 +164,32 @@
     </aside>
   </div>
 </main>
+{% endblock %}
 
+{% block partners %}
 {% get_partner_logo_paths as partner_logo_paths %}
 <section class="branding-partners" aria-label="{% trans 'branding_partners_aria_label' %}">
-  <h2 class="branding-partners-title">{% trans "branding_partners_aria_label" %}</h2>
+  <h2 class="branding-partners-title">{% trans "branding_partners_title" %}</h2>
   <div class="branding-partners-inner">
-    <div class="footer-partners-track">
-      {% for logo_path in partner_logo_paths %}
-      <span class="branding-partner-logo">
-        <img src="{% static logo_path %}" alt="{{ logo_path|cut:'icons/partners/'|cut:'.png'|cut:'.jpg'|cut:'.jpeg'|cut:'.svg'|cut:'.webp' }}">
-      </span>
-      {% endfor %}
-      {% for logo_path in partner_logo_paths %}
-      <span class="branding-partner-logo" aria-hidden="true">
-        <img src="{% static logo_path %}" alt="">
-      </span>
-      {% endfor %}
+    <div class="branding-partners-rows" id="partnerMarquee">
+      <div class="footer-partners-track">
+        {% for logo_path in partner_logo_paths %}
+        <span class="branding-partner-logo">
+          <img src="{% static logo_path %}" alt="{{ logo_path|cut:'icons/partners/'|cut:'.png'|cut:'.jpg'|cut:'.jpeg'|cut:'.svg'|cut:'.webp' }}">
+        </span>
+        {% endfor %}
+        {% for logo_path in partner_logo_paths %}
+        <span class="branding-partner-logo" aria-hidden="true">
+          <img src="{% static logo_path %}" alt="">
+        </span>
+        {% endfor %}
+      </div>
     </div>
   </div>
 </section>
+{% endblock %}
 
+{% block page_scripts %}
 <script>
   (function () {
     const passwordInput = document.getElementById("password");
@@ -211,6 +210,6 @@
       }
     });
   })();
+
 </script>
 {% endblock %}
-

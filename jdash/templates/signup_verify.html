@@ -1,0 +1,40 @@
+{% extends 'login_base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block content %}
+<main class="signup-page-shell">
+  <section class="signup-card" aria-label="{% trans 'Verify your email' %}">
+    <div class="signup-card-logo">
+      <a href="https://www.fz-juelich.de/" target="_blank" rel="noreferrer">
+        <img src="{% static 'icons/fz-icon.png' %}" alt="{% trans 'branding_fz_juelich_alt' %}">
+      </a>
+      <a href="https://www.fz-juelich.de/" target="_blank" rel="noreferrer">
+        <img class="signup-bb-logo" src="{% static 'icons/bb-icon.png' %}" alt="{% trans 'branding_bb_alt' %}">
+      </a>
+    </div>
+
+    <h1 class="signup-verification-title">{% trans "Verify your email" %}</h1>
+    <p class="signup-verification-copy">
+      {% blocktrans with email=email %}Enter the six-digit code sent to {{ email }} to complete your registration.{% endblocktrans %}
+    </p>
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <div class="signup-form-field">
+        <label class="form-label" for="{{ form.code.id_for_label }}">{{ form.code.label }}</label>
+        {{ form.code }}
+        {% if form.code.errors %}<div class="field-errors" role="alert">{{ form.code.errors }}</div>{% endif %}
+      </div>
+
+      <div class="signup-submit-actions mt-4">
+        <button type="submit" class="btn btn-primary">{% trans "Verify email" %}</button>
+        <button type="submit" name="resend_code" value="1" class="btn btn-outline-primary">{% trans "Send a new code" %}</button>
+      </div>
+      <p class="signup-login-link mb-0">
+        <a href="{% url 'signup' %}">{% trans "Start over" %}</a>
+      </p>
+    </form>
+  </section>
+</main>
+{% endblock %}

@@ -12,10 +12,13 @@ def request_study_csv_refresh(
     poll_interval_seconds: float = 0.25,
 ) -> bool:
     """
-    Ensure that the dashboard CSV for a study is reasonably current.
+    Request a dashboard CSV refresh without blocking the page request.
 
-    Returns True when the CSV is ready. Returns False when generation timed
-    out but an older CSV remains available.
+    Returns True when the existing CSV is recent enough. Returns False after
+    ensuring that a background refresh marker exists. ``timeout_seconds`` and
+    ``poll_interval_seconds`` remain in the signature for caller compatibility
+    but are intentionally unused: the details page must render immediately
+    from the latest available CSV.
     """
     if not study_id or Path(study_id).name != study_id:
         raise ValueError("Invalid study ID")
@@ -52,25 +55,4 @@ def request_study_csv_refresh(
         # Another request is already waiting for the same study.
         pass
 
-    deadline = time.monotonic() + timeout_seconds
-
-    while request_path.exists() and time.monotonic() < deadline:
-        time.sleep(poll_interval_seconds)
-
-    if request_path.exists():
-        # The worker timed out. An existing CSV can still be displayed.
-        if csv_path.is_file():
-            return False
-
-        raise TimeoutError(
-            f"CSV generation for {study_id} did not finish within "
-            f"{timeout_seconds} seconds"
-        )
-
-    if not csv_path.is_file():
-        raise FileNotFoundError(
-            f"CSV worker completed without creating {csv_path}"
-        )
-
-    return True
-
+    return False

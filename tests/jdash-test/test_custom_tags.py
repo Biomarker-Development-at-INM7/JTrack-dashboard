@@ -196,6 +196,31 @@ def test_get_study_sensor_summary_marks_active_wearable_sensor(monkeypatch, acti
     assert "Garmin-step" in result
 
 
+@pytest.mark.parametrize(
+    "sensor_list,expected",
+    [
+        ([], False),
+        ([constants.ema], False),
+        ([constants.field_name_labeling], False),
+        ([constants.ema, constants.field_name_labeling], False),
+        (["activity"], True),
+        ([constants.field_name_labeling, "location"], True),
+    ],
+)
+def test_has_passive_sensors_ignores_non_passive_markers(sensor_list, expected):
+    assert custom_tags.has_passive_sensors({"sensor_list": sensor_list}) is expected
+
+
+def test_active_only_study_has_active_badge_but_no_passive_badge():
+    study = {
+        "sensor_list": [constants.field_name_labeling],
+        "sensor_list_limited": ["accelerometer"],
+    }
+
+    assert custom_tags.has_passive_sensors(study) is False
+    assert custom_tags.has_active_labeling(study) is True
+
+
 def test_get_wearable_sensor_display_map_prefixes_device_name(monkeypatch):
     monkeypatch.setattr(
         custom_tags,

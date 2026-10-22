@@ -10,7 +10,6 @@
 <script src="{% static 'js/bootstrap-table.min.js' %}"></script>
 <script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
 <script src="{% static 'js/main.js' %}"></script>
-<script src="{% static 'js/popper.js' %}"></script>
 <style>
   .alt-task-list .task-formset:nth-of-type(odd),
   .alt-device-list .device-block:nth-of-type(odd) {
@@ -27,23 +26,6 @@
 	document.addEventListener('DOMContentLoaded', function() {
 		document.getElementById("id_number_of_subjects").readOnly = true;
 		
-		var selected_list = []
-		var options = document.getElementById('id_sensor_list').options;
-		for (let i = 0; i < options.length; i++) { 
-			if (options[i].selected){
-				selected_list.push(options[i].value)
-			}
-		}
-
-		sensor_list_limited_options = document.getElementById('sensor_list_limited').options
-        for (let i=0;i < selected_list.length ; i++){
-			for (let j = sensor_list_limited_options.length - 1; j >= 0; j--) {
-				if (sensor_list_limited_options[j].value === selected_list[i]) {
-					sensor_list_limited_options.remove(j);
-					break;
-				}
-			}
-		}
 		//document.getElementById('id_0_remove_btn').disabled = true    
 
 		const checkbox = document.getElementById("ecological_form_checkbox");
@@ -57,21 +39,28 @@
 			form.style.display = this.checked ? "block" : "none";
 		});
 
-        const sectionToggles = [
-            {
+	        const sectionToggles = [
+	            {
+	                checkboxId: 'passive_form_checkbox',
+	                sectionId: 'passive_monitoring_form',
+	                shouldEnable: function() {
+	                    const sensors = document.getElementById('id_sensor_list');
+	                    return sensors && sensors.selectedOptions.length > 0;
+	                }
+	            },
+	            {
                 checkboxId: 'task_form_checkbox',
                 sectionId: 'task_formset_body',
                 shouldEnable: function() {
-                    const container = document.getElementById('task_details_form');
-                    if (!container) {
-                        return false;
-                    }
-                    return Array.from(container.querySelectorAll('input, select, textarea')).some(function(field) {
-                        if (field.type === 'hidden') {
-                            return false;
-                        }
-                        return String(field.value || '').trim() !== '';
-                    });
+                    const activeSensors = document.getElementById('sensor_list_limited');
+                    const hasActiveSensors = activeSensors && activeSensors.selectedOptions.length > 0;
+                    const hasTask = Array.from(document.querySelectorAll('#task_details_form input[name$="-task_name"]'))
+                        .some(function(field) {
+                            return String(field.value || '').trim() !== '';
+                        });
+                    // The blank starter form remains loaded, but does not open
+                    // the section until Active Tracking is configured.
+                    return hasActiveSensors || hasTask;
                 }
             },
             {
@@ -88,7 +77,7 @@
             }
         ];
 
-        sectionToggles.forEach(function(toggleConfig) {
+	        sectionToggles.forEach(function(toggleConfig) {
             const checkbox = document.getElementById(toggleConfig.checkboxId);
             const section = document.getElementById(toggleConfig.sectionId);
 
@@ -105,8 +94,18 @@
             };
 
             checkbox.addEventListener('change', syncVisibility);
-            syncVisibility();
-        });
+	            syncVisibility();
+	        });
+
+			if (typeof initializeActiveSensorPicker === 'function') {
+				initializeActiveSensorPicker();
+			}
+			if (typeof initializePassiveSensorPicker === 'function') {
+				initializePassiveSensorPicker();
+			}
+			if (typeof initializeRecordingFrequencyEstimate === 'function') {
+				initializeRecordingFrequencyEstimate();
+			}
 
 	}, false);	
 
@@ -116,9 +115,11 @@
 	<li class="nav-item">
 	  <a class="nav-link active" aria-current="page" href="{%url 'home' %}">{% trans "index_tab1" %}</a>
 	</li>
+	{% if request.user|can_manage_study %}
 	<li class="nav-item">
 	  <a class="nav-link" href="{%url 'survey' %}">{% trans "index_tab2" %}</a>
 	</li>
+	{% endif %}
 	<li class="nav-item">
 	  <a class="nav-link" href="{%url 'analytics' study_name='all' %}">{% trans "index_tab3" %}</a>
 	</li>
@@ -129,31 +130,24 @@
 		
 		
 	</div>
-	<div class="col-xs-12 col-sm-9">
-		{% if messages %}
-		<ul class="messages">
-			{% for message in messages %}
-			<li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
-			{% endfor %}
-		</ul>
-	{% endif %}
-
-		</div>
 </div>
 
-<form action="{%url 'edit_study' study_name=study_name %}" method="POST" enctype="multipart/form-data">
+<form class="study-form-page" action="{%url 'edit_study' study_name=study_name %}" method="POST" enctype="multipart/form-data">
 	{% csrf_token %}
-	<div class="row">
-			<h3 class="mb-3"> {{ study_name }}</h3>
+	<div class="row study-form-layout">
+			<div class="study-form-header">
+				<h3 class="study-form-title mb-0">{{ study_name }}</h3>
+			</div>
 		  <!-- SECTION: Basic info -->
-			<div class="mb-4">
-				<div class="d-flex flex-wrap align-items-center justify-content-end gap-2 mb-3">
-					<div class="form-check form-switch large-switch mb-0">
-						{{ study_form.is_test }}{% trans "study_sel_test" %}
-						<span class="d-inline-block" tabindex="0" data-bs-toggle="tooltip"
-						title="{% trans 'study_test_study_tooltip' %}">	
-							<i class="fa fa-question-circle text-secondary" aria-hidden="true"></i>
-			  			</span>
+			<div class="card study-form-section study-basic-section mb-4">
+				<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+					<h5 class="mb-0">{% trans "General" %}</h5>
+					<div class="d-flex flex-wrap align-items-center justify-content-end gap-3">
+						<small class="text-muted d-block">{% trans "text_help_study_is_test" %}</small>
+						<div class="form-check form-switch large-switch mb-0">
+							{{ study_form.is_test }}
+							<label class="form-check-label" for="test_study">{% trans "study_sel_test" %}</label>
+						</div>
 					</div>
 				</div>
 
@@ -169,69 +163,88 @@
 	
 				
 	
-					<div class="col-12 col-md-4">
-						<div class="form-group">
-						{{ study_form.study_duration }}
-						<label>{% trans "study_duration" %}</label>
-						<small class="text-muted d-block">{% trans "study_days" %}</small>
-						</div>
-					</div>
-	
-					<div class="col-12 col-md-4">
-						<div class="form-group">
-						{{ study_form.number_of_subjects }}
-						<label>{% trans "study_number_of_subjects" %}</label>
-						</div>
-					</div>
-	
-					<div class="col-12 col-md-4">
-						<div class="form-group">
-						{{ study_form.recording_freq }}
-						<label>{% trans "study_recording_frequency" %}</label>
-						</div>
-					</div>
-				
-					<div class="col-12 col-md-4">
+					<div class="col-12 col-md-6">
 						<div class="form-group required">
 						{{ study_form.study_description }}
 						<label>{% trans "study_description" %}</label>
+						<small class="text-muted d-block">{% trans "text_help_study_description" %}</small>
 						</div>
 					</div>
 
-					<div class="col-12 col-md-4">
+					<div class="col-12 col-md-3">
 						<div class="form-group">
-						{{ study_form.sensor_list }}
-						<label>{% trans "study_passive_sensors" %}</label>
-						<small class="text-muted d-block">{% trans "study_multiselect_note" %}</small>
+						{{ study_form.study_duration }}
+						<label>{% trans "study_duration" %}</label>
+						<small class="text-muted d-block">{% trans "text_help_study_duration" %}</small>
 						</div>
 					</div>
 	
-					<div class="col-12 col-md-4">
+					<div class="col-12 col-md-3">
 						<div class="form-group">
-						{{ study_form.sensor_list_limited }}
-						<label>{% trans "study_active_sensors" %}</label>
-						<small class="text-muted d-block">{% trans "study_multiselect_note" %}</small>
-						</div>
+							{{ study_form.number_of_subjects }}
+							<label>{% trans "study_number_of_subjects" %}</label>
+							<small class="text-muted d-block">{% trans "text_help_study_number_of_subjects" %}</small>
+							</div>
 					</div>
 				</div>
 			</div>
 
+			<!-- SECTION: Passive sensors -->
+			<div class="card study-form-section p-3 p-lg-4 mb-4" id="passive_sensor_section">
+			  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+				<div class="d-flex flex-wrap align-items-center gap-3">
+				  <h5 class="mb-0">{% trans "Passive tracking" %}</h5>
+				  <small class="text-muted d-block">{% trans "text_help_study_passive_sensors" %}</small>
+				</div>
+				<div class="form-check form-switch large-switch mb-0">
+				  {{ study_form.passive_checkbox }}
+				  <label class="form-check-label" for="passive_form_checkbox">{% trans "Show passive sensors" %}</label>
+				</div>
+			  </div>
+			  <div id="passive_monitoring_form">
+				<div class="row g-3 wearable-device-layout">
+				  <div class="col-12 col-lg-5 wearable-device-controls">
+					<div class="form-group mb-2">
+					  <div class="d-none">{{ study_form.sensor_list }}</div>
+					  <select id="passive-sensor-picker" class="form-control" multiple size="6"></select>
+					  <label class="text-primary">{% trans "study_passive_sensors" %}</label>
+					  <small class="text-muted d-block">{% trans "study_select_sensors_note" %}</small>
+					</div>
+					<button type="button" id="add-passive-sensors" class="btn btn-success add-selected-sensors-btn">{% trans "study_sensor_add" %}</button>
+				  </div>
+				  <div class="col-12 col-lg-7 wearable-device-table">
+					<div class="table-responsive">
+					  <table class="table table-striped sensor-table mb-0">
+						<thead><tr>
+						  <th>{% trans "study_wearable_sensor" %}</th>
+						  <th style="width:80px;"></th>
+						</tr></thead>
+						<tbody id="passive-sensor-tbody"></tbody>
+					  </table>
+					</div>
+				  </div>
+				</div>
+			  </div>
+			</div>
+
 		  <!-- SECTION: EMA -->
-		  <div class="card p-3 p-lg-4 mb-4">
+		  <div class="card study-form-section study-ema-section p-3 p-lg-4 mb-4">
 			<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-			  <h5 class="mb-0">{% trans "study_sel_ema" %}</h5>
+			  <div class="d-flex flex-wrap align-items-center gap-3">
+				<h5 class="mb-0">{% trans "study_sel_ema" %}</h5>
+				<small class="text-muted d-block">{% trans "study_sel_ema_note" %}</small>
+			  </div>
 			  <div class="form-check form-switch large-switch mb-0">
-				{{ study_form.ema_checkbox }} EMA
-				<span data-bs-toggle="tooltip" data-bs-placement="right" title="{% trans 'study_sel_ema_note' %}">
-				  <i class="fa fa-question-circle text-secondary" aria-hidden="true"></i>
-				</span>
+				{{ study_form.ema_checkbox }}
+				<label class="form-check-label" for="ecological_form_checkbox">EMA</label>
 			  </div>
 			</div>
   
 			<div id="ecological_momentary_form" style="display:none;">
 			  <div class="row g-3">
 				<div class="col-12 col-lg-4">
-				  <div class="form-group required">
+				  <div class="form-group required study-searchable-select-field"
+				    data-search-placeholder="{% trans 'study_filter_surveys' %}">
 					{% if is_file %}
 					<a class="btn btn-primary" href="{% url 'edit_survey' study_name=study_name %}">
 					  {% trans "study_survey_title" %}
@@ -239,40 +252,84 @@
 					{% else %}
 					{{ study_form.survey }}
 					<label>{% trans "study_survey_title" %}</label>
+					<small class="text-muted d-block">{% trans "text_help_study_select_ema" %}</small>
 					{% endif %}
 				  </div>
 				</div>
   
 				<div class="col-12 col-lg-4">
-				  <div class="file-drop-area">
-					<span class="choose-file-button">{% trans "study_upload_ema_json" %}</span>
+				  <div class="file-drop-area study-file-upload-field">
+					<label for="{{ study_form.json_file.id_for_label }}">{% trans "study_upload_ema_json" %}</label>
 					<span class="file-message">{% trans "study_drag_drop_file" %}</span>
 					{{ study_form.json_file }}
 				  </div>
+				  <small class="text-muted d-block mt-1">{% trans "text_help_study_upload_ema_json" %}</small>
 				</div>
   
 				<div class="col-12 col-lg-4">
-				  <div class="file-drop-area">
-					<span class="choose-file-button">{% trans "study_upload_ema_zip" %}</span>
+				  <div class="file-drop-area study-file-upload-field">
+					<label for="{{ study_form.images_zip_file.id_for_label }}">{% trans "study_upload_ema_zip" %}</label>
 					<span class="file-message">{% trans "study_drag_drop_file" %}</span>
 					{{ study_form.images_zip_file }}
 				  </div>
+				  <small class="text-muted d-block mt-1">{% trans "text_help_study_upload_ema_images" %}</small>
 				</div>
 			  </div>
 			</div>
 		  </div>
   
 		  <!-- SECTION: Tasks -->
-		  <div class="card p-3 p-lg-4 mb-4" id="task_formset_container">
+		  <div class="card study-form-section p-3 p-lg-4 mb-4" id="task_formset_container">
 			<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-			  <h5 class="mb-0">{% trans "study_tasks_label" %}</h5>
+			  <div class="d-flex flex-wrap align-items-center gap-3">
+				<h5 class="mb-0">{% trans "Active tracking" %}</h5>
+				<small class="text-muted d-block">{% trans "text_help_study_active_sensors" %}</small>
+			  </div>
 			  <div class="form-check form-switch large-switch mb-0">
 				<input class="form-check-input" type="checkbox" id="task_form_checkbox">
-				<label class="form-check-label" for="task_form_checkbox">{% trans "task_show" %}</label>
+				<label class="form-check-label" for="task_form_checkbox">{% trans "Show active labels" %}</label>
 			  </div>
 			</div>
-			<div id="task_formset_body">
-			<div class="mb-3 d-flex justify-content-end">
+				<div id="task_formset_body">
+			<div class="row g-3 mb-3">
+			  <div class="col-12 col-lg-5">
+				<div class="form-group mb-0">
+				  {{ study_form.recording_freq }}
+				  <label class="text-primary">{% trans "Default Recording Frequency" %}</label>
+				  <small class="text-muted d-block">{% trans "text_help_study_recording_frequency" %}</small>
+				  <small id="recording-frequency-storage-estimate" class="text-info d-block mt-1"></small>
+				</div>
+			  </div>
+			</div>
+				<div class="row g-3 wearable-device-layout mb-3">
+				  <div class="col-12 col-lg-5 wearable-device-controls">
+					<div class="form-group mb-2">
+					  <div class="d-none">{{ study_form.sensor_list_limited }}</div>
+					  <select id="active-sensor-picker" class="form-control" multiple size="6"></select>
+					  <label class="text-primary">{% trans "study_active_sensors" %}</label>
+					  <small class="text-muted d-block">{% trans "study_select_sensors_note" %}</small>
+					</div>
+					<button type="button" id="add-active-sensors" class="btn btn-success add-selected-sensors-btn">
+					  {% trans "study_sensor_add" %}
+					</button>
+				  </div>
+				  <div class="col-12 col-lg-7 wearable-device-table">
+					<div class="table-responsive">
+					  <table class="table table-striped sensor-table mb-0">
+						<thead><tr>
+						  <th>{% trans "study_wearable_sensor" %}</th>
+						  <th style="width:80px;"></th>
+						</tr></thead>
+						<tbody id="active-sensor-tbody"></tbody>
+					  </table>
+					</div>
+				  </div>
+				</div>
+			<div class="mb-3 d-flex align-items-center justify-content-between gap-2">
+			  <div class="d-flex flex-wrap align-items-center gap-3">
+				<h5 class="study-task-list-title mb-0">{% trans "study_tasks_label" %}</h5>
+				<small class="text-muted d-block">{% trans "text_help_study_tasks" %}</small>
+			  </div>
 			  <button id="add-task" type="button" class="btn btn-secondary"
 					  onclick="add_task_form(this.id)">{% trans "study_add_task" %}</button>
 			</div>
@@ -286,14 +343,15 @@
 					<div class="form-group">
 					  {{ task_form.task_name }}
 					  <label>{% trans "study_task_name" %}</label>
+					  <small class="text-muted d-block">{% trans "text_help_study_task_title" %}</small>
 					</div>
 				  </div>
-  
+
 				  <div class="col-12 col-md-6 col-lg-3">
 					<div class="form-group">
 					  {{ task_form.task_duration }}
 					  <label>{% trans "study_task_duration" %}</label>
-					  <small class="text-muted d-block">{% trans "study_seconds" %}</small>
+					  <small class="text-muted d-block">{% trans "text_help_study_task_duration" %}</small>
 					</div>
 				  </div>
   
@@ -301,7 +359,7 @@
 					<div class="form-group">
 					  {{ task_form.task_preparation }}
 					  <label>{% trans "study_task_preparation" %}</label>
-					  <small class="text-muted d-block">{% trans "study_seconds" %}</small>
+					  <small class="text-muted d-block">{% trans "text_help_study_task_preparation" %}</small>
 					</div>
 				  </div>
   
@@ -317,6 +375,7 @@
 					<div class="form-group">
 					  {{ task_form.task_description }}
 					  <label>{% trans "study_task_description" %}</label>
+					  <small class="text-muted d-block">{% trans "text_help_study_task_description" %}</small>
 					</div>
 				  </div>
   
@@ -324,6 +383,7 @@
 					<div class="form-group">
 					  {{ task_form.task_preparation_text }}
 					  <label>{% trans "study_task_preparation_description" %}</label>
+					  <small class="text-muted d-block">{% trans "text_help_study_task_preparation_description" %}</small>
 					</div>
 				  </div>
 				</div>
@@ -333,9 +393,12 @@
 		  </div>
 		</div>
 		  <!-- SECTION: Wearable devices -->
-		  <div class="card p-3 p-lg-4 mb-4" id="wbdevice_details_form">
+		  <div class="card study-form-section p-3 p-lg-4 mb-4" id="wbdevice_details_form">
 			<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-			  <h5 class="mb-0">{% trans "study_wearable_devices_label" %}</h5>
+			  <div class="d-flex flex-wrap align-items-center gap-3">
+				<h5 class="mb-0">{% trans "study_wearable_devices_label" %}</h5>
+				<small class="text-muted d-block">{% trans "text_help_study_wearables" %}</small>
+			  </div>
 			  <div class="form-check form-switch large-switch mb-0">
 				<input class="form-check-input" type="checkbox" id="wearable_form_checkbox">
 				<label class="form-check-label" for="wearable_form_checkbox">{% trans "wearable_show" %}</label>
@@ -362,36 +425,34 @@
 					 data-device-prefix="{{ wbdevice_formset.prefix }}"
 					 data-sensor-prefix="{{ sf.prefix }}">
   
-				  <div class="row g-3 ">
-					
-					<div class="d-flex align-items-center  gap-3">
+				  <div class="row g-3 wearable-device-layout">
+					{{ sf.management_form }}
 
-						<div class="form-group flex-grow-1  mb-0">
-							{{ dform.device }}
-							<label class="text-primary">{% trans "study_wearable_device_name" %}</label>
-							
+					<div class="col-12 col-lg-5 wearable-device-controls">
+					  <div class="d-flex align-items-center gap-3 mb-3">
+						<div class="form-group flex-grow-1 mb-0">
+						  {{ dform.device }}
+						  <label class="text-primary">{% trans "study_wearable_device_name" %}</label>
+						  <small class="text-muted d-block">{% trans "text_help_study_wearable_device" %}</small>
 						</div>
-							<a type="button" class="btn btn-outline-danger btn-sm remove-device-bt " {% if forloop.counter0 == 0 %}style="display:none;"{% endif %}>
-								<i class="fa fa-trash fa-lg"></i>
-							  </a>
+						<a type="button" class="btn btn-outline-danger btn-sm remove-device-bt"
+						   {% if forloop.counter0 == 0 %}style="display:none;"{% endif %}>
+						  <i class="fa fa-trash fa-lg"></i>
+						</a>
+					  </div>
+
+					  <div class="form-group mb-2">
+						<select class="form-control sensor-multi" multiple size="6"></select>
+						<label class="text-primary">{% trans "study_wearable_device_sensors" %}</label>
+						<small class="text-muted d-block">{% trans "study_select_sensors_note" %}</small>
+					  </div>
+
+					  <button type="button" class="btn btn-success add-selected-sensors-btn">
+						{% trans "study_sensor_add" %}
+					  </button>
 					</div>
-						{{ sf.management_form }}
-  
-						<div class="col-12 col-lg-5">
-							<div class="form-group">
-								<select class="form-control sensor-multi" multiple size="6"></select>
-								<label class="text-primary">{% trans "study_wearable_device_sensors" %}</label>
-								<small class="text-muted d-block">{% trans "study_select_sensors_note" %}</small>
-							</div>
-						</div>
-  
-						<div class="col-12 col-lg-2 d-flex align-items-start pt-lg-4">
-							<button type="button" class="btn btn-success add-selected-sensors-btn ">
-								{% trans "study_sensor_add" %}
-							</button>
-						</div>
-					
-					<div class="col-12 col-lg-5">
+
+					<div class="col-12 col-lg-7 wearable-device-table">
 					  <div class="table-responsive">
 						<table class="table table-striped sensor-table mb-0">
 						  <thead>
@@ -411,7 +472,7 @@
 									<input
 										type="text"
 										class="form-control"
-                                        value="{% if f.instance.pk %}{{ f.instance.device_sensor.sensor.label|lower }}{% endif %}"
+										value="{% if f.instance.pk %}{{ f.instance.device_sensor.sensor.label|lower }}{% endif %}"
 										readonly
 									>
 								</td>
@@ -437,8 +498,13 @@
             </div>
 		  </div>
   
-		  <div class="">
-			<input name="update_study" type="submit" value="{% trans 'study_update_button' %}" class="btn btn-primary btn-block mb-8" />
+		  <div class="study-form-actions">
+			<button type="button"
+					class="btn btn-outline-secondary"
+					onclick="if (window.history.length > 1) { window.history.back(); } else { window.location.href='{% url 'home' %}'; }">
+			  {% trans "common_cancel" %}
+			</button>
+			<input name="update_study" type="submit" value="{% trans 'study_update_button' %}" class="btn btn-primary" />
 		  </div>
   
 
@@ -449,4 +515,3 @@
 
 
 {% endblock %}		 
-

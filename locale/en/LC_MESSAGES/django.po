@@ -338,6 +338,9 @@ msgstr "Biomarker Development Group, INM-7"
 msgid "index_add"
 msgstr "Add Study"
 
+msgid "index_viewer_create_study_access_info"
+msgstr "You do not have access to create studies."
+
 #: jdash/templates/index.html:66
 
 msgid "index_overview1"
@@ -590,6 +593,9 @@ msgstr "Please hold the Ctrl or Cmd key for multi-selection"
 msgid "study_create_button"
 msgstr "Create study"
 
+msgid "study_create_intro"
+msgstr "Set up the study structure and data-collection plan. Define its duration and subject capacity, select passive sensors and wearable devices, configure tasks, and optionally link an EMA survey before creating the study."
+
 #: jdash/templates/study/create_study.html:111 jdash/templates/study/details.html:275 jdash/templates/study/edit_study.html:112
 
 msgid "study_days"
@@ -615,10 +621,61 @@ msgstr "App"
 msgid "study_details_close"
 msgstr "Cancel"
 
+msgid "common_cancel"
+msgstr "Cancel"
+
+msgid "common_ok"
+msgstr "OK"
+
+msgid "View pending changes"
+msgstr "View pending changes"
+
+msgid "Hide pending changes"
+msgstr "Hide pending changes"
+
+msgid "Loading pending changes..."
+msgstr "Loading pending changes..."
+
+msgid "Full survey will be committed: %(questions)s questions and %(categories)s categories."
+msgstr "Full survey will be committed: %(questions)s questions and %(categories)s categories."
+
+msgid "Survey details updated"
+msgstr "Survey details updated"
+
+msgid "Questions added"
+msgstr "Questions added"
+
+msgid "Questions updated"
+msgstr "Questions updated"
+
+msgid "Questions deleted"
+msgstr "Questions deleted"
+
+msgid "Categories added"
+msgstr "Categories added"
+
+msgid "Categories updated"
+msgstr "Categories updated"
+
+msgid "Categories deleted"
+msgstr "Categories deleted"
+
+msgid "Question order changed"
+msgstr "Question order changed"
+
+msgid "No content differences found"
+msgstr "No content differences found"
+
+msgid "Linked study not found"
+msgstr "Linked study not found"
+
+msgid "The pending changes could not be loaded."
+msgstr "The pending changes could not be loaded."
+
 #: jdash/templates/study/details.html:206 jdash/templates/study/details.html:392 jdash/templates/study/details.html:395
 
 msgid "study_details_close_study"
-msgstr "Close Study"
+msgstr "Conclude study"
 
 #: jdash/templates/study/details.html:177 jdash/templates/study/details.html:196 jdash/templates/study/details.html:214
 
@@ -628,7 +685,7 @@ msgstr "Confirm"
 #: jdash/templates/study/details.html:210
 
 msgid "study_details_confirm_close_study"
-msgstr "Closing this study will archive the study folder and mark the study as closed. Participants will no longer be active in this study."
+msgstr "Concluding this study will archive the study folder and mark the study as concluded. Subjects will no longer be active in this study."
 
 #: jdash/templates/study/details.html:173
 
@@ -689,6 +746,12 @@ msgstr "Remove selection"
 
 msgid "study_details_clear_all_subjects"
 msgstr "Clear all selected subjects"
+
+msgid "study_filter_surveys"
+msgstr "Search surveys"
+
+msgid "study_filter_studies"
+msgstr "Search studies"
 
 msgid "study_details_create_subject_info"
 msgstr "Use this to add new participants to the study. JDash creates new subject IDs and QR codes for enrollment."
@@ -799,7 +862,7 @@ msgid "study_details_subjects_short"
 msgstr "Subjects"
 
 msgid "study_details_enrolled_short"
-msgstr "Enrolled"
+msgstr "Enrolled subjects"
 
 msgid "study_details_duration_short"
 msgstr "Duration"
@@ -1052,6 +1115,9 @@ msgstr "Investigators"
 msgid "study_details_viewers"
 msgstr "Viewers"
 
+msgid "study_details_viewer_subject_access_info"
+msgstr "You do not have access to add or remove subjects."
+
 msgid "study_details_no_members"
 msgstr "No study members"
 
@@ -1071,7 +1137,7 @@ msgstr "to confirm"
 #: jdash/templates/study/details.html:325
 
 msgid "study_details_total_number_of_subjects"
-msgstr "Total"
+msgstr "Total number of subjects"
 
 msgid "study_details_type_to_confirm"
 msgstr "Please type"
@@ -1108,12 +1174,12 @@ msgstr "Study name"
 #: jdash/templates/study/create_study.html:101 jdash/templates/study/edit_study.html:102
 
 msgid "study_note"
-msgstr "Please do not use spaces or special characters"
+msgstr "Unique study title used throughout the dashboard. Spaces and special characters are not allowed."
 
 #: jdash/templates/study/create_study.html:118 jdash/templates/study/edit_study.html:119
 
 msgid "study_number_of_subjects"
-msgstr "Number of participants"
+msgstr "Number of subjects"
 
 #: jdash/templates/study/create_study.html:139 jdash/templates/study/edit_study.html:140
 
@@ -1138,7 +1204,7 @@ msgstr "Ecological Momentary Assessment (EMA)"
 #: jdash/templates/study/create_study.html:160 jdash/templates/study/edit_study.html:161
 
 msgid "study_sel_ema_note"
-msgstr "This study uses the EMA application, and the assessment and resources should be uploaded during the creation of the study."
+msgstr "EMA questionnaires collect subject responses during the study."
 
 #: jdash/templates/study/create_study.html:88 jdash/templates/study/edit_study.html:89
 
@@ -1148,7 +1214,7 @@ msgstr "Test study"
 #: jdash/templates/study/create_study.html:296 jdash/templates/study/edit_study.html:303
 
 msgid "study_select_sensors_note"
-msgstr "Select sensors and then click Add"
+msgstr "Choose the measurements required by the study protocol, then click Add."
 
 #: jdash/templates/study/edit_study.html:309
 
@@ -1295,12 +1361,12 @@ msgid "survey_list_download_template"
 msgstr "Download Template"
 
 msgid "survey_list_manual_desc"
-msgstr "Select New Survey, then add questions one by one using the question form on the next page."
+msgstr "Create a survey, then add and configure its questions individually from the survey page."
 
 #: jdash/templates/survey/survey_list.html:132
 
 msgid "survey_list_manual_label"
-msgstr "1. Create manually:"
+msgstr "Create manually"
 
 msgid "survey_list_template_desc"
 msgstr "Download the question template, fill in your survey questions, and upload the completed file using the upload option above."
@@ -1308,12 +1374,15 @@ msgstr "Download the question template, fill in your survey questions, and uploa
 #: jdash/templates/survey/survey_list.html:135
 
 msgid "survey_list_template_label"
-msgstr "2. Upload from template:"
+msgstr "Upload from template"
 
 #: jdash/templates/survey/survey_list.html:129
 
 msgid "survey_list_two_ways_title"
-msgstr "Two Ways to Create a Survey"
+msgstr "Two ways to create a survey"
+
+msgid "survey_list_viewer_create_access_info"
+msgstr "You do not have access to create surveys."
 
 #: jdash/templates/survey/survey_list.html:109
 
@@ -1330,13 +1399,13 @@ msgid "text_error_message_to_contact_support"
 msgstr "Oops! Something went wrong. Please try again later or contact support."
 
 msgid "text_help_study_active_sensors"
-msgstr "Sensors used in the study to record actively."
+msgstr "Active tracking combines subject tasks with the sensors recorded while each task is performed."
 
 msgid "text_help_study_description"
-msgstr "Explanations of the study."
+msgstr "Summarize the research objective, subject group, and data-collection protocol for the study team."
 
 msgid "text_help_study_duration"
-msgstr "Number of days the study is conducted."
+msgstr "Expected number of days each subject provides study data."
 
 msgid "text_help_study_ema"
 msgstr "Time in minutes when the answer to the question is reminded (480 = 08:00)."
@@ -1345,37 +1414,49 @@ msgid "text_help_study_frequency"
 msgstr "How many days before the question is repeated (0 = anytime, 1 = every day, etc.)."
 
 msgid "text_help_study_is_test"
-msgstr "If selected, the study is used for testing purposes."
+msgstr "Marks this as a pilot or test study."
 
 msgid "text_help_study_number_of_subjects"
-msgstr "Number of subjects required for the whole study duration."
+msgstr "The total number of subjects expected to enroll."
 
 msgid "text_help_study_passive_sensors"
-msgstr "Sensors used in the study to record passively."
+msgstr "Selected sensor data is collected in the background during each subject's study period."
+
+msgid "text_help_study_recording_frequency"
+msgstr "Default sampling rate for continuously recorded sensors. Higher rates use more battery and storage."
 
 msgid "text_help_study_select_ema"
-msgstr "Selection help for the EMA survey used in the study."
+msgstr "Select the survey to use for EMA questionnaires."
 
 msgid "text_help_study_task_description"
-msgstr "Task description shown to participants."
+msgstr "Explain what subjects are expected to do during this task."
 
 msgid "text_help_study_task_duration"
-msgstr "Task duration in seconds."
+msgstr "Sensor recording duration while the subject performs the task, in seconds."
 
 msgid "text_help_study_task_preparation"
-msgstr "Preparation time before the task starts."
+msgstr "Preparation time before task recording begins, in seconds."
+
+msgid "text_help_study_task_preparation_description"
+msgstr "Provide any setup or safety instructions subjects should follow before starting the task."
 
 msgid "text_help_study_task_title"
-msgstr "Task title shown to participants."
+msgstr "Short, recognizable task name shown to subjects in the app."
 
 msgid "text_help_study_title"
 msgstr "The study name."
 
 msgid "text_help_study_upload_ema_images"
-msgstr "Upload a ZIP file containing images used by the EMA survey."
+msgstr "Optional ZIP file containing images referenced by the uploaded questionnaire JSON."
 
 msgid "text_help_study_upload_ema_json"
-msgstr "Upload a JSON file containing the EMA survey definition."
+msgstr "Questionnaire JSON file used instead of selecting an existing survey."
+
+msgid "text_help_study_wearable_device"
+msgstr "Select the wearable model subjects will use, then configure the measurements collected from it."
+
+msgid "text_help_study_wearables"
+msgstr "Wearable tracking collects data from a watch, band, or other connected device included in the study protocol."
 
 msgid "text_help_survey_category_activate_question"
 msgstr "Enter list of questions to activate. Example entries: [1] or [2, 3]."
@@ -1527,6 +1608,12 @@ msgstr "Filter subject-id:"
 
 msgid "Filter subjects"
 msgstr "Filter subjects"
+
+msgid "Include"
+msgstr "Include"
+
+msgid "Exclude"
+msgstr "Exclude"
 
 msgid "Graph"
 msgstr "Graph"
@@ -1906,7 +1993,7 @@ msgstr "This will save your question changes."
 #: jdash/templates/survey/create_question.html:29
 #: jdash/templates/survey/edit_question.html:52
 msgid "question_save_changes_commit_notice_linked_study"
-msgstr "Participants will not see these changes until you click Commit on the survey overview."
+msgstr "Subjects will not see these changes until you click Commit on the survey overview."
 
 #: jdash/templates/survey/create_question.html:32
 #: jdash/templates/survey/edit_question.html:55
@@ -1952,6 +2039,12 @@ msgstr "Current"
 msgid "create_survey_commit_study_needs_update"
 msgstr "Needs update"
 
+msgid "create_survey_commit_study_never_committed"
+msgstr "Never committed"
+
+msgid "create_survey_commit_failed_studies_label"
+msgstr "Could not commit to:"
+
 msgid "create_survey_commit_loading_message"
 msgstr "Commiting survey..."
 
@@ -1975,7 +2068,7 @@ msgstr "Survey commited to %(count)s linked studies: %(study_names)s."
 
 #: jdash/views/survey_views.py:196
 msgid "create_survey_commit_partial_failure"
-msgstr "Some linked studies could not be commited. Please check the server log."
+msgstr "Survey committed to the successful studies. Could not commit to: %(study_names)s."
 
 #: jdash/views/survey_views.py:202
 msgid "create_survey_commit_no_linked_study"
@@ -1985,7 +2078,7 @@ msgid "create_survey_commit_no_study_selected"
 msgstr "Please select at least one linked study to commit."
 
 msgid "create_survey_commit_failed"
-msgstr "The selected studies could not be commited. Please check the server log."
+msgstr "The survey could not be committed to: %(study_names)s."
 
 #: jdash/views/survey_views.py:733
 msgid "survey_commited_versioned_backup_created"
@@ -2477,3 +2570,383 @@ msgstr "subjects active on only one of their latest seven study days"
 
 msgid "subjects with no recorded EMA activity"
 msgstr "subjects with no recorded EMA activity"
+msgid "Test"
+msgstr "Test"
+
+msgid "General"
+msgstr "General"
+
+msgid "Recording duration per subject"
+msgstr "Recording duration per subject"
+
+msgid "Sensors Recorded"
+msgstr "Sensors Recorded"
+
+msgid "Recorded Subject-days"
+msgstr "Recorded Subject-days"
+
+msgid "Total Records"
+msgstr "Total Records"
+
+msgid "participants with at least one recorded sensor value"
+msgstr "participants with at least one recorded sensor value"
+
+msgid "sensors with recorded data across the study"
+msgstr "sensors with recorded data across the study"
+
+msgid "participant-days containing sensor data"
+msgstr "participant-days containing sensor data"
+
+msgid "sensor records collected across the study"
+msgstr "sensor records collected across the study"
+
+msgid "Overall Completion"
+msgstr "Overall Completion"
+
+msgid "participants with at least one EMA response"
+msgstr "participants with at least one EMA response"
+
+msgid "EMA responses collected across the study"
+msgstr "EMA responses collected across the study"
+
+msgid "participant-days containing EMA responses"
+msgstr "participant-days containing EMA responses"
+
+msgid "average questionnaire completion across participants"
+msgstr "average questionnaire completion across participants"
+
+#: jdash/templates/profile.html
+msgid "Profile"
+msgstr "Profile"
+
+msgid "Email"
+msgstr "Email"
+
+msgid "Role"
+msgstr "Role"
+
+msgid "Change password"
+msgstr "Change password"
+
+msgid "Current password"
+msgstr "Current password"
+
+msgid "New password"
+msgstr "New password"
+
+msgid "Confirm new password"
+msgstr "Confirm new password"
+
+msgid "Cancel"
+msgstr "Cancel"
+
+msgid "Study access"
+msgstr "Study access"
+
+msgid "Add registered users to a study and assign their study-specific role."
+msgstr "Add registered users to a study and assign their study-specific role."
+
+msgid "Study"
+msgstr "Study"
+
+msgid "Registered user"
+msgstr "Registered user"
+
+msgid "Search by username"
+msgstr "Search by username"
+
+msgid "Add user"
+msgstr "Add user"
+
+msgid "members"
+msgstr "members"
+
+msgid "User"
+msgstr "User"
+
+msgid "Study role"
+msgstr "Study role"
+
+msgid "Actions"
+msgstr "Actions"
+
+msgid "Owner"
+msgstr "Owner"
+
+msgid "Update"
+msgstr "Update"
+
+msgid "Remove"
+msgstr "Remove"
+
+msgid "No members are assigned to this study."
+msgstr "No members are assigned to this study."
+
+msgid "You do not maintain any studies yet."
+msgstr "You do not maintain any studies yet."
+
+msgid "Enter your current password, then choose a new password."
+msgstr "Enter your current password, then choose a new password."
+
+msgid "First name"
+msgstr "First name"
+
+msgid "Last name"
+msgstr "Last name"
+
+msgid "profile_study_role_permissions"
+msgstr "Study role permissions"
+
+msgid "profile_role_principal_investigator"
+msgstr "Principal Investigator"
+
+msgid "profile_role_principal_investigator_info"
+msgstr "Can manage the study configuration, surveys, subjects, data, notifications, and access for investigators and viewers."
+
+msgid "profile_role_investigator"
+msgstr "Investigator"
+
+msgid "profile_role_investigator_info"
+msgstr "Can manage the study configuration, surveys, subjects, data, and notifications."
+
+msgid "profile_role_viewer"
+msgstr "Viewer"
+
+msgid "profile_role_viewer_info"
+msgstr "Can view study information, analytics, audit history, and available downloads without making changes."
+msgid "contact_page_eyebrow"
+msgstr "Contact the JDash team"
+
+msgid "contact_page_heading"
+msgstr "Let's build better digital health research together."
+
+msgid "contact_page_lead"
+msgstr "Bring us your research question, study idea, or collaboration proposal. Together, we can explore how JDash can support meaningful digital health research."
+
+msgid "contact_page_form_title"
+msgstr "What would you like to explore?"
+
+msgid "contact_page_form_text"
+msgstr "Tell us about your research, your team, and where you see an opportunity to work together."
+
+msgid "contact_page_name"
+msgstr "Full name"
+
+msgid "contact_page_email"
+msgstr "Email"
+
+msgid "contact_page_message"
+msgstr "Message"
+
+msgid "contact_form_name_placeholder"
+msgstr "Your name"
+
+msgid "contact_form_email_placeholder"
+msgstr "you@example.org"
+
+msgid "contact_form_message_placeholder"
+msgstr "Tell us about your study or question"
+msgid "study_title_checking"
+msgstr "Checking study title…"
+
+msgid "study_title_available"
+msgstr "Study name is available."
+
+msgid "study_title_exists"
+msgstr "Study already exists. Choose another name."
+
+msgid "study_title_check_error"
+msgstr "The study title could not be checked."
+msgid "text_help_study_tasks"
+msgstr "Activities completed by subjects in the app."
+
+msgid "Verification code"
+msgstr "Verification code"
+
+msgid "Enter the six-digit code from your email."
+msgstr "Enter the six-digit code from your email."
+
+msgid "Six-digit code"
+msgstr "Six-digit code"
+
+msgid "Verify your JDASH email address"
+msgstr "Verify your JDASH email address"
+
+msgid "An email verification is already pending for this email address."
+msgstr "An email verification is already pending for this email address."
+
+msgid "An email verification is already pending for this username."
+msgstr "An email verification is already pending for this username."
+
+msgid "We could not send the verification code. Please try again."
+msgstr "We could not send the verification code. Please try again."
+
+msgid "Please wait a minute before requesting another verification code."
+msgstr "Please wait a minute before requesting another verification code."
+
+msgid "Start registration to receive an email verification code."
+msgstr "Start registration to receive an email verification code."
+
+msgid "A new verification code has been sent."
+msgstr "A new verification code has been sent."
+
+msgid "This verification code has expired. Please register again."
+msgstr "This verification code has expired. Please register again."
+
+msgid "Too many incorrect codes. Please register again."
+msgstr "Too many incorrect codes. Please register again."
+
+msgid "The verification code is incorrect."
+msgstr "The verification code is incorrect."
+
+msgid "An account with these details already exists. Please log in."
+msgstr "An account with these details already exists. Please log in."
+
+msgid "Your email has been verified. You can now log in."
+msgstr "Your email has been verified. You can now log in."
+
+msgid "viewer_access_guidance_title"
+msgstr "Registered User"
+
+msgid "viewer_access_guidance_copy"
+msgstr "Your account cannot create studies or surveys yet. To request Researcher access or access to an existing study, write to:"
+
+msgid "To create studies, write to Biomarker to request Researcher access:"
+msgstr "To create studies, write to Biomarker to request Researcher access:"
+
+msgid "No studies are available for analytics yet."
+msgstr "No studies are available for analytics yet."
+
+msgid "Account type"
+msgstr "Account type"
+
+msgid "Manage account types"
+msgstr "Manage account types"
+
+msgid "Promote Registered Users to Researchers so they can create studies and surveys."
+msgstr "Promote Registered Users to Researchers so they can create studies and surveys."
+
+msgid "Search users"
+msgstr "Search users"
+
+msgid "Search by username, name, or email"
+msgstr "Search by username, name, or email"
+
+msgid "Search"
+msgstr "Search"
+
+msgid "Name"
+msgstr "Name"
+
+msgid "Promote to Researcher"
+msgstr "Promote to Researcher"
+
+msgid "No Registered Users are waiting for an upgrade."
+msgstr "No Registered Users are waiting for an upgrade."
+
+msgid "Only Administrators can manage account types."
+msgstr "Only Administrators can manage account types."
+
+#, python-format
+msgid "%(username)s is now a Researcher."
+msgstr "%(username)s is now a Researcher."
+
+msgid "The selected user does not exist."
+msgstr "The selected user does not exist."
+
+msgid "Administrator accounts cannot be changed here."
+msgstr "Administrator accounts cannot be changed here."
+
+msgid "This account is already a Researcher."
+msgstr "This account is already a Researcher."
+
+msgid "Only Registered Users can be promoted to Researcher."
+msgstr "Only Registered Users can be promoted to Researcher."
+
+msgid "Send verification code"
+msgstr "Send verification code"
+
+msgid "Verify your email"
+msgstr "Verify your email"
+
+#, python-format
+msgid "Enter the six-digit code sent to %(email)s to complete your registration."
+msgstr "Enter the six-digit code sent to %(email)s to complete your registration."
+
+msgid "Verify email"
+msgstr "Verify email"
+
+msgid "Send a new code"
+msgstr "Send a new code"
+
+msgid "Start over"
+msgstr "Start over"
+
+msgid "Audit history"
+msgstr "Audit history"
+
+msgid "JSON versions"
+msgstr "JSON versions"
+
+msgid "Version"
+msgstr "Version"
+
+msgid "Saved at"
+msgstr "Saved at"
+
+msgid "Snapshot"
+msgstr "Snapshot"
+
+msgid "Size"
+msgstr "Size"
+
+msgid "Current"
+msgstr "Current"
+
+msgid "No JSON versions available."
+msgstr "No JSON versions available."
+
+msgid "Details"
+msgstr "Details"
+
+msgid "Loading version differences..."
+msgstr "Loading version differences..."
+
+msgid "Unable to load version differences."
+msgstr "Unable to load version differences."
+
+msgid "No differences from the previous version."
+msgstr "No differences from the previous version."
+
+msgid "This is the oldest available version."
+msgstr "This is the oldest available version."
+
+msgid "Not present"
+msgstr "Not present"
+
+msgid "Added"
+msgstr "Added"
+
+msgid "Removed"
+msgstr "Removed"
+
+msgid "Changed"
+msgstr "Changed"
+
+msgid "Changes from previous version"
+msgstr "Changes from previous version"
+
+msgid "Close"
+msgstr "Close"
+
+msgid "Field"
+msgstr "Field"
+
+msgid "Change"
+msgstr "Change"
+
+msgid "Previous"
+msgstr "Previous"
+
+msgid "Selected version"
+msgstr "Selected version"

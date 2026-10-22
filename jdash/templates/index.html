@@ -6,12 +6,11 @@
 {% block content %}
 
 <script src="{% static 'js/jquery.min.js' %}"></script>
-<link href="{% static 'css/bootstrap-table.min.css' %}" rel="stylesheet">
+<link href="{% static 'css/dataTables.bootstrap5.min.css' %}" rel="stylesheet">
 <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css">
-<script src="{% static 'js/bootstrap-table.min.js' %}"></script>
-<script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
+<script src="{% static 'js/dataTables.min.js' %}"></script>
+<script src="{% static 'js/dataTables.bootstrap5.min.js' %}"></script>
 <script src="{% static 'js/main.js' %}"></script>
-<script src="{% static 'js/popper.js' %}"></script>
 
 <div class="row mb-4">
 	<ul class="nav nav-tabs">
@@ -26,101 +25,112 @@
 	</li>
   </ul>
 </div> 
-	<div class="row mb-4" >
-		<div  class="col-md-6 col-lg-4">
-            {% if request.user|can_manage_study  %}
+	<div class="index-page-actions mb-4">
+		<div>
+			{% if request.user|can_create_study %}
 			<a id="add" class="btn btn-outline-primary btn-block" role="button" href="{%url 'add_study' %}">
 				{% trans "index_add" %}
 			</a>
 			{% endif %}
-			
 		</div>
-		<div class="col-md-6 col-lg-6">
-			{% if messages %}
-            <ul class="messages">
-                {% for message in messages %}
-                <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
-                {% endfor %}
-            </ul>
-            {% endif %}
-		</div>
-		<div class="col-md-6 col-lg-2 justify-content-end d-flex">
-            <div class="btn-group index-layout-toggle float-right" role="group" aria-label="Study layout">
-				  <button id="grid" type="button" class="btn btn-outline-dark active" aria-pressed="true">
+		{% if study_meta %}
+		<div class="index-layout-actions">
+			<div class="btn-group index-layout-toggle float-right" role="group" aria-label="Study layout">
+				<button id="grid" type="button" class="btn btn-outline-primary active" aria-pressed="true">
 					{% trans "index_view1" %}
-				  </button>
-				  <button id="list" type="button" class="btn btn-outline-dark" aria-pressed="false">
+				</button>
+				<button id="list" type="button" class="btn btn-outline-primary" aria-pressed="false">
 					{% trans "index_view2" %}
-				  </button>
-				</div>
+				</button>
+			</div>
 		</div>
+		{% endif %}
 	</div>
 	
 
-	<div id="index-list" class="row" style="display: none;">
+		<div id="index-list"{% if study_meta %} style="display: none;"{% endif %}>
+			{% if study_meta %}
+			<div class="study-index-filters">
+				<div id="study_count_toolbar" class="survey-table-count-toolbar filter-result-count">
+					<span id="study-visible-count" class="survey-count-badge" data-total="{{ study_meta|length }}">
+						{% blocktrans count study_count=study_meta|length %}{{ study_count }} study{% plural %}{{ study_count }} studies{% endblocktrans %}
+					</span>
+				</div>
+				<div class="study-index-search">
+				<label for="study-list-search">{% trans "Search" %}</label>
+				<input id="study-list-search" class="form-control" type="search" placeholder="{% trans 'Search' %}">
+			</div>
+			<div class="study-index-filter-field">
+					<label for="study-type-filter">Sensor type</label>
+				<select id="study-type-filter" class="form-select">
+					<option value="">All types</option>
+					<option value="ema">EMA</option>
+					<option value="passive">Passive Sensors</option>
+					<option value="wearable">Wearable</option>
+					<option value="Active Sensors">Active Sensors</option>
+				</select>
+			</div>
+			<div class="study-index-filter-field">
+				<label for="study-sort-filter">Sort by</label>
+				<select id="study-sort-filter" class="form-select">
+					<option value="created-desc">Newest first</option>
+					<option value="created-asc">Oldest first</option>
+					<option value="name-asc">Name A–Z</option>
+					<option value="name-desc">Name Z–A</option>
+					<option value="subjects-desc">Most enrolled</option>
+					<option value="subjects-asc">Fewest enrolled</option>
+				</select>
+			</div>
+			<button id="study-filter-clear" type="button" class="btn btn-outline-secondary">
+				{% trans "Clear filters" %}
+			</button>
+			</div>
+			{% endif %}
 
+		<div class="table-responsive survey-question-table-shell study-index-table-shell">
 		<table
-			id="index_table" class="table table-responsive"
-			data-search="true"
-			data-toolbar="#toolbar"
-			data-pagination="true"
-			data-sort-name="created_date"
-			data-sort-order="desc"
-			data-id-field="study_name"
-			data-page-list="[10, 25, 50, 100, all]"
-			data-response-handler="responseHandler">
+			id="index_table" class="table table-striped align-middle w-100"
+			>
 
 			<thead>
 				<tr>
 					<th data-field="study_name" data-sortable="true"> {% trans "index_overview5" %}</th>
-					<th data-field="no_of_subjects" > {% trans "index_overview6" %}</th>
+					<th class="index-enrolled-column" data-field="no_of_subjects">{% trans "index_overview6" %}</th>
 					<th data-field="study_desc"> {% trans "global_desc" %}</th>
 					<th data-field="users">Members</th>
-					<th data-field="created_date" data-sortable="true" data-visible="false">{% trans "index_overview8" %}</th>
+					<th class="index-created-column">{% trans "index_overview8" %}</th>
+					<th class="index-types-column">Study types</th>
 					<th data-field="sensors" >{% trans "index_overview9" %}</th>
-					<th data-events="operateEvents">{% trans "global_act" %}</th>
+					<th class="no-sort">{% trans "global_act" %}</th>
 				</tr>
 			</thead>
 			<tbody>
 				{% for study in study_meta%} 
-				<tr id="tr-{{study.title}}">
-					<td>{{study.title}}</td>
-					{% if study.stats %} 
+				<tr id="tr-{{study.title}}" data-study-key="{{ study.title|escape }}" data-study-types="{% if study|has_ema_sensor %}ema {% endif %}{% if study|has_passive_sensors %}passive {% endif %}{% if study|has_wearable_sensors %}wearable {% endif %}{% if study|has_active_labeling %}active-labeling{% endif %}">
 					<td>
-                        <div class="study-subject-progress-cell" aria-label="Subject enrollment status">
-
+						<div class="study-name-with-badge">
+							<span>{{ study.title }}</span>
+							{% if study.is_test %}
+							<span class="study-test-badge">{% trans "Test" %}</span>
+							{% endif %}
+						</div>
+					</td>
+					{% if study.stats %} 
+					<td data-order="{{ study.enrolled_subjects|default:0 }}">
+						<div class="study-subject-progress-cell" aria-label="Subject enrollment status">
+							
 							<div class="progress study-subject-progress">
-                                <div class="progress-bar
-                                     study-subject-progress-bar
-                                     study-subject-progress-bar--left"
-                                     role="progressbar" style="width:
-                                     {{study.stats.leftstudy_percentage|unlocalize}}% "
-                                     aria-valuenow="{{study.stats.leftstudy}}"
+								<div class="progress-bar study-subject-progress-bar study-subject-progress-bar--left" role="progressbar" style="width: {{study.stats.leftstudy_percentage|unlocalize}}%" aria-valuenow="{{study.stats.leftstudy}}" 
 								aria-label="{{study.stats.leftstudy}} Left study" aria-valuemin="0" aria-valuemax="100"></div>
-								<div class="progress-bar
-                                     study-subject-progress-bar
-                                     study-subject-progress-bar--removed"
-                                     role="progressbar" style="width:
-                                     {{study.stats.removed_percentage|unlocalize}}%"
-                                     aria-valuenow="{{study.stats.removed}}"
+								<div class="progress-bar study-subject-progress-bar study-subject-progress-bar--removed" role="progressbar" style="width: {{study.stats.removed_percentage|unlocalize}}%" aria-valuenow="{{study.stats.removed}}" 
 								aria-label="{{study.stats.removed}} Removed" aria-valuemin="0" aria-valuemax="100"></div>
-								<div class="progress-bar
-                                     study-subject-progress-bar
-                                     study-subject-progress-bar--completed"
-                                     role="progressbar" style="width:
-                                     {{study.stats.completed_percentage|unlocalize}}%"
-                                     aria-valuenow="{{study.stats.completed}}"
+								<div class="progress-bar study-subject-progress-bar study-subject-progress-bar--completed" role="progressbar" style="width: {{study.stats.completed_percentage|unlocalize}}%" aria-valuenow="{{study.stats.completed}}" 
 								aria-label="{{study.stats.completed}} Completed" aria-valuemin="0" aria-valuemax="100"></div>
-								<div class="progress-bar
-                                     study-subject-progress-bar
-                                     study-subject-progress-bar--active"
-                                     role="progressbar" style="width:
-                                     {{study.stats.instudy_percentage|unlocalize}}%"
-                                     aria-valuenow="{{study.stats.instudy}}"
+								<div class="progress-bar study-subject-progress-bar study-subject-progress-bar--active" role="progressbar" style="width: {{study.stats.instudy_percentage|unlocalize}}%" aria-valuenow="{{study.stats.instudy}}" 
 								aria-label="{{study.stats.instudy}} InStudy" aria-valuemin="0" aria-valuemax="100">
 									</div>
-						  	</div>
-                            <div class="study-subject-progress-legend">
+							</div>
+							<div class="study-subject-progress-legend">
 								{% if study.stats.instudy %}
 								<span class="study-subject-progress-legend-item"><span class="study-subject-progress-dot study-subject-progress-dot--active"></span>{{study.stats.instudy}} InStudy</span>
 								{% endif %}
@@ -137,7 +147,7 @@
 						</div>
 					</td>
 					{% else %} 
-					<td>{% trans "index_overview_empty" %}</td>
+					<td data-order="0">{% trans "index_overview_empty" %}</td>
 					{% endif %}
 					<td>{{study.description}}</td>
 					<td>
@@ -152,16 +162,23 @@
 							<span class="badge badge-light text-primary mr-1 member-badge">admin</span>
 						{% endif %}
 					</td>
-					<td>{{study.createdDate}}</td>
-                    <td> {{study | get_study_sensor_summary:study.current_sensor_list |safe }}</td>
+					<td data-order="{{ study.createdDate|date:'c' }}">{{study.createdDate}}</td>
+					<td>{% if study|has_ema_sensor %}EMA {% endif %}{% if study|has_passive_sensors %}Passive Sensors {% endif %}{% if study|has_wearable_sensors %}Wearable {% endif %}{% if study|has_active_labeling %}Active Sensors{% endif %}</td>
+					<td> {{study | get_study_sensor_summary:study.current_sensor_list |safe }}</td>
 					<td><a class="view"  href="{% url 'details' study_name=study.title %}"  >
 						<i class="fa fa-eye fa-lg"></i></a>
-                        {% if request.user|can_manage_study %}
+						
+						{% if request.user|can_manage_study %}
 						<a class="edit" href="{% url 'edit_study' study_name=study.title %}"  >
 							<i class="fa fa-edit fa-lg"></i></a>
                         <a class="test" href="{% url 'qc_study' study_name=study.title %}"  >
 								<i class="fa fa-check-square fa-lg" aria-hidden="true"></i>
 							</a>
+							<a class="history" href="{% url 'study_audit' study_name=study.title %}"
+						   title="{% trans 'global_history' %}"
+						   aria-label="{% trans 'global_history' %}">
+							<i class="fas fa-history fa-lg" aria-hidden="true"></i>
+						</a>
 							{% endif %}
 					</td>
 					
@@ -169,29 +186,27 @@
 				{% endfor %}
 			</tbody>
 		</table>
-	</div>
-    <div id="index-grid" class="row mt-4">
-		<div class="mb-2 d-flex justify-content-end">
-			<input id="study-search"
-         type="search"
-         class="form-control form-control w-auto"
-         placeholder="Search"
-         style="min-width: 200px;">
-		  </div>
-		  <div class="row g-3 mx-0">
+		</div>
+	{% if study_meta %}
+	    <div id="index-grid" class="row">
+		  <div id="study-grid-cards" class="row g-3 mx-0">
 			{% for study in study_meta %}
 			  <div class="col-12 col-md-6 col-lg-4 col-2048-3 study-card"
-				   data-title="{{ study.title|escape }}">
+				   data-title="{{ study.title|escape }}" data-study-key="{{ study.title|escape }}">
 				<div class="wrimagecard wrimagecard-topimage">
 				  <div class="wrimagecard-topimage_header">
 					<h2 class="h4 text-center">{{ study.title }}</h2>
+					{% if study.is_test %}
+					<span class="study-test-badge study-test-badge--card">{% trans "Test" %}</span>
+					{% endif %}
 				  </div>
-				  <div class="wrimagecard-topimage_title h-140">
-					<p>{{ study.description }}</p>
-				  </div>
-                   <div class="study-card-metrics">
+					  <div class="wrimagecard-topimage_title h-140">
+						<p class="study-card-description" title="{{ study.description|default:'' }}">{{ study.description }}</p>
+						
+						  </div>
+							  <div class="study-card-metrics">
 								<span class="study-card-metric">
-								  <strong>{{ study.enrolled_subjects}}</strong>
+								  <strong>{{ study.enrolled_subjects|default:0 }}</strong>
 								  <span>{% trans "index_overview6" %}</span>
 								</span>
 								<span class="study-card-metric">
@@ -200,25 +215,30 @@
 								</span>
 								<span class="study-card-metric">
 								  <strong>{{ study.duration|default:0 }}</strong>
-								  <span>{% trans "recording_duration" %}</span>
+								  <span>{% trans "study_days" %}</span>
 								</span>
 							  </div>
 					  <div class="study-card-tags">
 						{% if study|has_ema_sensor %}
 						<span class="study-card-tag">EMA</span>
 						{% endif %}
+						{% if study|has_passive_sensors %}
+						<span class="study-card-tag">Passive Sensors</span>
+						{% endif %}
 						{% if study|has_wearable_sensors %}
 						<span class="study-card-tag">Wearable</span>
 						{% endif %}
 						{% if study|has_active_labeling %}
-						<span class="study-card-tag">Active labeling</span>
+						<span class="study-card-tag">Active Sensors</span>
 						{% endif %}
 					  </div>
 				  <div class="card-action-bar">
 					<a class="float-lg-none link" href="{% url 'details' study_name=study.title %}">{% trans "global_view" %}</a>
-					{% if request.user|has_group:"Investigator" or request.user|has_group:"administrator" %}
+					
+					{% if request.user|can_manage_study %}
 					<a class="float-lg-none link" href="{% url 'edit_study' study_name=study.title %}">{% trans "global_edit" %}</a>
 					<a class="float-lg-none link" href="{% url 'qc_study' study_name=study.title %}">{% trans "global_qc" %}</a> 
+					<a class="float-lg-none link" href="{% url 'study_audit' study_name=study.title %}">{% trans "global_history" %}</a>
 					{% endif %}
 				  </div>
 				</div>
@@ -227,59 +247,10 @@
 		  </div>
 	<div id="no-results" class="text-muted text-center py-4" style="display:none;">
 		No studies match your search.
-	  </div>
+		  </div>
+		</div>
+	{% endif %}
 	</div>
+	
 
-	<script>
-		(() => {
-		  const input = document.getElementById('study-search');
-		  const count = document.getElementById('study-search-count');
-		  const noResults = document.getElementById('no-results');
-		  const cards = Array.from(document.querySelectorAll('#index-grid .study-card'));
-
-		  // normalize: lower-case + strip accents
-		  const norm = s => (s || '')
-			.toString()
-			.normalize('NFD')
-			.replace(/\p{Diacritic}/gu, '')
-			.toLowerCase()
-			.trim();
-
-		  const items = cards.map(card => ({
-			card,
-			key: norm(card.getAttribute('data-title'))
-		  }));
-
-		  let timer = null;
-		  function applyFilter(q) {
-			const nq = norm(q);
-			let shown = 0;
-
-			items.forEach(({ card, key }) => {
-			  const hit = !nq || key.includes(nq);
-			  card.style.display = hit ? '' : 'none';
-			  if (hit) shown++;
-			});
-
-			noResults.style.display = shown ? 'none' : '';
-			count.textContent = (!nq || shown === cards.length) ? '' : `${shown} of ${cards.length}`;
-		  }
-
-		  input.addEventListener('input', () => {
-			clearTimeout(timer);
-			timer = setTimeout(() => applyFilter(input.value), 120);
-		  });
-
-		  // optional: ESC to clear
-		  input.addEventListener('keydown', (e) => {
-			if (e.key === 'Escape' && input.value) {
-			  input.value = '';
-			  applyFilter('');
-			}
-		  });
-
-		  // init (handles bfcache)
-		  applyFilter(input.value);
-		})();
-	</script>
 {% endblock %}

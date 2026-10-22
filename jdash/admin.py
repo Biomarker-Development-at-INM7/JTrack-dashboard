@@ -19,32 +19,19 @@ from .models import (Study, Subject, Survey,
                      Answer, Category, Question,
                      DeviceCatalog,SensorCatalog,
                      Task,DeviceSensor,
+                     SurveyPublishState,
+                     StudyMembership,
                      StudyDeviceSensor,
                      SamplingRateCatalog,
                      UnitCatalog)
 
 
-ROLE_GROUP_NAMES = (
-    constants.group_name_administrator,
+LEGACY_ROLE_GROUP_NAMES = (
     constants.group_name_investigator,
     constants.group_name_viewer,
 )
 
-ROLE_CHOICES = (
-    (constants.group_name_administrator, "Administrator"),
-    (constants.group_name_investigator, "Investigator"),
-    (constants.group_name_viewer, "Viewer"),
-)
-
-
 class JDashUserChangeForm(UserChangeForm):
-    role = forms.ChoiceField(
-        choices=ROLE_CHOICES,
-        widget=forms.RadioSelect,
-        required=False,
-        help_text="Select exactly one application role. Study access groups are managed separately below.",
-    )
-
     class Meta(UserChangeForm.Meta):
         model = User
         fields = "__all__"
@@ -52,46 +39,16 @@ class JDashUserChangeForm(UserChangeForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if "groups" in self.fields:
-            self.fields["groups"].queryset = Group.objects.exclude(name__in=ROLE_GROUP_NAMES)
-            self.fields["groups"].label = "Study access groups"
+            self.fields["groups"].queryset = Group.objects.exclude(name__in=LEGACY_ROLE_GROUP_NAMES)
+            self.fields["groups"].label = "Global groups"
             self.fields["groups"].help_text = (
-                "Select the study-specific groups this user can access. "
-                "Use the Role field above for Administrator, Investigator, or Viewer."
+                "Only the Administrator group grants dashboard-wide access. "
+                "Assign study roles from the study access page."
             )
-
-        if self.instance and self.instance.pk:
-            role_names = set(self.instance.groups.filter(name__in=ROLE_GROUP_NAMES).values_list("name", flat=True))
-            for role_name, _label in ROLE_CHOICES:
-                if role_name in role_names:
-                    self.fields["role"].initial = role_name
-                    break
 
 
 class JDashUserAdmin(UserAdmin):
     form = JDashUserChangeForm
-
-    fieldsets = []
-    for title, options in UserAdmin.fieldsets:
-        field_names = []
-        for field in options.get("fields", ()):
-            if field == "user_permissions":
-                continue
-            if field == "groups":
-                field_names.extend(("role", "groups"))
-            else:
-                field_names.append(field)
-        fieldsets.append((title, {**options, "fields": tuple(field_names)}))
-    fieldsets = tuple(fieldsets)
-
-    def save_related(self, request, form, formsets, change):
-        super().save_related(request, form, formsets, change)
-        role_name = form.cleaned_data.get("role")
-        if not role_name:
-            return
-        user = form.instance
-        user.groups.remove(*Group.objects.filter(name__in=ROLE_GROUP_NAMES))
-        role_group, _created = Group.objects.get_or_create(name=role_name)
-        user.groups.add(role_group)
 
 
 admin.site.unregister(User)
@@ -183,6 +140,20 @@ class SurveyAdmin(JDashBaseAdmin):
     search_fields = ("id", "title")
     search_help_text = "Search by numeric ID or title (case-insensitive)."
 
+@admin.register(SurveyPublishState)
+class SurveyPublishStateAdmin(JDashBaseAdmin):
+    list_display = (
+        "id",
+        "study",
+        "survey",
+        "has_unpublished_changes",
+        "last_edited_at",
+        "last_published_at",
+    )
+    list_display_links = ("id", "study")
+    search_fields = ("id", "study__title", "survey__title")
+    search_help_text = "Search by numeric ID, study title, or survey title."
+
 class TaskInline(admin.TabularInline):   # or admin.StackedInline
     model = Task
     extra = 1
@@ -202,12 +173,20 @@ class StudDeviceSensorInline(admin.TabularInline):   # or admin.StackedInline
     )
     show_change_link = True
 
+
+class StudyMembershipInline(admin.TabularInline):
+    model = StudyMembership
+    extra = 0
+    fields = ("user", "role", "added_by", "created_at")
+    readonly_fields = ("created_at",)
+
         
 @admin.register(Study)
 class StudyAdmin(JDashBaseAdmin):
-    inlines = [TaskInline, StudDeviceSensorInline]
-    list_display = ("id", "title","owner","closed")
+    inlines = [TaskInline, StudDeviceSensorInline, StudyMembershipInline]
+    list_display = ("id", "title", "owner", "data_collection_completed", "closed")
     list_display_links = ("id", "title")
+    list_filter = ("data_collection_completed", "closed")
     search_fields = ("id", "title")
     search_help_text = "Search by numeric ID or title (case-insensitive)."
 

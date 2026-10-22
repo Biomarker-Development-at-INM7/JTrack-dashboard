@@ -29,19 +29,26 @@ end_point_for_jlytics = "jlytics/"
 # url names for each end point
 url_name_for_home = "home"
 url_name_for_login = "login"
+url_name_for_signup = "signup"
 url_name_for_logout = "logout"
 url_name_for_password_reset = "password_reset"
 url_name_for_password_reset_done = "password_reset_done"
 url_name_for_password_reset_confirm = "password_reset_confirm"
 url_name_for_password_reset_complete = "password_reset_complete"
+url_name_for_profile = "profile"
 url_name_for_contact_email = "contact_email"
 url_name_for_add_study = "add_study"
 url_name_for_edit_study = "edit_study"
 url_name_for_qc_study = "qc_study"
 url_name_for_study_audit = "study_audit"
+url_name_for_study_json_versions = "study_json_versions"
+url_name_for_download_study_json_version = "download_study_json_version"
+url_name_for_study_json_version_diff = "study_json_version_diff"
 url_name_for_survey_audit = "survey_audit"
 url_name_for_details = "details"
 url_name_for_export_study_csv = "export_study_csv"
+url_name_for_export_combined_study_csv = "export_combined_study_csv"
+url_name_for_export_study_wearables_csv = "export_study_wearables_csv"
 url_name_for_create_survey = "create_survey"
 url_name_for_manage_question = "manage_question"
 url_name_for_duplicate_survey = "duplicate_survey"
@@ -65,12 +72,14 @@ url_name_for_delete_subject_data = "delete_subject_data"
 # html names
 
 login_page = "login.html"
+signup_page = "signup.html"
 password_reset_form_page = "password_reset/form.html"
 password_reset_done_page = "password_reset/done.html"
 password_reset_confirm_page = "password_reset/confirm.html"
 password_reset_complete_page = "password_reset/complete.html"
 password_reset_email = "password_reset/email.html"
 password_reset_subject = "password_reset/user.txt"
+profile_page = "profile.html"
 details_page = "study/details.html"
 home_page = "index.html"
 create_study_page = "study/create_study.html"
@@ -114,7 +123,6 @@ session_key_last_name = "last_name"
 ## Json key constants ####
 key_name_app = "app"
 key_name_id = "id"
-key_name_version = "version"
 key_name_type = "type"
 key_name_study_name = "study_name"
 key_name_number_of_subjects = "number_of_subjects"
@@ -309,12 +317,6 @@ group_name_administrator = "administrator"
 group_name_investigator = "Investigator"
 group_name_viewer = "Viewer"
 
-group_mapping = {
-"administrator": "administrator",
-"Investigator": "Investigator",     
-}
-default_group = "Viewer"
-
 # Constants used for filter options and custom codes
 accelerometer = "accelerometer"
 activity = "activity"
@@ -330,6 +332,7 @@ gravity_sensor = "gravity_sensor"
 magnetic_sensor = "magnetic_sensor"
 linear_acceleration = "linear_acceleration"
 pedometer = "pedometer"
+homeBeacon = "homeBeacon"
 # response header constants
 zip_extension = '.zip'
 pdf_extension = ".pdf"
@@ -353,13 +356,14 @@ sensor_list = {
     gravity_sensor: 'gs',
     magnetic_sensor: 'ms',
     linear_acceleration: 'la',
-    pedometer: 'pd'
+    pedometer: 'pd',
+    homeBeacon: 'hb'
 }
 
  ## UI dropdown constants ####
 RECORDING_FREQUENCIES = [
     (0, ""),
-    (50, "50 hz"),
+    (50, "50 Hz"),
     (100, "100 Hz"),
     (150, "150 Hz"),
     (200, "200 Hz")
@@ -378,8 +382,14 @@ SENSORS_LIST = [
     ("linear_acceleration", "linear acceleration"),
     ("lockUnlock", "lockUnlock"),
     ("voice", "voice"),
-    ("pedometer", "pedometer")
+    ("pedometer", "pedometer"),
+    ("homeBeacon", "homeStation")
 
+]
+
+PASSIVE_SENSORS_LIST = [
+    sensor for sensor in SENSORS_LIST
+    if sensor[0] not in {"accelerometer", "gyroscope"}
 ]
 
 SENSORS_LIST_DB = [
@@ -396,7 +406,8 @@ SENSORS_LIST_DB = [
     ("linear_acceleration", "linear acceleration"),
     ("lockUnlock", "lockUnlock"),
     ("voice", "voice"),
-    ("pedometer", "pedometer")
+    ("pedometer", "pedometer"),
+    ("homeBeacon", "homeStation")
 
 ]
 

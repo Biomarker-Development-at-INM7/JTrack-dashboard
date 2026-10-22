@@ -32,7 +32,7 @@ class Survey(models.Model):
 class Study(models.Model):
     """Class representing a Study"""
     is_test = models.BooleanField(default=False)
-    title = models.CharField(max_length=500)   
+    title = models.CharField(max_length=500, unique=True)
     duration =  models.IntegerField(default=0)
     numberOfSubjects = models.IntegerField(default=0)
     description = models.TextField(max_length=1000,blank=True, null=True)
@@ -54,10 +54,96 @@ class Study(models.Model):
         null=True,
     )
     images = models.CharField(max_length=500,default="",blank=True )
+    data_collection_completed = models.BooleanField(
+        default=False,
+        help_text="Indicates that participant data collection has finished.",
+    )
     closed = models.BooleanField(default=False)
     def __str__(self):
         ret =  self.title 
         return ret
+
+
+class StudyMembership(models.Model):
+    """A user's role within one study."""
+
+    class Role(models.TextChoices):
+        MAINTAINER = "maintainer", "Maintainer"
+        INVESTIGATOR = "investigator", "Investigator"
+        VIEWER = "viewer", "Viewer"
+
+    study = models.ForeignKey(
+        Study,
+        on_delete=models.CASCADE,
+        related_name="memberships",
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="study_memberships",
+    )
+    role = models.CharField(max_length=20, choices=Role.choices)
+    added_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="created_study_memberships",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["study", "user"],
+                name="uniq_study_membership_user",
+            )
+        ]
+        ordering = ["study__title", "user__username"]
+
+    def __str__(self):
+        return f"{self.study.title} / {self.user.username}: {self.get_role_display()}"
+
+
+class SurveyPublishState(models.Model):
+    """Tracks whether a DB-backed survey has unpublished changes per linked study."""
+
+    study = models.ForeignKey(
+        Study,
+        on_delete=models.CASCADE,
+        related_name="survey_publish_states",
+    )
+    survey = models.ForeignKey(
+        Survey,
+        on_delete=models.CASCADE,
+        related_name="publish_states",
+    )
+    has_unpublished_changes = models.BooleanField(default=False)
+    last_edited_at = models.DateTimeField(blank=True, null=True)
+    last_published_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["study", "survey"],
+                name="uniq_publish_state_per_study_survey",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["survey", "has_unpublished_changes"]),
+            models.Index(fields=["study", "survey"]),
+        ]
+        ordering = ["study__title", "survey_id"]
+
+    def __str__(self):
+        state = "unpublished" if self.has_unpublished_changes else "published"
+        return f"{self.study.title} / {self.survey.title}: {state}"
+
+
+
     
 class Category(models.Model): 
     """Class representing a Category"""

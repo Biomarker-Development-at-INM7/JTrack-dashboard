@@ -5,12 +5,11 @@
 {% block content %}
 
 <script src="{% static 'js/jquery.min.js' %}"></script>
-<link href="{% static 'css/bootstrap-table.min.css' %}" rel="stylesheet">
+<link href="{% static 'css/dataTables.bootstrap5.min.css' %}" rel="stylesheet">
 <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css">
-<script src="{% static 'js/bootstrap-table.min.js' %}"></script>
-<script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
+<script src="{% static 'js/dataTables.min.js' %}"></script>
+<script src="{% static 'js/dataTables.bootstrap5.min.js' %}"></script>
 <script src="{% static 'js/main.js' %}"></script>
-<script src="{% static 'js/popper.js' %}"></script>
 
 <div class="row mb-4">
   <ul class="nav nav-tabs">
@@ -30,81 +29,212 @@
   <div class="col-md-6 col-lg-4">
     
   </div>
-  <div class="col-md-6 col-lg-8">
-    {% if messages %}
-      <ul class="messages">
-        {% for message in messages %}
-          <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
-        {% endfor %}
-      </ul>
-    {% endif %}
-  </div>
 </div>
 
 <div class="row">
-  <div class="d-flex justify-content-between align-items-center">
-    <div class="d-flex justify-content-start align-items-center">
-    <a class="" href="{% url 'details' study_name=study.title %}"  >
-      <h3 >{{study.title}}</h3></a>
-    
-    </div>
-    <a class="btn btn-outline-primary" href="{% url 'qc_study' study_name=study.title  %}">{% trans "global_back_overview" %}</a>
-</div>
   <div class="col-12">
-        
-          <div  id="study-audit-log" 
-            aria-labelledby="study-audit-log">
-            {% if audit_history %}
-              <div class="table-responsive">
-	                <table id="study_audit_table" class="table table-striped table-hover align-middle audit-table"
-                    data-search="true"
-                    data-pagination="true"
-                    data-page-list="[10, 25, 50, 100, all]"
-                    data-page-size="25">
-	                  <thead class="table-dark">
-	                    <tr>
-	                      <th scope="col">{% trans "Timestamp" %}</th>
-	                      <th scope="col">{% trans "Actor" %}</th>
-	                      <th scope="col">{% trans "Object" %}</th>
-                        <th scope="col">{% trans "Action" %}</th>
-	                      <th scope="col">{% trans "Changes" %}</th>
-	                    </tr>
-	                  </thead>
-                  <tbody>
-                    {% for entry in audit_history %}
-                      <tr>
-                        <td>{{ entry.timestamp }}</td>
-                        <td>{% if entry.actor %}{{ entry.actor }}{% else %}-{% endif %}</td>
-                        <td>{{ entry.object_repr }}</td>
-                        <td>{{ entry.action_label }}</td>
-                        <td class="audit-changes-cell">
-                          {% if entry.changes %}
-                            {% for field, values in entry.changes.items %}
-                              {% if field not in "id sortId study is_enabled notes" %}
-                                <span class="badge badge-light text-dark mr-1 mb-1">
-                                  {{ field|title|cut:"_" }}:
-                                  <span class="text-danger">{{ values.0|default:"-" }}</span>
-                                  <i class="fa fa-long-arrow-right mx-1"></i>
-                                  <span class="text-success">{{ values.1|default:"-" }}</span>
-                                </span>
-                              {% endif %}
-                            {% endfor %}
-	                          {% else %}
-	                            <span class="text-muted">{% trans "No field diff" %}</span>
-	                          {% endif %}
-	                        </td>
-	                      </tr>
-	                    {% endfor %}
-	                  </tbody>
-	                </table>
-	              </div>
-	            {% else %}
-	              <p class="mb-0 text-muted">{% trans "No audit history available." %}</p>
-	            {% endif %}
-          
+    <div class="study-subpage-header">
+      <div class="study-subpage-header-main">
+        <div class="study-subpage-title">
+          <h3>{{ study.title }}</h3>
+        </div>
+        <div class="nav history-view-switch" id="study-history-tabs" role="tablist" aria-label="{% trans 'global_history' %}">
+          <button class="history-view-switch-button{% if show_json_versions %} active{% endif %}"
+                  id="json-versions-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#json-versions-pane"
+                  type="button"
+                  role="tab"
+                  aria-controls="json-versions-pane"
+                  aria-selected="{% if show_json_versions %}true{% else %}false{% endif %}">
+            <i class="fas fa-file-code" aria-hidden="true"></i>
+            <span>{% trans "JSON versions" %}</span>
+          </button>
+          <button class="history-view-switch-button{% if not show_json_versions %} active{% endif %}"
+                  id="audit-history-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#audit-history-pane"
+                  type="button"
+                  role="tab"
+                  aria-controls="audit-history-pane"
+                  aria-selected="{% if show_json_versions %}false{% else %}true{% endif %}">
+            <i class="fas fa-history" aria-hidden="true"></i>
+            <span>{% trans "Audit history" %}</span>
+          </button>
+        </div>
+      </div>
+      <a class="btn btn-outline-primary" href="{% url 'details' study_name=study.title %}">{% trans "global_back_overview" %}</a>
+    </div>
+  </div>
 
+  <div class="col-12">
+    <div class="tab-content" id="study-history-tab-content">
+      <div class="tab-pane fade{% if not show_json_versions %} show active{% endif %}"
+           id="audit-history-pane"
+           role="tabpanel"
+           aria-labelledby="audit-history-tab"
+           tabindex="0">
+        {% if audit_history %}
+          <div class="data-table-filters audit-table-filters">
+            <div class="data-table-filter data-table-filter--search">
+              <label for="audit-filter-search">{% trans "Search" %}</label>
+              <input id="audit-filter-search" class="form-control" type="search" placeholder="{% trans 'Search audit history' %}">
+            </div>
+            <div class="data-table-filter">
+              <label for="audit-filter-actor">{% trans "Actor" %}</label>
+              <select id="audit-filter-actor" class="form-select">
+                <option value="">{% trans "All actors" %}</option>
+              </select>
+            </div>
+            <div class="data-table-filter">
+              <label for="audit-filter-action">{% trans "Action" %}</label>
+              <select id="audit-filter-action" class="form-select">
+                <option value="">{% trans "All actions" %}</option>
+              </select>
+            </div>
+            <button id="audit-filter-clear" type="button" class="btn btn-outline-secondary">{% trans "Clear filters" %}</button>
+          </div>
+          <div class="table-responsive survey-question-table-shell jdash-data-table-shell">
+            <table id="study_audit_table" class="table table-striped align-middle audit-table w-100">
+              <thead>
+                <tr>
+                  <th scope="col">{% trans "Timestamp" %}</th>
+                  <th scope="col" class="audit-actor-column">{% trans "Actor" %}</th>
+                  <th scope="col">{% trans "Object" %}</th>
+                  <th scope="col" class="audit-action-column">{% trans "Action" %}</th>
+                  <th scope="col">{% trans "Changes" %}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for entry in audit_history %}
+                  <tr>
+                    <td data-order="{{ entry.timestamp|date:'c' }}">{{ entry.timestamp }}</td>
+                    <td>{% if entry.actor %}{{ entry.actor }}{% else %}-{% endif %}</td>
+                    <td>{{ entry.object_repr }}</td>
+                    <td>{{ entry.action_label }}</td>
+                    <td class="audit-changes-cell">
+                      {% if entry.changes %}
+                        {% for field, values in entry.changes.items %}
+                          {% if field not in "id sortId study is_enabled notes" %}
+                            <span class="badge badge-light text-dark mr-1 mb-1">
+                              {{ field|title|cut:"_" }}:
+                              <span class="text-danger">{{ values.0|default:"-" }}</span>
+                              <i class="fa fa-long-arrow-right mx-1"></i>
+                              <span class="text-success">{{ values.1|default:"-" }}</span>
+                            </span>
+                          {% endif %}
+                        {% endfor %}
+                      {% else %}
+                        <span class="text-muted">{% trans "No field diff" %}</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="mb-0 text-muted">{% trans "No audit history available." %}</p>
+        {% endif %}
+      </div>
+
+      <div class="tab-pane fade{% if show_json_versions %} show active{% endif %}"
+           id="json-versions-pane"
+           role="tabpanel"
+           aria-labelledby="json-versions-tab"
+           tabindex="0">
+        {% if json_versions %}
+          <div class="table-responsive survey-question-table-shell jdash-data-table-shell">
+            <table id="study_json_versions_table" class="table table-striped align-middle w-100">
+              <thead>
+                <tr>
+                  <th scope="col">{% trans "Version" %}</th>
+                  <th scope="col">{% trans "Saved at" %}</th>
+                  <th scope="col">{% trans "Size" %}</th>
+                  <th scope="col" class="no-sort">{% trans "Actions" %}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for version in json_versions %}
+                  <tr>
+                    <td data-order="{{ version.version_number }}">
+                      {% if version.version %}v{{ version.version }}{% else %}-{% endif %}
+                      {% if version.is_current %}
+                        <span class="json-version-current-badge ms-1">{% trans "Current" %}</span>
+                      {% endif %}
+                      <button type="button"
+                              class="btn btn-link btn-sm p-0 ms-2 json-version-diff-trigger"
+                              data-bs-toggle="modal"
+                              data-bs-target="#jsonVersionDiffModal"
+                              data-diff-url="{% url 'study_json_version_diff' study_name=study.title version_key=version.key %}">
+                        {% trans "Details" %}
+                      </button>
+                    </td>
+                    <td data-order="{{ version.created_at|date:'c' }}">{{ version.created_at }}</td>
+                    <td data-order="{{ version.size }}">{{ version.size|filesizeformat }}</td>
+                    <td>
+                      <a class="btn btn-sm btn-outline-primary"
+                         href="{% url 'download_study_json_version' study_name=study.title version_key=version.key %}">
+                        <i class="fas fa-download" aria-hidden="true"></i>
+                        {% trans "Download" %}
+                      </a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="mb-0 text-muted">{% trans "No JSON versions available." %}</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade"
+     id="jsonVersionDiffModal"
+     tabindex="-1"
+     aria-labelledby="jsonVersionDiffModalLabel"
+     aria-hidden="true"
+     data-loading-text="{% trans 'Loading version differences...' %}"
+     data-error-text="{% trans 'Unable to load version differences.' %}"
+     data-no-changes-text="{% trans 'No differences from the previous version.' %}"
+     data-oldest-text="{% trans 'This is the oldest available version.' %}"
+     data-not-present-text="{% trans 'Not present' %}"
+     data-added-text="{% trans 'Added' %}"
+     data-removed-text="{% trans 'Removed' %}"
+     data-changed-text="{% trans 'Changed' %}">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="jsonVersionDiffModalLabel">{% trans "Changes from previous version" %}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
+      </div>
+      <div class="modal-body">
+        <div id="json-version-diff-status" class="text-muted" role="status"></div>
+        <div id="json-version-diff-content" class="d-none">
+          <p id="json-version-diff-summary" class="mb-3"></p>
+          <div class="table-responsive json-version-diff-table-shell">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th scope="col">{% trans "Field" %}</th>
+                  <th scope="col">{% trans "Change" %}</th>
+                  <th scope="col">{% trans "Previous" %}</th>
+                  <th scope="col">{% trans "Selected version" %}</th>
+                </tr>
+              </thead>
+              <tbody id="json-version-diff-rows"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans "Close" %}</button>
+      </div>
+    </div>
   </div>
 </div>
 
 {% endblock %}
-

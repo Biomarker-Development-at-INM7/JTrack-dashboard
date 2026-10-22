@@ -65,6 +65,7 @@ class MaintenanceModeMiddleware:
             if (
                 candidate in exempt_paths
                 or candidate_without_slash.endswith(normalized_login)
+                or candidate_without_slash.endswith("/signup")
                 or candidate_without_slash.endswith("/password-reset")
                 or candidate_without_slash.endswith("/password-reset/done")
                 or candidate_without_slash.endswith("/reset/done")

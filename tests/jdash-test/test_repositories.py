@@ -17,7 +17,7 @@ django.setup()
 # --- Django ---
 from django.utils import timezone
 from django.http import HttpResponse
-from django.contrib.auth.models import User, Group, Permission
+from django.contrib.auth.models import User
 
 # --- Third-party ---
 import pytest
@@ -66,8 +66,8 @@ class TestRetireveAllStudiesForUser:
 
 class TestCreateNewStudy:
     @patch("jdash.repositories.study_repository.studymodel.objects.create")
-    @patch("jdash.repositories.study_repository.create_new_study_group")
-    def test_create_study_basic(self, mock_create_group, mock_create_study):
+    @patch("jdash.repositories.study_repository.StudyMembership.objects.update_or_create")
+    def test_create_study_basic(self, mock_membership_create, mock_create_study):
         mock_user = MagicMock()
         form_data = {
             "name": "Study",
@@ -83,7 +83,7 @@ class TestCreateNewStudy:
         }
         study_repository.create_new_study_in_db(mock_user, form_data, survey=None, images_url=None)
         mock_create_study.assert_called_once()
-        mock_create_group.assert_called_once()
+        mock_membership_create.assert_called_once()
 
 class TestCreateNewSurvey:
     @patch("jdash.repositories.survey_repository.User.objects.get")
@@ -393,58 +393,37 @@ def test_update_study_db_details_missing_name_key():
         study_repository.update_study_db_details(form_data)
 
 
-@patch('jdash.repositories.study_repository.User.objects.get')
-@patch('jdash.repositories.study_repository.Group.objects.get')
-@patch('jdash.repositories.study_repository.Permission.objects.get')
-def test_assign_all_group_permissions(mock_permission_get, mock_group_get, mock_user_get):
-    # Arrange
-    username = "testuser"
-    groupname = "testgroup"
+@patch("jdash.repositories.study_repository.sync_study_device_sensors")
+@patch("jdash.repositories.study_repository.sync_task_list")
+@patch("jdash.repositories.study_repository.get_object_or_404")
+def test_update_study_db_details_clears_survey_when_selection_is_removed(
+    mock_get_study,
+    mock_sync_tasks,
+    mock_sync_sensors,
+):
+    study = MagicMock()
+    study.survey = MagicMock()
+    mock_get_study.return_value = study
+    form_data = {
+        "name": "EMA Study",
+        "description": "Description",
+        "duration": 10,
+        "number_of_subjects": 5,
+        constants.field_name_is_test: False,
+        "enrolled_subjects": [],
+        constants.field_name_sensor_list: [],
+        constants.field_name_frequency: 50,
+        constants.field_name_labeling: 0,
+        "ema_checkbox": True,
+        "task_list": [],
+        "device_sensor_rows": [],
+    }
 
-    mock_user = MagicMock()
-    mock_user_get.return_value = mock_user
+    study_repository.update_study_db_details.__wrapped__(form_data)
 
-    mock_group = MagicMock()
-    mock_group_get.return_value = mock_group
-
-    # Mock permissions returned in order
-    mock_add_perm = MagicMock(spec=Permission)
-    mock_change_perm = MagicMock(spec=Permission)
-    mock_delete_perm = MagicMock(spec=Permission)
-    mock_view_perm = MagicMock(spec=Permission)
-
-    # Permission.objects.get called 4 times with different names
-    mock_permission_get.side_effect = [mock_add_perm, mock_change_perm, mock_delete_perm, mock_view_perm]
-
-    # Act
-    study_repository.assign_all_group_permissions(username, groupname)
-
-    # Assert User.objects.get called once with username
-    mock_user_get.assert_called_once_with(username=username)
-
-    # Assert Group.objects.get called once with groupname
-    mock_group_get.assert_called_once_with(name=groupname)
-
-    # Assert Permission.objects.get called with expected names
-    expected_perm_names = [
-        'Can add study',
-        'Can change study',
-        'Can delete study',
-        'Can view study'
-    ]
-    actual_perm_calls = [call.kwargs['name'] for call in mock_permission_get.call_args_list]
-    assert actual_perm_calls == expected_perm_names
-
-    # Assert user added to the group
-    mock_group.user_set.add.assert_called_once_with(mock_user)
-
-    # Assert permissions set on the group
-    mock_group.permissions.set.assert_called_once_with([
-        mock_add_perm,
-        mock_change_perm,
-        mock_delete_perm,
-        mock_view_perm,
-    ])
+    assert study.ecological_momentary_assessment is True
+    assert study.survey is None
+    study.save.assert_called_once_with()
 
 
 @patch("jdash.repositories.study_repository.studymodel.objects.filter")
@@ -479,7 +458,7 @@ def test_retrieve_all_survey_for_user_admin(
     mock_survey_serializer.return_value = expected_json
 
     user = MagicMock()
-    user.groups.values_list.return_value = [constants.group_name_administrator]
+    user.groups.filter.return_value.exists.return_value = True
 
     result = survey_repository.retrieve_all_survey_for_user(user, "ignored_session")
 
@@ -496,7 +475,7 @@ def test_retrieve_all_survey_for_user_non_admin_uses_database(
     mock_study_filter, mock_survey_objects, mock_survey_serializer, mock_add_metadata
 ):
     user = MagicMock()
-    user.groups.values_list.return_value = ["StudyA_group"]
+    user.groups.filter.return_value.exists.return_value = False
     expected_surveys = [{"id": 1, "title": "Survey1"}]
     mock_survey_serializer.return_value = json.dumps(expected_surveys)
     queryset = mock_survey_objects.filter.return_value
@@ -624,51 +603,16 @@ def test_update_question_in_db(mock_filter):
     )
 
 
-@pytest.mark.parametrize("group_name,user_owner,expected_filter_owner_call", [
-    (["administrator"], None, False),          # Admin: no owner filter
-    (["investigator"], "user_obj", True),     # Non-admin: filter by owner
-])
 @patch("jdash.repositories.survey_repository.surveyModel.objects.filter")
-def test_delete_survey_for_user(mock_filter, group_name, user_owner, expected_filter_owner_call):
+def test_delete_survey_for_user(mock_filter):
     survey_id = 123
 
-    # Mock queryset after first filter
-    mock_qs_first = MagicMock(name="QuerySetFirst")
-    # Mock queryset after chained filter (for non-admin)
-    mock_qs_second = MagicMock(name="QuerySetSecond")
-    # Mock queryset after .all()
-    mock_qs_all = MagicMock(name="QuerySetAll")
+    queryset = mock_filter.return_value
+    result = survey_repository.delete_survey_for_user(MagicMock(), survey_id)
 
-    mock_filter.return_value = mock_qs_first
-
-    if "administrator" in group_name:
-        # For admin, only one filter with id=survey_id
-        # .all() returns mock_qs_all
-        mock_qs_first.all.return_value = mock_qs_all
-        # .delete() called on mock_qs_all
-        mock_qs_all.delete.return_value = None
-    else:
-        # For non-admin, first filter with owner=user returns mock_qs_first
-        # Chained filter with id=survey_id returns mock_qs_second
-        mock_qs_first.filter.return_value = mock_qs_second
-        # .all() on mock_qs_second returns mock_qs_all
-        mock_qs_second.all.return_value = mock_qs_all
-        # .delete() called on mock_qs_all
-        mock_qs_all.delete.return_value = None
-
-    user = user_owner
-
-    result = survey_repository.delete_survey_for_user(group_name, user, survey_id)
-
-    if "administrator" in group_name:
-        mock_filter.assert_called_once_with(id=survey_id)
-        mock_qs_first.all.assert_called_once()
-        mock_qs_all.delete.assert_called_once()
-    else:
-        mock_filter.assert_called_once_with(owner=user)
-        mock_qs_first.filter.assert_called_once_with(id=survey_id)
-        mock_qs_second.all.assert_called_once()
-        mock_qs_all.delete.assert_called_once()
+    mock_filter.assert_called_once_with(id=survey_id)
+    queryset.all.assert_called_once()
+    queryset.all.return_value.delete.assert_called_once()
 
     assert result is True
 

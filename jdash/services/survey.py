@@ -33,10 +33,14 @@ from jdash.repositories.survey_repository import (
     get_question_by_sortid,
     delete_answer_in_db,
 )
-from jdash.utils.fileutils import open_study_json, save_study_json
-from jdash.utils.utils import normalize_question_data_defaults,coerce_bool
+from jdash.utils.fileutils import (
+    open_study_json,
+    save_study_json,
+)
+from jdash.utils.utils import coerce_bool, normalize_question_data_defaults
 from jdash.utils.surveyFileToJSON import SurveyFileToJSONConverter
 from jdash.models import Question, Category
+from jdash.services.survey_publish_state import mark_survey_unpublished
 logger = logging.getLogger("django")
 
 
@@ -262,6 +266,18 @@ class Survey:
         logger.debug("Survey.generate_json_for_study return_value=%s", survey_json)
         return survey_json
 
+    @classmethod
+    def publish_to_associated_study_json(cls, survey_id):
+        """
+        Publish the latest DB-backed survey JSON into linked study JSON files.
+
+        Compatibility wrapper for older callers. The current implementation
+        publishes to every study linked to the survey.
+        """
+        from jdash.services.survey_publish import publish_survey_to_linked_studies
+
+        return publish_survey_to_linked_studies(survey_id)
+
     @staticmethod
     def create_answers(question_id, answers, question_type=None):
         """
@@ -282,7 +298,7 @@ class Survey:
             question_type,
         )
         for index, answer in enumerate(answers):
-            logger.info("Creating answer for question %s: %s", question_id, answer)
+            logger.debug("Creating answer for question_id=%s payload=%s", question_id, answer)
             answer['answerSortId'] = answer.get("answerSortId", index + 1 if question_type in [1, 2] else 1)
             create_answer_in_db(question_id, answer)
         logger.info("Survey.create_answers finished for question_id=%s", question_id)
@@ -310,7 +326,7 @@ class Survey:
 
         if answers:
             cls.create_answers(question.pk, answers, question.questionType)
-
+        mark_survey_unpublished(survey_id)
         logger.info("Survey.create_question_with_answers finished for survey_id=%s", survey_id)
         logger.debug("Survey.create_question_with_answers return_value=%s", question.pk)
         return question.pk
@@ -333,7 +349,7 @@ class Survey:
         question_type = int(question_obj["questionType"])
 
         with transaction.atomic():
-            cls.update_question_order(question_id, question_obj["sortId"])
+            cls.update_question_order(question_id, question_obj["sortId"], mark_unpublished=False)
             update_question_in_db(question_id, question_obj)
 
             existing_answers = retrieve_all_answers_for_questions(question_id)
@@ -343,6 +359,7 @@ class Survey:
                 cls.create_answers(question_id, answers, question_type)
 
         survey_id = retrieve_question(question_id).survey_id
+        mark_survey_unpublished(survey_id)
         logger.info("Survey.update_question_with_answers finished for question_id=%s", question_id)
         logger.debug("Survey.update_question_with_answers return_value=%s", survey_id)
         return survey_id
@@ -379,6 +396,7 @@ class Survey:
         """
         logger.info("Survey.update_from_data called for survey_id=%s", survey_id)
         survey = update_survey_info_in_db(form_data, survey_id)
+        mark_survey_unpublished(survey.id)
         logger.info("Survey.update_from_data finished for survey_id=%s", survey_id)
         logger.debug("Survey.update_from_data return_value=%s", survey.id)
         return survey.id
@@ -560,7 +578,11 @@ class Survey:
 
         next_sort_id = removed_sort_id
         for following_question_id in following_question_ids:
-            cls.update_question_order(following_question_id, next_sort_id)
+            cls.update_question_order(
+                following_question_id,
+                next_sort_id,
+                mark_unpublished=False,
+            )
             next_sort_id += 1
 
     @classmethod
@@ -595,7 +617,12 @@ class Survey:
         Returns:
             int: Identifier of the parent survey.
         """
-        logger.info("Survey.delete_questions called for survey_id=%s question_ids=%s", survey_id, question_ids)
+        logger.info(
+            "Survey.delete_questions called for survey_id=%s question_count=%s",
+            survey_id,
+            len(question_ids),
+        )
+        logger.debug("Survey.delete_questions question_ids=%s", question_ids)
         all_questions = retrieve_all_questions_for_survey(survey_id)
         selected_questions = cls._questions_selected_for_delete(question_ids, all_questions)
         if not selected_questions:
@@ -606,10 +633,11 @@ class Survey:
         with transaction.atomic():
             for question in selected_questions:
                 cls._delete_question_without_dependency_check(question["db_id"], survey_id)
+        mark_survey_unpublished(survey_id)
         return survey_id
 
     @staticmethod
-    def update_question_order(question_id, new_sequence_id):
+    def update_question_order(question_id, new_sequence_id, mark_unpublished=True):
         """
         Reorder a question within its survey.
 
@@ -657,6 +685,8 @@ class Survey:
 
         question.sortId = new_sequence_id
         question.save()
+        if mark_unpublished:
+            mark_survey_unpublished(question.survey_id)
         logger.info("Updated moved question ID %s to new sortId: %d", question.id, new_sequence_id)
         logger.info("Survey.update_question_order finished for question_id=%s", question_id)
         logger.debug("Survey.update_question_order return_value=%s", True)
@@ -752,6 +782,7 @@ class Survey:
 
         existing_categories = get_categories_from_db(survey_id)
         cls.sync_categories(category_list, existing_categories, survey_id)
+        mark_survey_unpublished(survey_id)
         logger.info("Survey.update_categories finished for survey_id=%s", survey_id)
         logger.debug("Survey.update_categories return_value=%s", None)
 

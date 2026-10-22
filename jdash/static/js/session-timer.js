@@ -9,12 +9,14 @@
   const checkIntervalMs = Number(configElement.dataset.checkIntervalMs || 30000);
   const keepAliveThrottleMs = Number(configElement.dataset.keepaliveThrottleMs || 60000);
   const logoutUrl = configElement.dataset.logoutUrl || "";
+  const csrfToken = configElement.dataset.csrfToken || "";
   const sessionCheckUrl = configElement.dataset.sessionCheckUrl || "";
   const timeoutMs = timeoutSeconds * 1000;
   const modalThresholdMs = modalThresholdSeconds * 1000;
   const activityStorageKey = "jdashLastActivityAt";
   const timerDisplay = document.getElementById("logout-timer");
   const sessionModalElement = document.getElementById("sessionModal");
+  const logoutLink = document.querySelector(".jdash-logout-link");
 
   let logoutTriggered = false;
   let fallbackLastActivityAt = Date.now();
@@ -37,16 +39,8 @@
       try {
         return new modalClass(sessionModalElement);
       } catch (error) {
-        // Fall through to jQuery modal support.
+        return null;
       }
-    }
-
-    if (window.jQuery) {
-      const modalElement = window.jQuery(sessionModalElement);
-      return {
-        show() { modalElement.modal("show"); },
-        hide() { modalElement.modal("hide"); }
-      };
     }
 
     return null;
@@ -94,12 +88,35 @@
   }
 
   function logoutNow() {
-    if (logoutTriggered || !logoutUrl) {
+    if (logoutTriggered || !logoutUrl || !csrfToken) {
       return;
     }
     logoutTriggered = true;
     clearLastActivityAt();
-    window.location.assign(logoutUrl);
+    fetch(logoutUrl, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "X-CSRFToken": csrfToken
+      }
+    })
+      .then((response) => {
+        if (response.redirected) {
+          window.location.assign(response.url);
+          return;
+        }
+        logoutTriggered = false;
+      })
+      .catch(() => {
+        logoutTriggered = false;
+      });
+  }
+
+  if (logoutLink) {
+    logoutLink.addEventListener("click", function (event) {
+      event.preventDefault();
+      logoutNow();
+    });
   }
 
   function handleSessionCheckResponse(response) {

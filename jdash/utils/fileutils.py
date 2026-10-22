@@ -523,6 +523,213 @@ def create_backup_json_file(study_name, study_json):
         json.dump(study_json, jf, ensure_ascii=False, indent=4)
 
 
+_STUDY_JSON_VERSION_KEY_PATTERN = re.compile(r"^v(?P<version>\d+)_(?P<timestamp>\d{14})$")
+
+
+def _validated_study_json_directory(study_name):
+    """Return the canonical study directory without allowing path traversal."""
+    studies_root = os.path.realpath(config.studies_folder)
+    study_directory = os.path.realpath(os.path.join(studies_root, study_name))
+    if os.path.dirname(study_directory) != studies_root:
+        raise ValueError("Study name resolves outside the studies folder.")
+    return study_directory
+
+
+def list_study_json_versions(study_name):
+    """Return the current study JSON and valid versioned backup snapshots."""
+    study_directory = _validated_study_json_directory(study_name)
+    if not os.path.isdir(study_directory):
+        return []
+
+    versions = []
+    current_version = None
+    current_path = os.path.join(study_directory, f"{study_name}.json")
+    if os.path.isfile(current_path) and not os.path.islink(current_path):
+        try:
+            current_json = _load_json_file(current_path)
+            current_version = int(current_json.get(constants.key_name_version, 1))
+        except (OSError, ValueError, TypeError, json.JSONDecodeError):
+            current_version = None
+        versions.append({
+            "key": "current",
+            "version": current_version,
+            "version_number": current_version or 0,
+            "created_at": datetime.fromtimestamp(os.path.getmtime(current_path)),
+            "filename": os.path.basename(current_path),
+            "size": os.path.getsize(current_path),
+            "is_current": True,
+        })
+
+    filename_prefix = f"{study_name}_"
+    for filename in os.listdir(study_directory):
+        if not filename.startswith(filename_prefix) or not filename.endswith(".json"):
+            continue
+        version_key = filename[len(filename_prefix):-len(".json")]
+        match = _STUDY_JSON_VERSION_KEY_PATTERN.fullmatch(version_key)
+        if match is None:
+            continue
+        archived_version = int(match.group("version"))
+        if current_version is not None and archived_version == current_version:
+            continue
+        version_path = os.path.join(study_directory, filename)
+        if not os.path.isfile(version_path) or os.path.islink(version_path):
+            continue
+        versions.append({
+            "key": version_key,
+            "version": archived_version,
+            "version_number": archived_version,
+            "created_at": datetime.strptime(match.group("timestamp"), "%Y%m%d%H%M%S"),
+            "filename": filename,
+            "size": os.path.getsize(version_path),
+            "is_current": False,
+        })
+
+    return sorted(
+        versions,
+        key=lambda item: (
+            item["is_current"],
+            item["version_number"],
+            item["created_at"],
+        ),
+        reverse=True,
+    )
+
+
+def resolve_study_json_version_path(study_name, version_key):
+    """Resolve a current or archived JSON version key to a safe local path."""
+    study_directory = _validated_study_json_directory(study_name)
+    if version_key == "current":
+        filename = f"{study_name}.json"
+    elif _STUDY_JSON_VERSION_KEY_PATTERN.fullmatch(version_key):
+        filename = f"{study_name}_{version_key}.json"
+    else:
+        raise ValueError("Invalid study JSON version key.")
+
+    version_path = os.path.realpath(os.path.join(study_directory, filename))
+    if os.path.dirname(version_path) != study_directory:
+        raise ValueError("Study JSON version resolves outside the study folder.")
+    if not os.path.isfile(version_path):
+        raise FileNotFoundError(version_path)
+    return version_path
+
+
+_MISSING_JSON_VALUE = object()
+
+
+def _json_diff_path(parent_path, key):
+    if isinstance(key, int):
+        return f"{parent_path}[{key}]" if parent_path else f"[{key}]"
+    key = str(key)
+    if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_-]*", key):
+        return f"{parent_path}.{key}" if parent_path else key
+    key_literal = json.dumps(key, ensure_ascii=False)
+    return f"{parent_path}[{key_literal}]" if parent_path else f"[{key_literal}]"
+
+
+def _collect_json_differences(previous, selected, path=""):
+    changes = []
+
+    compare_as_dict = (
+        isinstance(previous, dict) and isinstance(selected, dict)
+    ) or (
+        previous is _MISSING_JSON_VALUE and isinstance(selected, dict)
+    ) or (
+        selected is _MISSING_JSON_VALUE and isinstance(previous, dict)
+    )
+    if compare_as_dict:
+        previous_dict = previous if isinstance(previous, dict) else {}
+        selected_dict = selected if isinstance(selected, dict) else {}
+        keys = sorted(set(previous_dict) | set(selected_dict))
+        for key in keys:
+            changes.extend(
+                _collect_json_differences(
+                    previous_dict.get(key, _MISSING_JSON_VALUE),
+                    selected_dict.get(key, _MISSING_JSON_VALUE),
+                    _json_diff_path(path, key),
+                )
+            )
+        return changes
+
+    compare_as_list = (
+        isinstance(previous, list) and isinstance(selected, list)
+    ) or (
+        previous is _MISSING_JSON_VALUE and isinstance(selected, list)
+    ) or (
+        selected is _MISSING_JSON_VALUE and isinstance(previous, list)
+    )
+    if compare_as_list:
+        previous_list = previous if isinstance(previous, list) else []
+        selected_list = selected if isinstance(selected, list) else []
+        for index in range(max(len(previous_list), len(selected_list))):
+            changes.extend(
+                _collect_json_differences(
+                    previous_list[index] if index < len(previous_list) else _MISSING_JSON_VALUE,
+                    selected_list[index] if index < len(selected_list) else _MISSING_JSON_VALUE,
+                    _json_diff_path(path, index),
+                )
+            )
+        return changes
+
+    if previous is not _MISSING_JSON_VALUE and selected is not _MISSING_JSON_VALUE and previous == selected:
+        return changes
+
+    if previous is _MISSING_JSON_VALUE:
+        change_type = "added"
+    elif selected is _MISSING_JSON_VALUE:
+        change_type = "removed"
+    else:
+        change_type = "changed"
+
+    changes.append({
+        "path": path or "$",
+        "change_type": change_type,
+        "previous_exists": previous is not _MISSING_JSON_VALUE,
+        "previous": None if previous is _MISSING_JSON_VALUE else previous,
+        "selected_exists": selected is not _MISSING_JSON_VALUE,
+        "selected": None if selected is _MISSING_JSON_VALUE else selected,
+    })
+    return changes
+
+
+def get_study_json_version_diff(study_name, version_key):
+    """Compare a study JSON version with the immediately older snapshot."""
+    versions = list_study_json_versions(study_name)
+    selected_index = next(
+        (index for index, version in enumerate(versions) if version["key"] == version_key),
+        None,
+    )
+    if selected_index is None:
+        raise FileNotFoundError(version_key)
+
+    selected_version = versions[selected_index]
+    previous_version = versions[selected_index + 1] if selected_index + 1 < len(versions) else None
+    result = {
+        "selected": {
+            "key": selected_version["key"],
+            "version": selected_version["version"],
+            "is_current": selected_version["is_current"],
+        },
+        "previous": None,
+        "changes": [],
+    }
+    if previous_version is None:
+        return result
+
+    result["previous"] = {
+        "key": previous_version["key"],
+        "version": previous_version["version"],
+        "is_current": previous_version["is_current"],
+    }
+    previous_json = _load_json_file(
+        resolve_study_json_version_path(study_name, previous_version["key"])
+    )
+    selected_json = _load_json_file(
+        resolve_study_json_version_path(study_name, selected_version["key"])
+    )
+    result["changes"] = _collect_json_differences(previous_json, selected_json)
+    return result
+
+
 def get_names(directory):
     """
     Method to get all files and folders in a directory

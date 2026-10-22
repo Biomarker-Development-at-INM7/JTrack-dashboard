@@ -6,12 +6,11 @@
 
 <script src="{% static 'js/jquery.min.js' %}"></script>
 <link href="{% static 'css/form.css' %}" rel="stylesheet">
-<link href="{% static 'css/bootstrap-table.min.css' %}" rel="stylesheet">
+<link href="{% static 'css/dataTables.bootstrap5.min.css' %}" rel="stylesheet">
 <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css">
-<script src="{% static 'js/bootstrap-table.min.js' %}"></script>
-<script src="{% static 'js/bootstrap-table-filter-control.min.js' %}"></script>
+<script src="{% static 'js/dataTables.min.js' %}"></script>
+<script src="{% static 'js/dataTables.bootstrap5.min.js' %}"></script>
 <script src="{% static 'js/main.js' %}"></script>
-<script src="{% static 'js/popper.js' %}"></script>
 <style>
     .qc-table-wrap {
         overflow-x: auto;
@@ -121,55 +120,65 @@
 </div> 
 	
 <div >
-    <div class="d-flex justify-content-between align-items-center">
-        <div class="d-flex justify-content-start align-items-center">
-        <a class="" href="{% url 'details' study_name=study.title %}"  >
-            <h3 >{{study.title}}</h3></a>
-       
-        </div>
+    <div class="study-subpage-header">
+        <a class="study-subpage-title" href="{% url 'details' study_name=study.title %}">
+            <h3>{{study.title}}</h3>
+        </a>
         <a class="btn btn-outline-primary" href="{% url 'study_audit' study_name=study.title %}">{% trans "global_history" %}</a>
     </div>
-    <div class="study-info-note mb-3" role="alert">
+    <div class="study-info-note mt-3 mb-3" role="alert">
         {% trans "study_details_data_available_next_day" %}
     </div>
-    <div id="toolbar" class="toolbar-container">
-        {% if request.user|has_group:"Investigator"  %}
-            <button name="select_all" id="select_all"  onclick="toggleSelectAll('owner', this)" class="btn btn-primary" >{% trans "study_sop_select_all" %}</button>
-        {% else %}
-            <button name="select_all" id="select_all" onclick="toggleSelectAll('admin', this)" class="btn btn-primary" >{% trans "study_sop_select_all" %}</button>
-        {% endif %}
-        <form id="testcaseForm" name="testcaseForm" action="{% url 'qc_study' study_name=study.title %}" method="POST">
-         {% csrf_token %}
-         <input type="hidden" id="testCaseFlagsInput" name="test_case_flags" value="">
-            <input name="update_test_flags" id="update_test_flags"
-                    type="submit" onclick="sendCheckedFlagsToServer('{{ study.title }}')"
-            class="btn btn-primary" value="{% trans 'study_sop_update' %}">
-        </form>
-    </div>
-    <div class="col-md-6 col-lg-6">
-        {% if messages %}
-        <ul class="messages">
-            {% for message in messages %}
-            <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
-            {% endfor %}
-        </ul>
-        {% endif %}
-    </div> 
-    <div class="qc-table-wrap">
-    <table id ="qc_table" class="table table-striped align-middle"
-    data-toolbar="#toolbar"
-        data-search="true"
-        data-pagination="true"
-        data-id-field="testcase_db_id"
-        data-page-list="[10, 30, 50, 100, all]">
+	<div class="qc-table-controls">
+	    <div id="toolbar" class="qc-update-panel">
+	        <form id="testcaseForm" name="testcaseForm" action="{% url 'qc_study' study_name=study.title %}" method="POST">
+	            {% csrf_token %}
+	            <input type="hidden" id="testCaseFlagsInput" name="test_case_flags" value="">
+	            <input name="update_test_flags" id="update_test_flags"
+	                    type="submit" onclick="sendCheckedFlagsToServer('{{ study.title }}')"
+	                    class="btn btn-primary" value="{% trans 'study_sop_update' %}"
+	                    {% if not can_update_qc_checks %}disabled{% endif %}>
+	        </form>
+	    </div>
+	    <div class="data-table-filters qc-table-filters">
+	        <div class="data-table-filter data-table-filter--search">
+	            <label for="qc-filter-search">{% trans "Search" %}</label>
+	            <input id="qc-filter-search" class="form-control" type="search" placeholder="Search checks, steps or outcomes">
+	        </div>
+	        <div class="data-table-filter">
+	            <label for="qc-filter-status">Completion status</label>
+	            <select id="qc-filter-status" class="form-select">
+	                <option value="">All checks</option>
+	                <option value="admin-complete">Admin completed</option>
+	                <option value="owner-complete">Owner completed</option>
+	                <option value="pending">Pending</option>
+	            </select>
+	        </div>
+	        <button id="qc-filter-clear" type="button" class="btn btn-outline-secondary">{% trans "Clear filters" %}</button>
+	    </div>
+	</div>
+    <div class="qc-table-wrap survey-question-table-shell jdash-data-table-shell">
+    <table id ="qc_table" class="table table-striped align-middle w-100">
         <thead>
             <tr>
-                <th data-field="tested_by_admin">{% trans "study_sop_admin" %}</th>
-                <th data-field="tested_by_owner" >{% trans "study_sop_owner" %}</th>
+                <th class="no-sort">
+                    <label class="qc-header-check">
+                        <input id="qc-select-all-admin" class="form-check-input qc-select-all" type="checkbox" data-checkbox-class="admin-checkbox"
+                            {% if not can_update_qc_admin_checks %}disabled{% endif %}>
+                        <span>{% trans "study_sop_admin" %}</span>
+                    </label>
+                </th>
+                <th class="no-sort">
+                    <label class="qc-header-check">
+                        <input id="qc-select-all-owner" class="form-check-input qc-select-all" type="checkbox" data-checkbox-class="owner-checkbox">
+                        <span>{% trans "study_sop_owner" %}</span>
+                    </label>
+                </th>
+                <th class="qc-status-column">Completion status</th>
                 <th>{% trans "global_desc" %}</th>
                 <th>{% trans "study_sop_steps" %}</th>
                 <th>{% trans "study_sop_expected_outcome" %}</th>
-                <th>Comments</th>
+                <th class="no-sort">Comments</th>
             </tr>
         </thead>
         <tbody>
@@ -180,13 +189,15 @@
                        id="admin_checkbox{{ forloop.counter }}" 
                        {% if test.tested_by_admin %} 
                         checked {% endif %}
-                       {% if request.user|has_group:Investigator %} 
+                       {% if not can_update_qc_admin_checks %}
                             disabled {% endif %}>
                 </td>
                 <td> <input type="checkbox" class="custom-control-input
                                                  owner-checkbox"
                        id="owner_checkbox{{ forloop.counter }}" {% if test.tested_by_owner %}checked{% endif %}
+                       {% if not can_update_qc_owner_checks %}disabled{% endif %}
                     </td>
+                <td>{% if test.tested_by_admin %}admin-complete {% endif %}{% if test.tested_by_owner %}owner-complete {% endif %}{% if not test.tested_by_admin or not test.tested_by_owner %}pending{% endif %}</td>
                 <input type="hidden" class="testcase-db-id" value="{{ test.id }}">
                 <td>{{test.description}}</td>
                 <td class="qc-steps-cell">{{test.steps}}</td>
@@ -247,4 +258,3 @@
 </div>
 	
 {% endblock %}
-

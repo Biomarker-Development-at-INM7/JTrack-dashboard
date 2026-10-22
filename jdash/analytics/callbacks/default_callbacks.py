@@ -17,8 +17,8 @@ def data_per_day_candidates(study, sensor):
     return [
         os.path.join(outputs_dir, f"Data_per_day_{sensor}_latest.csv"),
         os.path.join(outputs_dir, f"Data_per_day_device_{sensor}_latest.csv"),
+        os.path.join(outputs_dir, f"Device_per_day_{sensor}_latest.csv"),
     ]
-
 
 def resolve_data_per_day_path(study, sensor):
     """
@@ -273,4 +273,3 @@ def default_callbacks(app):
         columns = [{"name": col, "id": col} for col in df.columns]
         data = df.to_dict("records")
         return columns, data
-

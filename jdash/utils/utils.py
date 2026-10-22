@@ -255,18 +255,20 @@ def get_survey_list(session_key):
         if ema_studies :
             for study in ema_studies:
                 data = get_json_data(study)
+                legacy_survey = data.get(constants.key_name_survey) or {}
+                if not legacy_survey:
+                    continue
                 survey={}
-                survey['id'] = '999'
                 survey[constants.key_name_study_title] = study
                 survey[constants.key_name_study_name] = data[constants.key_study_name_json]
                 survey[constants.key_name_survey_description] = study+" json file"
-                if constants.key_name_survey_topN not in data[constants.key_name_survey]:
+                if constants.key_name_survey_topN not in legacy_survey:
                     survey[constants.key_name_survey_topN] = -1
                 else:
-                    survey[constants.key_name_survey_topN] = data[constants.key_name_survey][constants.key_name_survey_topN]
+                    survey[constants.key_name_survey_topN] = legacy_survey[constants.key_name_survey_topN]
                 survey["category_names"] = ", ".join(
                     category.get("categoryTitle", "")
-                    for category in data.get(constants.key_name_survey, {}).get(constants.key_name_categories, [])
+                    for category in legacy_survey.get(constants.key_name_categories, [])
                     if category.get("categoryTitle")
                 )
                 total_list.append(survey) 
@@ -342,6 +344,7 @@ def answer_serializer(queryset):
             "id": obj['answerSortId'],
             "text": text_value,
             "subText" : obj['answerSubText'],
+            "answerSubText": obj['answerSubText'],
             "value": obj['value'],
             "defaultValue": obj['defaultValue'],
             "stepSize": obj['stepSize'],
@@ -628,6 +631,14 @@ def normalize_question_data_defaults(question_data):
         question_data[constants.field_name_activation_condition] = ""
         
     if question_data[constants.field_name_deactivation_condition] is None:
+        question_data[constants.field_name_deactivation_condition] = ""
+
+    # A condition has no meaning without target questions. Clear stale values
+    # when targets are removed during question editing or import.
+    if not question_data[constants.field_name_activate_question]:
+        question_data[constants.field_name_activation_condition] = ""
+
+    if not question_data[constants.field_name_deactivate_question]:
         question_data[constants.field_name_deactivation_condition] = ""
 
     question_data["mandatory"] = coerce_bool(question_data.get("mandatory"), default=False)

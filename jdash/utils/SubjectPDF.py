@@ -102,16 +102,19 @@ class SubjectPDF():
         #self.cell(40, 10, txt=text, ln=0, align='L')
         #self.ln(10)
 
-    def qr_codes(self, qr_code_path):
+    def qr_codes(self, qr_code_path, start_activation=1, end_activation=None):
         """
-        Draws all 4 qr codes for different activations
+        Draw QR codes for the requested inclusive activation range.
 
         :param qr_code_path: path to qr_code to img file. Only needs the activation number to be completed
         :return:
         """
 
+        if end_activation is None:
+            end_activation = config.number_of_activations
+
         qr_text = ""
-        for i in range(1, config.number_of_activations + 1):
+        for i in range(start_activation, end_activation + 1):
             qr_text += self.text_field('Activation ' + str(i))
             qr_text += "<img src='"+qr_code_path + "_" + str(i) + ".png' style='width: 140px; float: right;'>"
             qr_text += self.draw_input_line('Date of activation')

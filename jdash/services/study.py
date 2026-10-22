@@ -17,12 +17,10 @@ import subprocess
 import threading
 import zipfile
 from datetime import datetime
-from django.utils import timezone
 import numpy as np
 import pandas as pd
 from django.conf import settings
-from django.contrib.auth.models import Group
-from django.db import connection
+from django.utils import timezone
 from pandas.errors import EmptyDataError
 
 from jdash.utils.utils import (
@@ -51,8 +49,8 @@ from jdash.utils.fileutils import (
 from jdash.services.datahelper import validate_empty
 from jdash.services.subject import Subject
 from jdash.services.survey import Survey
-
-from jdash.models import Study as StudyModel
+from jdash.services.survey_publish_state import mark_study_survey_published
+from jdash.models import Study as StudyModel, StudyMembership
 from jdash.repositories.study_repository import (
     create_new_study_in_db,
     close_study_model,
@@ -80,70 +78,42 @@ def _get_study_group_members(study_name, user=None):
     administrators = []
     investigators = []
     viewers = []
-    group_name = f"{study_name}_group"
-
-    try:
-        study_group = Group.objects.get(name=group_name)
-    except Group.DoesNotExist:
+    study = StudyModel.objects.filter(title=study_name).first()
+    if not study:
         return administrators, investigators, viewers
 
-    for member in study_group.user_set.all().order_by("username"):
-        if user is not None and member.pk == user.pk:
+    for membership in study.memberships.select_related("user").order_by("user__username"):
+        if user is not None and membership.user_id == user.pk:
             continue
-        member_group_names = set(member.groups.values_list("name", flat=True))
-        if constants.group_name_administrator in member_group_names:
-            administrators.append(member.username)
-            continue
-        if constants.group_name_investigator in member_group_names:
-            investigators.append(member.username)
-        elif constants.group_name_viewer in member_group_names:
-            viewers.append(member.username)
+        if membership.role == StudyMembership.Role.MAINTAINER:
+            administrators.append(membership.user.username)
+        elif membership.role == StudyMembership.Role.INVESTIGATOR:
+            investigators.append(membership.user.username)
         else:
-            viewers.append(member.username)
+            viewers.append(membership.user.username)
 
     return administrators, investigators, viewers
 
 
 def _get_study_member_roster(study_name):
     """Return structured study members for the details-page roster."""
-    def role_from_groups(member):
-        group_names = set(member.groups.values_list("name", flat=True))
-        if constants.group_name_administrator in group_names:
-            return "Admin"
-        if constants.group_name_investigator in group_names:
-            return "Investigator"
-        if constants.group_name_viewer in group_names:
-            return "Viewer"
-        return ""
-
     study = StudyModel.objects.select_related("owner").filter(title=study_name).first()
-    owner = study.owner if study else None
     members_by_id = {}
 
-    try:
-        group = Group.objects.get(name=f"{study_name}_group")
-        group_members = group.user_set.prefetch_related("groups").order_by(
-            "last_name", "first_name", "username"
-        )
-    except Group.DoesNotExist:
-        group_members = []
+    if not study:
+        return []
 
-    for member in group_members:
+    for membership in study.memberships.select_related("user").order_by(
+        "user__last_name", "user__first_name", "user__username"
+    ):
+        member = membership.user
         members_by_id[member.pk] = {
             "username": member.username,
             "display_name": member.get_full_name() or member.username,
             "email": member.email,
-            "role": role_from_groups(member),
-            "is_owner": bool(owner and member.pk == owner.pk),
-        }
-
-    if owner and owner.pk not in members_by_id:
-        members_by_id[owner.pk] = {
-            "username": owner.username,
-            "display_name": owner.get_full_name() or owner.username,
-            "email": owner.email,
-            "role": role_from_groups(owner),
-            "is_owner": True,
+            "role": membership.get_role_display(),
+            "role_key": membership.role,
+            "is_owner": member.pk == study.owner_id,
         }
 
     return sorted(
@@ -229,7 +199,7 @@ class Study:
         """Retrieve or create the Survey object and JSON."""
         self.meta.setdefault(constants.field_name_survey, {})
         if self._survey is None:
-            raw = self.meta[constants.field_name_survey]
+            raw = self.meta.get(constants.field_name_survey)
             if not raw:
                 return None
             if isinstance(raw, int):
@@ -270,7 +240,9 @@ class Study:
             # survey property setter already updated self.meta
             pass  
         self.persist_meta()
-        create_new_study_in_db(self.user, self.meta, self._survey, images_url)
+        study = create_new_study_in_db(self.user, self.meta, self._survey, images_url)
+        if self._survey is not None:
+            mark_study_survey_published(study.id, self._survey.id)
         self._start_subjects_pdf()
         self._create_test_cases()
         logger.info("Study.create finished for study_name=%s", self.study_name)
@@ -280,24 +252,17 @@ class Study:
     def _make_directories(self):
         """
         Create the required filesystem directories for the study.
+
+        Returns:
+            None
         """
-
-        os.makedirs(self.path, exist_ok=True)
-        change_permissions(self.path)
-
-        os.makedirs(
-            os.path.join(self.bids_path, config.analytics_outputs_folder),
-            exist_ok=True
-        )
-        change_permissions(self.bids_path)
+        os.makedirs(self.path, exist_ok=True); change_permissions(self.path)
+        os.makedirs(os.path.join(self.bids_path, config.analytics_outputs_folder), exist_ok=True)
         change_ownership(self.bids_path);
-        os.makedirs(self.dash_root, exist_ok=True)
-        change_permissions(self.dash_root)
-
+        change_permissions(self.bids_path)
         for sub in (config.qr_folder, config.sheets_folder):
-            sub_path = os.path.join(self.dash_root, sub)
-            os.makedirs(sub_path, exist_ok=True)
-            change_permissions(sub_path)
+            os.makedirs(os.path.join(self.dash_root, sub), exist_ok=True)
+        change_permissions(self.dash_root)
 
     def _store_images(self) -> str:
         """
@@ -429,23 +394,6 @@ class Study:
                 )
         return ordered
 
-    @staticmethod
-    def _ensure_legacy_survey_ids(meta_data: dict):
-        """
-        Inject the legacy survey id marker for file-backed EMA studies.
-
-        Args:
-            meta_data (dict): Study metadata dictionary to normalize.
-
-        Returns:
-            None
-        """
-        survey_data = meta_data.get("survey")
-        if isinstance(survey_data, dict) and "id" not in survey_data:
-            if "survey_ios" in meta_data:
-                meta_data["survey_ios"]["id"] = "999"
-            meta_data["survey"]["id"] = "999"
-
     def _group_by_subject(self, data):
         """
         Group parsed dashboard rows by logical subject id.
@@ -533,7 +481,7 @@ class Study:
                 study_json[constants.field_name_labeling] = 3
 
         if 'survey' in values_obj:
-            logger.info("update_study_details:: survey %s", values_obj['survey'])
+            logger.debug("update_study_details survey_payload=%s", values_obj['survey'])
             if type(values_obj['survey']) == int:
                 study_json['survey'] = Survey.generate_json_for_download(values_obj['survey'])
             else:
@@ -574,6 +522,9 @@ class Study:
         logger.info("Study.update called for study_name=%s", self.study_name)
         study_json = self.update_details(values_obj)
         update_study_db_details(values_obj)
+        if isinstance(values_obj.get("survey"), int):
+            study_id = json.loads(retrieve_study_details_by_title(self.study_name))[constants.key_name_id]
+            mark_study_survey_published(study_id, values_obj["survey"])
         self._refresh_test_cases()
         self._trigger_update_json_script()
         logger.info("Study.update finished for study_name=%s", self.study_name)
@@ -766,7 +717,15 @@ class Study:
         try:
             study_df = read_study_df(self.study_name)
             enrolled_subject_list = get_user_list(study_df)
-            logger.info(enrolled_subject_list)
+            logger.info(
+                "Study.zip_unused_sheets loaded enrolled subjects study_name=%s count=%s",
+                self.study_name,
+                len(enrolled_subject_list),
+            )
+            logger.debug(
+                "Study.zip_unused_sheets enrolled_subjects=%s",
+                enrolled_subject_list,
+            )
         except (FileNotFoundError, KeyError, studyexceptions.EmptyStudyTableException):
             enrolled_subject_list = []
 
@@ -879,23 +838,20 @@ def get_all_study_details(user):
                 else:
                     res = list(raw_sensor_list)
                 study[constants.key_name_sensor_list] = res
-                if constants.key_name_survey in json_data:
+                if json_data.get(constants.key_name_survey):
                     res.append(constants.ema)
-                if constants.field_name_labeling in json_data:
-                    if json_data[constants.field_name_labeling] is not None and json_data[constants.field_name_labeling] > 0 :
-                        res.append(constants.field_name_labeling)
                 study[constants.key_name_sensor_list] = res  
                 # study[constants.key_name_sensor_list] = study[constants.key_name_sensor_list].append(constants.ema)
                 sensors = res
             else:
-                sensors = ['ema']
+                sensors = [constants.ema] if json_data.get(constants.key_name_survey) else []
+                study[constants.key_name_sensor_list] = sensors
             study['wearables'] = json_data.get('wearables', [])
             study[constants.key_name_current_sensor_list] = get_latest_received_study_sensor_details(study[constants.key_name_study_title])
             # to add old surveys with no ids in session and use for survey files listing                          
             survey_data = json_data.get(constants.key_name_survey)
-            if isinstance(survey_data, dict):
-                if "id" not in survey_data:
-                    study["old_ema"]= True
+            if isinstance(survey_data, dict) and survey_data and "id" not in survey_data:
+                study["old_ema"] = True
       
             total_study_dict.append(study)
     except FileNotFoundError as fnfe:

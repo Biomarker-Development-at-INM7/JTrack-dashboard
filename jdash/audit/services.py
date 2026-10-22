@@ -4,6 +4,7 @@ from typing import Optional
 
 from auditlog.models import LogEntry
 
+from jdash.config import constants
 from jdash.models import (
     Answer,
     Category,
@@ -67,6 +68,61 @@ class StudyAuditService:
     This keeps write-path code clean while still allowing a single HTML history
     view for a study and its directly owned child records.
     """
+
+    DROPOUT_REASON_LABELS = {
+        "withdrawn": "Participant withdrew",
+        "lost_follow_up": "Lost to follow-up",
+        "technical_issue": "Technical issue",
+        "other": "Other",
+    }
+
+    @staticmethod
+    def log_subject_removal(study_name, actor, subject_ids, reason="", delete_data=False):
+        study = Study.objects.filter(title=study_name).first()
+        if study is None:
+            return None
+
+        action_label = (
+            "Removed and deleted subject data"
+            if delete_data
+            else "Removed and kept existing data"
+        )
+        changes = {
+            "subject_id": ["-", StudyAuditService._format_subject_ids(subject_ids)],
+            "subject_action": ["-", action_label],
+            "removal_reason": ["-", StudyAuditService._format_dropout_reason(reason)],
+        }
+
+        return LogEntry.objects.log_create(
+            study,
+            force_log=True,
+            action=LogEntry.Action.UPDATE,
+            actor=actor if getattr(actor, "is_authenticated", False) else None,
+            changes=changes,
+        )
+
+    @staticmethod
+    def _format_subject_ids(subject_ids):
+        if isinstance(subject_ids, (list, tuple, set)):
+            ids = subject_ids
+        else:
+            ids = str(subject_ids or "").split(constants.value_sep)
+
+        return constants.value_sep.join(
+            str(subject_id).strip()
+            for subject_id in ids
+            if str(subject_id).strip()
+        )
+
+    @staticmethod
+    def _format_dropout_reason(reason):
+        reason = str(reason or "").strip()
+        if not reason:
+            return "-"
+        return StudyAuditService.DROPOUT_REASON_LABELS.get(
+            reason,
+            reason.replace("_", " ").capitalize(),
+        )
 
     @staticmethod
     def get_related_querysets(study: Study):

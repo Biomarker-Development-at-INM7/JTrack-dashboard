@@ -3,42 +3,70 @@ import re
 import json
 from pathlib import Path
 from django import template
-from django.contrib.auth.models import Group
+from django.conf import settings
 from django.contrib.staticfiles import finders
 from django.utils.html import format_html, format_html_join
 from django.templatetags.static import static
 from jdash.services.subject import Subject
 from jdash.services import permissions
 from jdash.config import constants
-from jdash.models import SensorCatalog
+from jdash.models import SensorCatalog, Study
 from jdash.utils.fileutils import build_wearable_dashboard_sensor_name
+from django.contrib.staticfiles import finders
 register = template.Library()
 
+HASHED_FILE_RE = re.compile(
+    r"\.[0-9a-f]{12}\.(png|jpg|jpeg|svg|webp)$",
+    re.IGNORECASE,
+)
+
+
+@register.simple_tag
+def support_email():
+    return getattr(settings, "SUPPORT_EMAIL", "")
+
+
+@register.filter(name="device_brand_icon")
+def device_brand_icon(device_brand):
+    """Render the mobile-platform icon represented by a device brand."""
+    brand = str(device_brand or "").strip()
+    normalized = brand.lower()
+    if normalized in {"", "none", "null", "nan"}:
+        return format_html('<span class="text-muted" aria-label="Unknown platform">—</span>')
+    if any(marker in normalized for marker in ("ios", "apple", "iphone", "ipad")):
+        return format_html(
+            '<span class="device-brand-icon device-brand-icon--ios" title="{}" '
+            'aria-label="iOS"><i class="fab fa-apple" aria-hidden="true"></i></span>',
+            brand or "iOS",
+        )
+    return format_html(
+        '<span class="device-brand-icon device-brand-icon--android" title="{}" '
+        'aria-label="Android"><i class="fab fa-android" aria-hidden="true"></i></span>',
+        brand,
+    )
 def _iter_partner_logo_paths():
-    """
-    Yield relative static paths for partner logos from known static roots.
+    prefix = "icons/partners/"
+    allowed_extensions = {".png", ".jpg", ".jpeg", ".svg", ".webp"}
 
-    Returns:
-        list[str]: Sorted unique static-relative paths under icons/partners.
-    """
-    repo_root = Path(__file__).resolve().parents[2]
-    candidate_dirs = [
-        repo_root / "jdash" / "static" / "icons" / "partners",
-        repo_root / "static" / "icons" / "partners",
-    ]
-    allowed_suffixes = {".png", ".jpg", ".jpeg", ".svg", ".webp"}
-    results = []
+    logos = set()
 
-    for candidate_dir in candidate_dirs:
-        if not candidate_dir.exists():
-            continue
-        for file_path in sorted(candidate_dir.iterdir()):
-            if file_path.is_file() and file_path.suffix.lower() in allowed_suffixes:
-                static_relative = file_path.relative_to(candidate_dir.parent.parent).as_posix()
-                results.append(static_relative)
+    for finder in finders.get_finders():
+        for path, storage in finder.list(ignore_patterns=[]):
+            path = path.replace("\\", "/")
 
-    # preserve order while removing duplicates
-    return list(dict.fromkeys(results))
+            if not path.startswith(prefix):
+                continue
+
+            if Path(path).suffix.lower() not in allowed_extensions:
+                continue
+
+            # Never return already-generated manifest files
+            if HASHED_FILE_RE.search(path):
+                continue
+
+            logos.add(path)
+
+    return sorted(logos)
 
 
 @register.simple_tag
@@ -98,7 +126,16 @@ def _format_sensor_display_name(value):
     value = str(value or "").strip()
     if not value:
         return ""
+    if value == constants.homeBeacon:
+        return "homeStation"
     return value.lower()
+
+
+@register.filter(name="sensor_display_name")
+def sensor_display_name(value):
+    """Use the research-facing sensor label without changing stored keys."""
+    value = str(value or "").strip()
+    return "homeStation" if value == constants.homeBeacon else value
 
 
 def _sensor_key_matches_any(candidate_keys, active_sensor_keys):
@@ -624,6 +661,25 @@ def has_ema_sensor(study):
     return constants.ema in sensor_list or bool(study.get("survey"))
 
 
+@register.filter(name="has_passive_sensors")
+def has_passive_sensors(study):
+    """Return True when a study has configured passive sensor collection."""
+    if not isinstance(study, dict):
+        return False
+    sensor_list = study.get("sensor_list") or []
+    if isinstance(sensor_list, str):
+        sensor_list = [sensor_list]
+    excluded_sensor_markers = {
+        constants.ema,
+        constants.field_name_labeling,
+    }
+    for sensor in sensor_list:
+        normalized_sensor = str(sensor).strip().lower()
+        if normalized_sensor and normalized_sensor not in excluded_sensor_markers:
+            return True
+    return False
+
+
 @register.filter(name="has_wearable_sensors")
 def has_wearable_sensors(study):
     """
@@ -901,28 +957,14 @@ def get_category_title(category_value, categories):
     return category_value
 
 
-@register.filter(name='has_group')
-def has_group(user, group_name):
-    """
-    Check if a user belongs to a specific group.
-
-    Args:
-        user (User): Django user instance.
-        group_name (str): Name of the group to check.
-
-    Returns:
-        bool: True if user belongs to the group, False otherwise.
-    """
-    try:
-        group = Group.objects.get(name=group_name)
-    except Group.DoesNotExist:
-        return False
-    return group in user.groups.all()
-
-
 @register.filter(name="can_manage_study")
 def can_manage_study(user):
     return permissions.can_manage_study(user)
+
+
+@register.filter(name="can_create_study")
+def can_create_study(user):
+    return permissions.can_create_study(user)
 
 
 @register.filter(name="is_administrator")
@@ -930,25 +972,51 @@ def is_administrator(user):
     return permissions.is_administrator(user)
 
 
-@register.filter(name="is_investigator")
-def is_investigator(user):
-    return permissions.is_investigator(user)
-
-
-@register.filter(name="is_viewer")
-def is_viewer(user):
-    return permissions.is_viewer(user)
-
-
+@register.filter(name="is_default_viewer")
+def is_default_viewer(user):
+    """Support deployments that still use the legacy default Viewer group."""
+    viewer_group_name = getattr(constants, "group_name_viewer", "Viewer")
+    return (
+        permissions.has_any_group(user, {viewer_group_name})
+        and permissions.highest_study_role(user) is None
+    )
 @register.filter(name="role_group_label")
 def role_group_label(user):
     if permissions.is_administrator(user):
         return "Administrator"
-    if permissions.is_investigator(user):
-        return "Investigator"
-    if permissions.is_viewer(user):
-        return "Viewer"
+    study_role = permissions.highest_study_role(user)
+    if study_role:
+        return study_role.title()
     return ""
+
+
+@register.simple_tag
+def current_study_role(user, request):
+    """Return the membership role for the study addressed by the current page."""
+    if not user or not getattr(user, "is_authenticated", False):
+        return ""
+
+    match = getattr(request, "resolver_match", None)
+    kwargs = getattr(match, "kwargs", {}) or {}
+    study_name = kwargs.get("study_name")
+    study_id = request.GET.get("study") if request else None
+
+    study = None
+    if study_name and study_name != "all":
+        study = Study.objects.filter(title=study_name).only("id", "owner_id").first()
+    elif study_id:
+        try:
+            study = Study.objects.filter(pk=int(study_id)).only("id", "owner_id").first()
+        except (TypeError, ValueError):
+            study = None
+
+    if study is None:
+        return ""
+    if permissions.is_administrator(user):
+        return "administrator"
+    if permissions.is_study_principal_investigator(user, study):
+        return "maintainer"
+    return permissions.study_membership_role(user, study) or ""
 
 
 @register.filter(name="can_qc_study")

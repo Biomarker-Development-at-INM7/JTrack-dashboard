@@ -4,11 +4,13 @@ import logging
 import os
 import shlex
 import subprocess
+import tempfile
 import threading
 import zipfile
 from datetime import datetime, timedelta
 from django.utils import timezone
 from django.conf import settings
+from django.db.models import Q
 from django.http.response import FileResponse, Http404, HttpResponse
 from django.urls import reverse
 from django.utils.encoding import escape_uri_path
@@ -17,6 +19,7 @@ from django.utils.translation import gettext
 from jdash.config import constants as constants
 from jdash.config import runtime_config as config
 from jdash.config.textmessages import TextMessages as textmessages
+from jdash.audit.services import StudyAuditService
 from jdash.exceptions.controllerexceptions import controller_error_message
 from jdash.models import FileDownloadToken
 from jdash.repositories.study_repository import (
@@ -33,10 +36,14 @@ from jdash.services.notification import (
 from jdash.services.study import Study, get_all_study_details
 from jdash.services.subject import Subject
 from jdash.utils.fileutils import (
+    build_wearable_dashboard_csv_candidates,
     change_permissions,
     delete_download_dataset_zip,
+    get_json_data,
     handle_uploaded_file,
+    merge_wearable_dashboard_data,
     open_study_json,
+    read_study_df,
     save_study_json,
     set_download_file_permissions,
 )
@@ -147,7 +154,7 @@ def download_dataset(study_dataset_name):
             )
 
     response.close = close_with_zip_cleanup
-    logger.info(response)
+    logger.debug("download_dataset response=%s", response)
     return response
 
 
@@ -163,6 +170,56 @@ def download_study_dashboard_csv(study_name):
         content_type="text/csv; charset=utf-8",
         as_attachment=True,
         filename=filename,
+    )
+
+
+def download_study_wearables_csv(study_name):
+    """Stream the wearable CSV merged into the study details table."""
+    filepath = next(
+        (
+            candidate
+            for candidate in build_wearable_dashboard_csv_candidates(study_name)
+            if os.path.isfile(candidate)
+        ),
+        None,
+    )
+    if filepath is None:
+        raise Http404("Wearable dashboard CSV is not available for this study.")
+
+    filename = f"jtrack_wearables_{study_name}.csv"
+    return FileResponse(
+        open(filepath, "rb"),
+        content_type="text/csv; charset=utf-8",
+        as_attachment=True,
+        filename=filename,
+    )
+
+
+def download_combined_study_dashboard_csv(study_name):
+    """Merge the main and wearable dashboard data into one CSV download."""
+    dashboard_df = read_study_df(study_name)
+    if dashboard_df.empty:
+        raise Http404("Dashboard CSV is not available for this study.")
+
+    try:
+        study_meta = get_json_data(study_name)
+    except (FileNotFoundError, OSError, ValueError, json.JSONDecodeError):
+        study_meta = {}
+
+    combined_df = merge_wearable_dashboard_data(
+        dashboard_df,
+        study_name,
+        study_meta.get("wearables", []),
+    )
+    csv_file = tempfile.SpooledTemporaryFile(max_size=8 * 1024 * 1024)
+    csv_file.write(combined_df.to_csv(index=False).encode(constants.encoding))
+    csv_file.seek(0)
+
+    return FileResponse(
+        csv_file,
+        content_type="text/csv; charset=utf-8",
+        as_attachment=True,
+        filename=f"jutrack_dashboard_{study_name}.csv",
     )
 
 
@@ -212,8 +269,12 @@ def initiate_download_study_dataset(study_name, data_type, user_details):
         thread = threading.Thread(target=check_file_and_send_email, args=(user_details, filename))
         thread.start()
         return True
-    except Exception as exc:
-        logger.info("An error occurred: %s", exc)
+    except Exception:
+        logger.exception(
+            "initiate_download_study_dataset failed for study=%s data_type=%s",
+            study_name,
+            data_type,
+        )
         return False
 
 
@@ -387,7 +448,12 @@ def create_new_study(form, task_formset, request, study_device_formset, sensor_f
         sensor_formsets,
     )
     form_data["version"] = 1
-    logger.info("successful retrieval of form data %s", form_data)
+    logger.info(
+        "User action=create_study user=%s study=%s",
+        request.user.get_username(),
+        form_data.get(constants.field_name_name),
+    )
+    logger.debug("create_new_study form_data=%s", form_data)
     if form_data[constants.field_name_images] is True:
         handle_uploaded_file(
             request.FILES[constants.field_name_images_zip_file],
@@ -406,7 +472,12 @@ def create_new_study(form, task_formset, request, study_device_formset, sensor_f
         )
         response, error = False, controller_error_message(exc)
 
-    logger.info("response after creating entries in db %s", response)
+    logger.info(
+        "User action=create_study_complete user=%s study=%s success=%s",
+        request.user.get_username(),
+        form_data.get(constants.field_name_name),
+        response,
+    )
     if response:
         context = context_for_home_page(request.user)
         context[constants.key_name_success_message] = (
@@ -429,7 +500,12 @@ def update_study_meta_data(study_name, form, formset, request, study_device_form
             study_device_formset,
             sensor_formsets,
         )
-        logger.info("update_study_meta_data %s", values_to_be_updated)
+        logger.info(
+            "User action=update_study user=%s study=%s",
+            request.user.get_username(),
+            study_name,
+        )
+        logger.debug("update_study_meta_data payload=%s", values_to_be_updated)
         Study(study_name, None).update(values_to_be_updated)
         context[constants.key_name_study_meta], context[constants.key_name_stats], error = (
             get_all_study_details(request.user)
@@ -568,7 +644,7 @@ def create_subjects_for_study(study_name, count):
 
         context[constants.key_name_meta_data] = study_json
         context[constants.key_name_success_message] = (
-            str(count) + gettext(textmessages.success_new_user)
+            f"{count} {gettext(textmessages.success_new_user)}"
         )
 
     except Exception as exc:
@@ -577,6 +653,11 @@ def create_subjects_for_study(study_name, count):
 
     logger.info("create_subjects:end")
     return context
+
+
+def generate_additional_subject_qr_codes(study_name, subject_id):
+    """Generate activations 5–8 and append them as page two of an existing subject PDF."""
+    Subject.add_qr_activations(study_name, subject_id, 5, 8)
 
 def send_push_notification(study_name, message_title, message_text, receivers):
     """
@@ -607,7 +688,8 @@ def create_display_sop_list_of_study(study_name):
     context = {}
     try:
         study = json.loads(retrieve_study_details_by_title(study_name))
-        logger.info("create_display_sop_list_of_study %s", study)
+        logger.info("Loaded QC data study=%s", study_name)
+        logger.debug("create_display_sop_list_of_study payload=%s", study)
         context[constants.key_name_test_list] = json.loads(
             retrieve_test_cases_for_study(study[constants.key_name_id])
         )
@@ -675,4 +757,39 @@ def delete_subjects_from_server(study_name, subject_ids, actor=None, dropout_rea
             dropout_reason,
             delete_data=True,
         )
+        invalidate_study_downloads(study_name)
     logger.info("delete_subjects_from_server subject  :end")
+
+
+def invalidate_study_downloads(study_name):
+    """Prevent existing dataset links from serving a stale study snapshot."""
+    tokens = list(
+        FileDownloadToken.objects.filter(
+            Q(file_name__startswith=f"{study_name}_raw_")
+            | Q(file_name__startswith=f"{study_name}_processed_")
+        ).exclude(status__in=("downloaded", "invalidated"))
+    )
+    if not tokens:
+        return 0
+
+    FileDownloadToken.objects.filter(pk__in=[token.pk for token in tokens]).update(
+        status="invalidated"
+    )
+    download_root = os.path.join(config.storage_folder, config.download_folder)
+    for token in tokens:
+        local_zip_path = os.path.join(
+            download_root,
+            token.file_name + constants.zip_extension,
+        )
+        delete_download_dataset_zip(
+            local_zip_path,
+            token.file_name,
+            delete_remote=False,
+        )
+
+    logger.info(
+        "Invalidated %s dataset download(s) after subject deletion for study %s",
+        len(tokens),
+        study_name,
+    )
+    return len(tokens)

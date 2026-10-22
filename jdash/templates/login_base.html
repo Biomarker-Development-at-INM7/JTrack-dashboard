@@ -18,39 +18,19 @@
     <link rel="stylesheet" href="{% static 'css/style.css' %}" />
 </head>
 
-<body class="d-flex flex-column min-vh-100">
+<body class="branding-page d-flex flex-column min-vh-100">
     {% include "brand_nav.html" with request=request %}
+    {% include "includes/message_popups.html" %}
 
-    <div class="flex-grow-1">
+    <div class="branding-main flex-grow-1">
         {% block content %}
         {% endblock %}
+        {% block partners %}
+        {% endblock %}
     </div>
-    <script>
-        function buildLanguageSwitchPath(targetLang) {
-            const url = new URL(window.location.href);
-            let path = url.pathname;
-
-            if (/^\/dev\/(en|de)(\/|$)/.test(path)) {
-                return path.replace(/^\/dev\/(en|de)(?=\/|$)/, `/dev/${targetLang}`) + url.search + url.hash;
-            } else if (/^\/(en|de)(\/|$)/.test(path)) {
-                path = path.replace(/^\/(en|de)(?=\/|$)/, "");
-            } else if (/^\/(en|de)\/dev(\/|$)/.test(path)) {
-                path = path.replace(/^\/(en|de)\/dev(?=\/|$)/, "/dev");
-            }
-
-            if (!path.startsWith("/")) {
-                path = `/${path}`;
-            }
-            if (path === "") {
-                path = "/";
-            }
-
-            return `/${targetLang}${path}${url.search}${url.hash}`;
-        }
-
-        document.querySelectorAll(".language-link").forEach((link) => {
-            link.href = buildLanguageSwitchPath(link.dataset.language);
-        });
-    </script>
+    {% block page_scripts %}
+    {% endblock %}
+    <script src="{% static 'js/language_switcher.js' %}"></script>
+    <script src="{% static 'js/required-field-markers.js' %}"></script>
 </body>
 </html>

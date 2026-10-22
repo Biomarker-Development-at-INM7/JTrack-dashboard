@@ -1,8 +1,12 @@
 from django import forms
+from django.contrib.auth import get_user_model
+from django.contrib.auth.forms import UserCreationForm
+from django.utils.translation import gettext_lazy as _
 from django.utils.safestring import mark_safe
 from django.forms import (formset_factory,inlineformset_factory,
                           modelformset_factory,BaseModelFormSet)
-from django.core.validators import RegexValidator
+from django.core.validators import RegexValidator, URLValidator
+from django.core.exceptions import ValidationError
 from django.forms import widgets
 from django.forms.widgets import Widget
 from jdash.models import (Answer, Question, Study, 
@@ -12,6 +16,44 @@ from jdash.models import (Answer, Question, Study,
                           SamplingRateCatalog, UnitCatalog)
 from jdash.config import constants as constants
 import json
+
+
+class RegistrationForm(UserCreationForm):
+    """Public account registration without assigning an existing study."""
+
+    first_name = forms.CharField(label=_("First name"), max_length=150)
+    last_name = forms.CharField(label=_("Last name"), max_length=150)
+    email = forms.EmailField(label=_("Email"))
+
+    class Meta(UserCreationForm.Meta):
+        model = get_user_model()
+        fields = ("first_name", "last_name", "email", "username", "password1", "password2")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        placeholders = {
+            "first_name": _("Enter your first name"),
+            "last_name": _("Enter your last name"),
+            "email": _("Enter your email address"),
+            "username": _("Choose a username"),
+            "password1": _("Choose a password"),
+            "password2": _("Confirm your password"),
+        }
+        for name, field in self.fields.items():
+            field.required = True
+            field.widget.attrs.update({
+                "class": "form-control",
+                "placeholder": placeholders.get(name, ""),
+                "autocomplete": (
+                    "new-password" if name in {"password1", "password2"} else name
+                ),
+            })
+
+    def clean_email(self):
+        email = self.cleaned_data["email"].strip().lower()
+        if get_user_model().objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError(_("An account with this email address already exists."))
+        return email
 
 
 def _coerce_checkbox_initial(value, default=False):
@@ -287,7 +329,7 @@ class CreateStudyForm(StrictValidationMixin, forms.Form):
         choices=constants.RECORDING_FREQUENCIES
     ), required=False)
 
-    sensor_list = forms.MultipleChoiceField(choices=constants.SENSORS_LIST,widget=forms.SelectMultiple(
+    sensor_list = forms.MultipleChoiceField(choices=constants.PASSIVE_SENSORS_LIST,widget=forms.SelectMultiple(
         attrs={
             'class' : 'form-control',
             'style': 'height: 200px;' 
@@ -328,13 +370,18 @@ class CreateStudyForm(StrictValidationMixin, forms.Form):
         json_data = kwargs.pop('json_data', None)  # avoid popping 'data'
         super().__init__(*args, **kwargs)
 
-        self.fields['survey'].choices = [('', 'Select survey')] + [(data['id'], data['title']) for data in survey]
+        survey_choices = [('', 'Select survey')] + [
+            (data['id'], f"{data['title']} (ID: {data['id']})")
+            for data in survey
+        ]
+        self.fields['survey'].choices = survey_choices
 
         if json_data != None:
             self.fields['study_label'].initial = json_data["name"]  # ← change 'name' to 'study_label'
             self.fields['study_duration'].initial = json_data["duration"]
             self.fields['number_of_subjects'].initial = json_data["number_of_subjects"]
             self.fields['study_description'].initial = json_data["description"]
+
 
             survey_data = json_data.get("survey")
             ema_enabled = json_data.get("ema_checkbox")
@@ -346,20 +393,23 @@ class CreateStudyForm(StrictValidationMixin, forms.Form):
                 if "id" in survey_data:
                     self.fields['survey'].initial = initial_survey_id
                 else:
-                    self.fields['survey'].choices = [('', 'Select survey')] + [(data['id'], data['title']) for data in survey]
+                    self.fields['survey'].choices = survey_choices
             else:
-                self.fields['survey'].choices = [('', 'Select survey')] + [(data['id'], data['title']) for data in survey]
+                self.fields['survey'].choices = survey_choices
 
             if "is_test" in json_data:   
                 self.fields['is_test'].initial = json_data["is_test"]
-            if 'sensor_size' in json_data and json_data['sensor_size'] > 0:
-                self.fields['passive_checkbox'].initial = True
-                self.fields['recording_freq'].initial = json_data["frequency"]
-                self.fields['sensor_list'].initial = json_data["sensor_list"] 
+            passive_sensors = json_data.get('sensor_list') or []
+            self.fields['passive_checkbox'].initial = bool(passive_sensors)
+            self.fields['sensor_list'].initial = passive_sensors
+            if 'frequency' in json_data:
+                self.fields['recording_freq'].initial = json_data['frequency']
+
+            self.fields['sensor_list_limited'].initial = (
+                json_data.get('sensor_list_limited') or []
+            )
             if 'active_labeling' in json_data:
                 self.fields['active_labeling'].initial = json_data['active_labeling']
-                if json_data['active_labeling'] == 3 and 'sensor_list_limited' in json_data:
-                    self.fields['sensor_list_limited'].initial = json_data['sensor_list_limited']
             
                                 
 
@@ -846,6 +896,7 @@ class QuestionForm(forms.ModelForm):
         self.fields['deactivate_question'].required = False
         self.fields['activation_condition'].required = False
         self.fields['deactivation_condition'].required = False
+
         self.fields['activate_question'].widget.attrs.update({
             'id': 'activate_question',
             'rows': 1,
@@ -864,6 +915,7 @@ class QuestionForm(forms.ModelForm):
             'id': 'clockTime_end',
             'rows': 1,
         })
+
         if categories:
             category_choices = [
                 (self.UNCATEGORIZED_VALUE, self.UNCATEGORIZED_LABEL),
@@ -939,20 +991,20 @@ class ContactUsForm(forms.Form):
     fullname = forms.CharField(widget=forms.TextInput(  
         attrs={
             'class': 'form-control',
-            'placeholder': 'Full Name'
+            'placeholder': _('contact_form_name_placeholder')
         }
     ), label = False)
     email = forms.EmailField(widget=forms.EmailInput(
         attrs = {
             'class': 'form-control',
-            'placeholder': 'Email'
+            'placeholder': _('contact_form_email_placeholder')
         }
     ))
     message = forms.CharField(widget=forms.Textarea(  
         attrs={
-            'rows' : 10,
+            'rows' : 5,
             'class': 'form-control',
-            'placeholder': 'Message'
+            'placeholder': _('contact_form_message_placeholder')
         }
     ), label = False)
 
@@ -966,4 +1018,3 @@ class DateForm(forms.Form):
 
     class Meta:
         fields = '__all__'
-
