@@ -1316,11 +1316,11 @@ function validateNecessaryFields() {
     qTypeEl.reportValidity();
     return false;
   } else if (frequencyEl && String(frequencyEl.value).trim() === '') {
-    frequencyEl.setCustomValidity('Please enter a repetition interval or default values check the default switch');
+    frequencyEl.setCustomValidity('Please enter a repetition interval');
     frequencyEl.reportValidity();
     return false;
   } else if (nextDayToAnswerEl && String(nextDayToAnswerEl.value).trim() === '') {
-    nextDayToAnswerEl.setCustomValidity('Please enter the first day to answer or default values check the default switch');
+    nextDayToAnswerEl.setCustomValidity('Please enter the first day to answer ');
     nextDayToAnswerEl.reportValidity();
     return false;
   }else{

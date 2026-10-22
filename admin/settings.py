@@ -214,6 +214,7 @@ FIREBASE_URL = os.getenv('FIREBASE_URL', 'https://fcm.googleapis.com/send')
 FIREBASE_URL_EMA = os.getenv("FIREBASE_URL_EMA", "https://fcm.googleapis.com/v1/projects/jtrackema/messages:send")
 FIREBASE_URL_MAIN = os.getenv("FIREBASE_URL_MAIN", "https://fcm.googleapis.com/v1/projects/jtrack-social/messages:send")
 FIREBASE_URL_MAIN_IOS = os.getenv("FIREBASE_URL_MAIN_IOS", "https://fcm.googleapis.com/v1/projects/jtrack-social-21946/messages:send")
+
 SMTP_SERVER = os.getenv("SMTP_SERVER", EMAIL_HOST)
 SMTP_PORT = int(os.getenv("SMTP_PORT", str(EMAIL_PORT)))
 SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", EMAIL_HOST_USER)
@@ -236,11 +237,7 @@ SERVICE_ACCOUNT_FILE_MAIN = os.getenv(
     'SERVICE_ACCOUNT_FILE_MAIN',
     str(SECRETS_DIR / 'jtracksocial-firebase-adminsdk.json')
 ) or str(SECRETS_DIR / 'jtracksocial-firebase-adminsdk.json')
-SERVICE_ACCOUNT_FILE_MAIN_IOS = os.getenv(
-    'SERVICE_ACCOUNT_FILE_MAIN_IOS',
-    str(SECRETS_DIR / 'jtrack-social-21946-firebase-adminsdk.json')
-) or str(SECRETS_DIR / 'jtrack-social-21946-firebase-adminsdk.json')
-   
+
 # Internationalization
 # https://docs.djangoproject.com/en/3.2/topics/i18n/
 

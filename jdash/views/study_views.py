@@ -176,6 +176,17 @@ def study_details(request, study_name):
         if not permissions.can_manage_study(request.user, study_record):
             return _forbidden(request)
 
+    study_management_posts = {
+        constants.button_name_send_notification,
+        constants.button_name_create_subjects,
+        constants.button_name_remove_subjects,
+        constants.button_name_change_subject_status,
+        constants.button_name_delete_subject_data,
+    }
+    if request.method == constants.post_method and any(name in request.POST for name in study_management_posts):
+        if not permissions.can_manage_study(request.user):
+            return _forbidden()
+
     if constants.button_name_send_notification in request.POST:
         form = SendNotificationForm(
             request.POST,
@@ -577,6 +588,9 @@ def edit_study(request, study_name):
     Returns:
         HttpResponse: Rendered study edit page or home page on success.
     """
+    if not permissions.can_manage_study(request.user):
+        return _forbidden()
+
     context = {}
     try:
         study = studymodel.objects.get(title=study_name)

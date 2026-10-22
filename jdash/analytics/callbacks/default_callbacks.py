@@ -144,7 +144,7 @@ def default_callbacks(app):
         try:
             df = pd.read_csv(path, sep=';')
         except Exception as e:
-            return blank_fig(f"File not found: Contact the administrator") 
+            return blank_fig(f"File parse error: {e}") 
 
         DT_COL, VAL_COL = "Date", "Data_per_day"
 
